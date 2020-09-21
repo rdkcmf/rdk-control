@@ -21,7 +21,9 @@
 #include "ctrlm.h"
 #include <limits.h>
 #include <float.h>
+#include "rfcapi.h"
 
+#define CTRLM_RFC_MAX_PARAM_LEN                         MAX_PARAM_LEN //from rfcapi.h is 2048
 #define CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_PREFIX  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.XRPollingConfiguration."
 #define CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_ENABLED CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_PREFIX "Enable"
 #define CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_DEFAULT CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_PREFIX "Default"
@@ -45,6 +47,7 @@
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_TIMING                "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioTiming"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_CONFIDENCE_THRESHOLD  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioConfidenceThreshold"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_LEVEL         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioDuckingLevel"
+#define CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.VSDKConfiguration"
 
 typedef enum {
    CTRLM_TR181_RESULT_FAILURE = 0,

@@ -65,7 +65,7 @@ ctrlm_voice_generic_t::~ctrlm_voice_generic_t() {
     }
 }
 
-void ctrlm_voice_generic_t::voice_sdk_open(const json_t *json_obj_vsdk) {
+void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
     ctrlm_voice_t::voice_sdk_open(json_obj_vsdk);
 
     this->obj_ws         = new ctrlm_voice_endpoint_ws_t(this);

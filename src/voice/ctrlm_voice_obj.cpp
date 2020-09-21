@@ -150,7 +150,7 @@ bool ctrlm_voice_t::privacy_mode(void) {
    return (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
 }
 
-void ctrlm_voice_t::voice_sdk_open(const json_t *json_obj_vsdk) {
+void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    if(this->xrsr_opened) {
       LOG_ERROR("%s: already open\n", __FUNCTION__);
       return;
@@ -195,7 +195,7 @@ void ctrlm_voice_t::voice_sdk_open(const json_t *json_obj_vsdk) {
    this->state_dst   = CTRLM_VOICE_STATE_DST_READY;
 }
 
-bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, const json_t *json_obj_vsdk) {
+bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk) {
     json_config                       conf;
     ctrlm_voice_iarm_call_settings_t *voice_settings     = NULL;
     uint32_t                          voice_settings_len = 0;
@@ -291,7 +291,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, const js
         }
      }
 
-    this->process_xconf();
+    this->process_xconf(&json_obj_vsdk);
 
     this->voice_sdk_open(json_obj_vsdk);
 
@@ -585,11 +585,15 @@ bool ctrlm_voice_t::voice_init_set(const char *init, bool db_write) {
     return(ret);
 }
 
-void ctrlm_voice_t::process_xconf() {
+void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
    LOG_INFO("%s: Voice XCONF Settings\n", __FUNCTION__);
    int result;
    
    char encoder_params_str[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS * 2 + 1];
+   char encoded_rfc_val[CTRLM_RFC_MAX_PARAM_LEN] = {0}; //MAX_PARAM_LEN from rfcapi.h is 2048
+
+   LOG_INFO("%s: Voice XCONF Settings\n", __FUNCTION__);
+
    memset(encoder_params_str, 0, sizeof(encoder_params_str));
    result  = ctrlm_tr181_string_get(CTRLM_RF4CE_TR181_RF4CE_OPUS_ENCODER_PARAMS, encoder_params_str, sizeof(encoder_params_str));
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
@@ -617,6 +621,52 @@ void ctrlm_voice_t::process_xconf() {
    result = ctrlm_tr181_real_get(CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_LEVEL, &audio_settings.ducking_level);
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
        changed = true;
+   }
+
+   result = ctrlm_tr181_string_get(CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION, &encoded_rfc_val[0], CTRLM_RFC_MAX_PARAM_LEN);
+   if(result == CTRLM_TR181_RESULT_SUCCESS) {
+      json_error_t jerror;
+      json_t *jvsdk;
+      char *decoded_buf = NULL;
+      size_t decoded_buf_len = 0;
+
+      decoded_buf = (char *)g_base64_decode((const gchar*)encoded_rfc_val, &decoded_buf_len);
+      if(decoded_buf) {
+         if(decoded_buf_len > 0 && decoded_buf_len < CTRLM_RFC_MAX_PARAM_LEN) {
+            LOG_INFO("%s: VSDK configuration taken from XCONF\n", __FUNCTION__);
+            LOG_INFO("%s\n", decoded_buf);
+
+            jvsdk = json_loads(&decoded_buf[0], 0, &jerror);
+            do {
+               if(NULL == jvsdk) {
+                  LOG_ERROR("%s: XCONF has VSDK params but json_loads() failed, line %d: %s \n",
+                        __FUNCTION__, jerror.line, jerror.text );
+                  break;
+               }
+               if(!json_is_object(jvsdk))
+               {
+                  LOG_ERROR("%s: found VSDK in text but invalid object\n", __FUNCTION__);
+                  break;
+               }
+               //If execution reaches here we have XCONF overrides for the text file
+               *json_obj_vsdk = json_deep_copy(jvsdk);
+               if(NULL == *json_obj_vsdk)
+               {
+                  LOG_ERROR("%s: found VSDK object but failed to copy. We have lost any /opt file VSDK parameters\n", __FUNCTION__);
+                  /* Nothing to do about this unlikely error. If I copy to a temp pointer to protect the input,
+                   * then I have to copy from temp to real, and check that copy for failure. Where would it end?
+                   */
+                  break;
+               }
+               LOG_INFO("%s: received vsdk JSON object copied it to json_obj_vsdk\n", __FUNCTION__);
+            }while(0);
+         } else {
+            LOG_WARN("%s: incorrect length\n", __FUNCTION__);
+         }
+         free(decoded_buf);
+      } else {
+         LOG_WARN("%s: failed to decode base64\n", __FUNCTION__);
+      }
    }
 
    if(changed) {

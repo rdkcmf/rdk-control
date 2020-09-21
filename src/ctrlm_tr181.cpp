@@ -22,7 +22,6 @@
 #include <strings.h>
 #include "ctrlm_tr181.h"
 #include "libIBus.h" 
-#include "rfcapi.h"
 
 #define RFC_CALLER_ID "controlMgr"
 

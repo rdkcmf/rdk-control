@@ -354,7 +354,7 @@ class ctrlm_voice_t {
     std::string                           voice_stb_data_sat_get() const;
     bool                                  voice_stb_data_test_get() const;
 
-    virtual bool                          voice_configure_config_file_json(json_t *obj_voice, const json_t *json_obj_vsdk);
+    virtual bool                          voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk);
     virtual bool                          voice_configure(ctrlm_voice_iarm_call_settings_t *settings, bool db_write);
     virtual bool                          voice_configure(json_t *settings, bool db_write);
     virtual bool                          voice_status(ctrlm_voice_status_t *status);
@@ -363,8 +363,9 @@ class ctrlm_voice_t {
     virtual bool                          server_message(const char *message, unsigned long length);
     void                                  voice_params_qos_get(voice_params_qos_t *params);
     void                                  voice_params_opus_encoder_get(voice_params_opus_encoder_t *params);
-    virtual void                          process_xconf();
+    virtual void                          process_xconf(json_t **json_obj_vsdk);
     virtual void                          query_strings_updated();
+
 
     bool                                  voice_device_streaming(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
     void                                  voice_controller_command_status_read(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
@@ -413,7 +414,7 @@ public:
     // End Event Interface
 
     protected:
-    virtual void          voice_sdk_open(const json_t *json_obj_vsdk);
+    virtual void          voice_sdk_open(json_t *json_obj_vsdk);
     virtual void          voice_sdk_update_routes() = 0;
     virtual bool          voice_session_has_stb_data();
     unsigned long         voice_session_id_next();

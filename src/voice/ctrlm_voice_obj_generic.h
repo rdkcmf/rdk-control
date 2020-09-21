@@ -33,7 +33,7 @@ class ctrlm_voice_generic_t : public ctrlm_voice_t {
     virtual ~ctrlm_voice_generic_t();
     
     protected:
-    void                  voice_sdk_open(const json_t *json_obj_vsdk);
+    void                  voice_sdk_open(json_t *json_obj_vsdk);
     void                  voice_sdk_update_routes();
     void                  query_strings_updated();
 
