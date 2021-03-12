@@ -221,6 +221,15 @@ AC_ARG_ENABLE([breakpad],
 esac],[breakpad=false])
 AM_CONDITIONAL([BREAKPAD_ENABLED], [test x$breakpad = xtrue])
 
+AC_ARG_ENABLE([dunfell-build],
+[  --enable-dunfell-build    Turn on dunfell build support],
+[case "${enableval}" in
+  yes) dunfellbuild=true ;;
+  no)  dunfellbuild=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-dunfell-build]) ;;
+esac],[dunfellbuild=false])
+AM_CONDITIONAL([DUNFELL_BUILD_ENABLED], [test x$dunfellbuild = xtrue])
+
 AC_ARG_VAR(VSDK_UTILS_JSON_TO_HEADER, script to create header from json object)
 AC_ARG_VAR(VSDK_UTILS_JSON_COMBINE,   script to combine multiple json files)
 

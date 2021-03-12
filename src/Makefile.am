@@ -244,6 +244,10 @@ AM_CPPFLAGS += -DSUPPORT_VOICE_DEST_ALSA
 AM_LDFLAGS  += -lvirtualmic
 endif
 
+if DUNFELL_BUILD_ENABLED
+AM_CPPFLAGS += -DDUNFELL_BUILD_SUPPORT
+endif
+
 CTRLM_CONFIG_JSON        =ctrlm_config.json
 CTRLM_CONFIG_JSON_DEF    =ctrlm_config_default.json
 CTRLM_CONFIG_JSON_TMPL   =ctrlm_config.json.template

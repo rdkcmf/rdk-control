@@ -22,7 +22,11 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
-#include <stropts.h>
+#ifdef DUNFELL_BUILD_SUPPORT
+    #include <sys/sysmacros.h>
+#else
+    #include <stropts.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/file.h>
 #include <sys/types.h>
