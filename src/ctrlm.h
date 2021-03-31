@@ -132,13 +132,6 @@ typedef enum
    CTRLM_CLOSE_PAIRING_WINDOW_REASON_TIMEOUT,
 } ctrlm_close_pairing_window_reason;
 
-typedef enum {
-   CTRLM_POWER_STATE_ON,
-   CTRLM_POWER_STATE_STANDBY,
-   CTRLM_POWER_STATE_DEEPSLEEP,
-   CTRLM_POWER_STATE_UNKNOWN
-} ctrlm_power_state_t;
-
 typedef struct {
    ctrlm_main_queue_msg_type_t type;
    ctrlm_network_id_t          network_id;
@@ -415,6 +408,7 @@ ctrlm_pairing_restrict_by_remote_t restrict_pairing_by_remote_get();
 void                               ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *data, size_t len);
 void                               ctrlm_event_handler_system(const char *owner, IARM_EventId_t event_id, void *data, size_t len);
 void                               ctrlm_quit_main_loop();
+gboolean                           ctrlm_power_state_change(ctrlm_power_state_t power_state);
 
 gboolean ctrlm_main_iarm_call_status_get(ctrlm_main_iarm_call_status_t *status);
 gboolean ctrlm_main_iarm_call_network_status_get(ctrlm_main_iarm_call_network_status_t *status);

@@ -387,6 +387,7 @@ void ctrlm_db_power_state_change(ctrlm_main_queue_power_state_change_t *dqm) {
       g_assert(0);
       return;
    }
+
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
    msg->new_state = dqm->new_state;
    if(g_ctrlm_db.ds_mode) {
@@ -403,13 +404,12 @@ void ctrlm_db_power_state_change(ctrlm_main_queue_power_state_change_t *dqm) {
 #ifdef DEEPSLEEP_CLOSE_DB
 void ctrlm_db_power_state_change_(ctrlm_db_queue_msg_power_state_change_t *dqm) {
    g_assert(dqm);
-
-   if(dqm->new_state == CTRLM_POWER_STATE_DEEPSLEEP && g_ctrlm_db.ds_mode == false) {
-      LOG_INFO("%s: Closing DB due to DEEPSLEEP\n", __FUNCTION__);
+   if(dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP && g_ctrlm_db.ds_mode == false) {
+      LOG_INFO("%s: Closing DB due to DEEP_SLEEP\n", __FUNCTION__);
       ctrlm_db_close();
       g_ctrlm_db.ds_mode = true;
-   } else if(dqm->new_state != CTRLM_POWER_STATE_DEEPSLEEP && g_ctrlm_db.ds_mode == true) {
-      LOG_INFO("%s: Opening DB due to coming out of DEEPSLEEP\n", __FUNCTION__);
+   } else if(dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP && g_ctrlm_db.ds_mode == true) {
+      LOG_INFO("%s: Opening DB due to coming out of DEEP_SLEEP\n", __FUNCTION__);
       ctrlm_db_open(g_ctrlm_db.path);
       g_ctrlm_db.ds_mode = false;
    }

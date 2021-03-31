@@ -4430,14 +4430,14 @@ ctrlm_hal_result_t ctrlm_obj_network_rf4ce_t::hal_rf4ce_decrypt(ctrlm_hal_rf4ce_
 void ctrlm_obj_network_rf4ce_t::power_state_change(ctrlm_main_queue_power_state_change_t *dqm) {
    g_assert(dqm);
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 11)
-   if((dqm->old_state != CTRLM_POWER_STATE_DEEPSLEEP && dqm->new_state == CTRLM_POWER_STATE_DEEPSLEEP) ||
-      (dqm->old_state == CTRLM_POWER_STATE_DEEPSLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEPSLEEP)) {
+   if((dqm->old_state != CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) ||
+      (dqm->old_state == CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP)) {
       ctrlm_main_queue_msg_network_property_set_t msg;
       ctrlm_hal_network_property_dpi_control_t dpi;
       memset(&msg, 0, sizeof(msg));
       memset(&dpi, 0, sizeof(dpi));
 
-      dpi.dpi_enable = (dqm->new_state == CTRLM_POWER_STATE_DEEPSLEEP ? 1 : 0);
+      dpi.dpi_enable = (dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP ? 1 : 0);
 #ifndef CTRLM_HAL_DPI_DEFAULT
       // Use custom list
       dpi.defaults = 0;

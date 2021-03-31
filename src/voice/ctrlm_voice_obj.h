@@ -409,6 +409,7 @@ public:
     virtual void                  voice_action_keyword_verification_callback(bool success, rdkx_timestamp_t timestamp);
     virtual void                  voice_server_return_code_callback(long ret_code);
     virtual void                  voice_session_transcription_callback(const char *transcription);
+    virtual void                  voice_power_state_change(ctrlm_power_state_t power_state);
     // End Event Interface
 
     protected:
@@ -511,6 +512,8 @@ public:
    bool                 controller_supports_qos(void);
    void                 set_audio_mode(ctrlm_voice_audio_settings_t *settings);
    void                 audio_state_set(bool session);
+   bool                 privacy_mode(void);
+
 };
 
 // Helper Functions

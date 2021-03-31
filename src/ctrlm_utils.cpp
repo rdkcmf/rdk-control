@@ -907,6 +907,18 @@ const char *ctrlm_ir_state_str(ctrlm_ir_state_t state) {
    return(ctrlm_invalid_return(state));
 }
 
+const char *ctrlm_power_state_str(ctrlm_power_state_t state)
+{
+   switch(state) {
+   case CTRLM_POWER_STATE_STANDBY:                return("STANDBY");
+   case CTRLM_POWER_STATE_ON:                     return("ON");
+   case CTRLM_POWER_STATE_LIGHT_SLEEP:            return("LIGHT_SLEEP");
+   case CTRLM_POWER_STATE_DEEP_SLEEP:             return("DEEP_SLEEP");
+   default:                                       break;
+   }
+   return(ctrlm_invalid_return(state));
+}
+
 static const char *ctrlm_key_code_to_string[256] = {
       "OK",               // 0x00
       "UP_ARROW",         // 0x01

@@ -146,6 +146,10 @@ ctrlm_voice_t::~ctrlm_voice_t() {
     /* Close Voice SDK */
 }
 
+bool ctrlm_voice_t::privacy_mode(void) {
+   return (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
+}
+
 void ctrlm_voice_t::voice_sdk_open(const json_t *json_obj_vsdk) {
    if(this->xrsr_opened) {
       LOG_ERROR("%s: already open\n", __FUNCTION__);
@@ -179,9 +183,9 @@ void ctrlm_voice_t::voice_sdk_open(const json_t *json_obj_vsdk) {
        LOG_ERROR("%s: Failed to get host name <%s>\n", __FUNCTION__, strerror(errsv));
    }
 
-   bool privacy_mode = (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
 
-   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, XRSR_POWER_MODE_FULL, privacy_mode, json_obj_vsdk)) {
+
+   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, XRSR_POWER_MODE_FULL, privacy_mode(), json_obj_vsdk)) {
       LOG_ERROR("%s: Failed to open speech router\n", __FUNCTION__);
       g_assert(0);
    }
@@ -2218,6 +2222,31 @@ void ctrlm_voice_t::voice_set_ipc(ctrlm_voice_ipc_t *ipc) {
         this->voice_ipc = NULL;
     }
     this->voice_ipc = ipc;
+}
+
+void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
+   LOG_INFO("%s: entering power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+
+   bool success = true;
+   switch(power_state) {
+      case CTRLM_POWER_STATE_DEEP_SLEEP:
+         if(!xrsr_power_mode_set(XRSR_POWER_MODE_SLEEP)) {
+            success = false;
+         }
+         break;
+      case CTRLM_POWER_STATE_ON: {
+            if(!xrsr_power_mode_set(XRSR_POWER_MODE_FULL)) {
+               success = false;
+            }
+         }
+         break;
+      default:
+         LOG_INFO("%s: no action needed for power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+         break;
+   }
+   if(!success) {
+      LOG_ERROR("%s: failed to set xrsr to power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+   }
 }
 
 void ctrlm_voice_t::voice_device_status_change(ctrlm_voice_device_t device, ctrlm_voice_device_status_t status, bool *update_routes) { // THIS FUNCTION ASSUMES THE SEMAPHORE IS ALREADY LOCKED

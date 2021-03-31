@@ -267,6 +267,7 @@ typedef struct {
 #ifdef AUTH_ENABLED
    ctrlm_auth_t                      *authservice;
 #endif
+   ctrlm_power_state_t                power_state;
 } ctrlm_global_t;
 
 static ctrlm_global_t g_ctrlm;
@@ -502,6 +503,7 @@ int main(int argc, char *argv[]) {
    //g_ctrlm.precomission_table             = g_hash_table_new(g_str_hash, g_str_equal);
    g_ctrlm.loading_db                     = false;
    g_ctrlm.return_code                    = 0;
+   g_ctrlm.power_state                    = CTRLM_POWER_STATE_ON;
 
    g_ctrlm.service_access_token.clear();
 
@@ -871,6 +873,15 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
    // Check the response from each thread on the previous attempt
    for(vector<ctrlm_thread_monitor_t>::iterator it = g_ctrlm.monitor_threads.begin(); it != g_ctrlm.monitor_threads.end(); it++) {
       LOG_DEBUG("%s: Checking %s\n", __FUNCTION__, it->name);
+
+      //This only happens when low power mode was entered from ctrlmTestApp, normally ctrlm thread monitor will not run
+      if((ctrlm_db_queue_msg_push == it->queue_push) &&
+        ((CTRLM_POWER_STATE_STANDBY      == g_ctrlm.power_state) ||
+        (CTRLM_POWER_STATE_DEEP_SLEEP    == g_ctrlm.power_state))) {
+            LOG_INFO("%s: skip checking %s in faux standby\n", __FUNCTION__, it->name);
+            continue;
+      }
+
       if(it->response != CTRLM_THREAD_MONITOR_RESPONSE_ALIVE) {
          LOG_FATAL("%s: Thread %s is unresponsive\n", __FUNCTION__, it->name);
          ctrlm_quit_main_loop();
@@ -2260,13 +2271,21 @@ gpointer ctrlm_main_thread(gpointer param) {
                LOG_ERROR("%s: Power State Change msg NULL\n", __FUNCTION__);
                break;
             }
+            dqm->old_state = g_ctrlm.power_state;
+            g_ctrlm.power_state = dqm->new_state;
             // Set Power change in Networks
             for(auto const &itr : g_ctrlm.networks) {
                itr.second->power_state_change(dqm);
             }
 
             // Set Power change in DB
+            LOG_INFO("%s: calling DB\n", __FUNCTION__);
             ctrlm_db_power_state_change(dqm);
+
+            #ifdef USE_VOICE_SDK
+            g_ctrlm.voice_session->voice_power_state_change(dqm->new_state);
+            #endif
+
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL: {
@@ -5318,6 +5337,22 @@ gboolean ctrlm_ntp_check(gpointer user_data) {
       LOG_ERROR("%s: failed to allocate time check\n", __FUNCTION__);
    }
    return(false);
+}
+
+gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state) {
+   //Allocate a message and send it to Control Manager's queue
+   ctrlm_main_queue_power_state_change_t *msg = (ctrlm_main_queue_power_state_change_t *)g_malloc(sizeof(ctrlm_main_queue_power_state_change_t));
+   if(NULL == msg) {
+      LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
+      g_assert(0);
+      return(false);
+   }
+
+   msg->header.type = CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
+   msg->header.network_id = CTRLM_MAIN_NETWORK_ID_ALL;
+   msg->new_state = power_state;
+   ctrlm_main_queue_msg_push(msg);
+   return(true);
 }
 
 ctrlm_controller_id_t ctrlm_last_used_controller_get(ctrlm_network_type_t network_type) {

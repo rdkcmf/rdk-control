@@ -17,11 +17,10 @@
  * limitations under the License.
 */
 
-#include "ctrlm_ipc.h"
-
 #ifndef _CTRLM_IPC_VOICE_H_
 #define _CTRLM_IPC_VOICE_H_
 
+#include "ctrlm_ipc.h"
 /// @file ctrlm_ipc_voice.h
 ///
 /// @defgroup CTRLM_IPC_VOICE IARM API - Voice

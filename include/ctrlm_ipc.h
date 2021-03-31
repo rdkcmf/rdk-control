@@ -19,6 +19,8 @@
 #ifndef _CTRLM_IPC_H_
 #define _CTRLM_IPC_H_
 
+#include "libIARM.h"
+#include "libIBusDaemon.h"
 #include "ctrlm_ipc_key_codes.h"
 
 /// @file ctrlm_ipc.h
@@ -116,7 +118,7 @@
 #define CTRLM_MAIN_IARM_CALL_CHIP_STATUS_GET                     "Main_ChipStatusGet"                   ///< get Chip status
 #define CTRLM_MAIN_IARM_CALL_AUDIO_CAPTURE_START                 "Main_AudioCaptureStart"               ///< Sends message to xraudio to capture mic data, in specified container
 #define CTRLM_MAIN_IARM_CALL_AUDIO_CAPTURE_STOP                  "Main_AudioCaptureStop"                ///< Sends message to xraudio to stop capturing mic data
-
+#define CTRLM_MAIN_IARM_CALL_POWER_STATE_CHANGE                  "Main_PowerStateChange"                ///< Sends message to xr-speech-router to set power state, download DSP firmware, etc
 // IARM calls for the IR Database
 #define CTRLM_MAIN_IARM_CALL_IR_CODES                            "Main_IRCodes"           ///< IARM Call to retrieve IR Codes based on type, manufacturer, and model
 #define CTRLM_MAIN_IARM_CALL_IR_MANUFACTURERS                    "Main_IRManufacturers"   ///< IARM Call to retrieve list of manufacturers, based on (partial) name
@@ -416,6 +418,16 @@ typedef enum {
    CTRLM_AUDIO_CONTAINER_NONE    = 1,
    CTRLM_AUDIO_CONTAINER_INVALID = 2
 } ctrlm_audio_container_t;
+
+/// @brief Power State Type
+/// @details Power Manager sends the current power state and the new power state. This type is used to track the state information.
+typedef enum {
+   CTRLM_POWER_STATE_STANDBY                = 0,
+   CTRLM_POWER_STATE_ON                     = 1,
+   CTRLM_POWER_STATE_LIGHT_SLEEP            = 2,
+   CTRLM_POWER_STATE_DEEP_SLEEP             = 3,
+   CTRLM_POWER_STATE_INVALID                = 4
+}ctrlm_power_state_t;
 
 /// @brief Network Id Type
 /// @details During initialization, of the HAL network, Control Manager will assign a unique id to the network.  It must be used in all
@@ -799,6 +811,12 @@ typedef struct {
    ctrlm_audio_container_t  container;
    char                     file_path[128];
 } ctrlm_main_iarm_call_audio_capture_t;
+
+typedef struct {
+   unsigned char api_revision;
+   ctrlm_iarm_call_result_t result;
+   ctrlm_power_state_t new_state;
+} ctrlm_main_iarm_call_power_state_change_t;
 
 /// @}
 

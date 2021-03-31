@@ -93,6 +93,8 @@ const char *ctrlm_rf4ce_reboot_reason_str(controller_reboot_reason_t reboot_reas
 
 const char *ctrlm_ir_state_str(ctrlm_ir_state_t state);
 
+const char *ctrlm_power_state_str(ctrlm_power_state_t state);
+
 bool        ctrlm_file_copy(const char* src, const char* dst, bool overwrite);
 bool        ctrlm_file_exists(const char* path);
 bool        ctrlm_file_timestamp_get(const char *path, guint64 *ts);
