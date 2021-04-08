@@ -44,6 +44,7 @@ static IARM_Result_t ctrlm_main_iarm_call_factory_reset(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_controller_unbind(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_ir_remote_usage_get(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_last_key_info_get(void *arg);
+static IARM_Result_t ctrlm_main_iarm_call_last_keypress_get(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_control_service_set_values(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_control_service_get_values(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_control_service_can_find_my_remote(void *arg);
@@ -85,6 +86,7 @@ ctrlm_iarm_call_t ctrlm_iarm_calls[] = {
    {CTRLM_MAIN_IARM_CALL_CONTROLLER_UNBIND,                  ctrlm_main_iarm_call_controller_unbind                  },
    {CTRLM_MAIN_IARM_CALL_IR_REMOTE_USAGE_GET,                ctrlm_main_iarm_call_ir_remote_usage_get                },
    {CTRLM_MAIN_IARM_CALL_LAST_KEY_INFO_GET,                  ctrlm_main_iarm_call_last_key_info_get                  },
+   {CTRLM_MAIN_IARM_CALL_LAST_KEYPRESS_GET,                  ctrlm_main_iarm_call_last_keypress_get                  },
    {CTRLM_MAIN_IARM_CALL_CONTROL_SERVICE_SET_VALUES,         ctrlm_main_iarm_call_control_service_set_values         },
    {CTRLM_MAIN_IARM_CALL_CONTROL_SERVICE_GET_VALUES,         ctrlm_main_iarm_call_control_service_get_values         },
    {CTRLM_MAIN_IARM_CALL_CONTROL_SERVICE_CAN_FIND_MY_REMOTE, ctrlm_main_iarm_call_control_service_can_find_my_remote },
@@ -741,7 +743,6 @@ IARM_Result_t ctrlm_event_handler_power_pre_change(void* pArgs)
 #endif
 
 IARM_Result_t ctrlm_main_iarm_call_voice_session_begin(void *arg) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    ctrlm_voice_iarm_call_voice_session_t *params = (ctrlm_voice_iarm_call_voice_session_t *)arg;
 
    if(0 == g_atomic_int_get(&running)) {
@@ -778,7 +779,6 @@ IARM_Result_t ctrlm_main_iarm_call_voice_session_begin(void *arg) {
 }
 
 IARM_Result_t ctrlm_main_iarm_call_voice_session_end(void *arg) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    ctrlm_voice_iarm_call_voice_session_t *params = (ctrlm_voice_iarm_call_voice_session_t *)arg;
 
    if(0 == g_atomic_int_get(&running)) {
@@ -816,7 +816,6 @@ IARM_Result_t ctrlm_main_iarm_call_voice_session_end(void *arg) {
 
 
 IARM_Result_t ctrlm_main_iarm_call_start_pairing(void *arg) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    ctrlm_iarm_call_StartPairing_params_t *params = (ctrlm_iarm_call_StartPairing_params_t *)arg;
 
    if(0 == g_atomic_int_get(&running)) {
@@ -853,7 +852,6 @@ IARM_Result_t ctrlm_main_iarm_call_start_pairing(void *arg) {
 }
 
 IARM_Result_t ctrlm_main_iarm_call_start_pair_with_code(void *arg) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    ctrlm_iarm_call_StartPairWithCode_params_t *params = (ctrlm_iarm_call_StartPairWithCode_params_t *)arg;
 
    if(0 == g_atomic_int_get(&running)) {
@@ -890,7 +888,6 @@ IARM_Result_t ctrlm_main_iarm_call_start_pair_with_code(void *arg) {
 }
 
 IARM_Result_t ctrlm_main_iarm_call_find_my_remote(void *arg) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    ctrlm_iarm_call_FindMyRemote_params_t *params = (ctrlm_iarm_call_FindMyRemote_params_t *)arg;
 
    if(0 == g_atomic_int_get(&running)) {
@@ -927,7 +924,6 @@ IARM_Result_t ctrlm_main_iarm_call_find_my_remote(void *arg) {
 }
 
 IARM_Result_t ctrlm_main_iarm_call_get_rcu_status(void *arg) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    ctrlm_iarm_RcuStatus_params_t *params = (ctrlm_iarm_RcuStatus_params_t *)arg;
 
    if(0 == g_atomic_int_get(&running)) {
@@ -1002,3 +998,43 @@ void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state) {
    }
 }
 
+IARM_Result_t ctrlm_main_iarm_call_last_keypress_get(void *arg) {
+   ctrlm_main_iarm_call_last_key_info_t *params = (ctrlm_main_iarm_call_last_key_info_t *)arg;
+
+   if(0 == g_atomic_int_get(&running)) {
+      LOG_ERROR("%s: IARM Call received when IARM component in stopped/terminated state, reply with ERROR\n", __FUNCTION__);
+      return(IARM_RESULT_INVALID_STATE);
+   }
+   if(params == NULL) {
+      LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
+      return(IARM_RESULT_INVALID_PARAM);
+   }
+   if(params->api_revision != CTRLM_MAIN_IARM_BUS_API_REVISION) {
+      LOG_INFO("%s: Unsupported API Revision (%u, %u)\n", __FUNCTION__, params->api_revision, CTRLM_MAIN_IARM_BUS_API_REVISION);
+      params->result = CTRLM_IARM_CALL_RESULT_ERROR_API_REVISION;
+      return(IARM_RESULT_SUCCESS);
+   }
+
+   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+
+   // Signal completion of the operation
+   sem_t semaphore;
+
+   // Allocate a message and send it to Control Manager's queue
+   ctrlm_main_queue_msg_get_last_keypress_t msg;
+   memset(&msg, 0, sizeof(msg));
+
+   sem_init(&semaphore, 0, 0);
+
+   msg.params            = params;
+   msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
+   msg.semaphore         = &semaphore;
+
+   ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_get_last_keypress, &msg, sizeof(msg), NULL, params->network_id);
+
+   // Wait for the result condition to be signaled
+   sem_wait(&semaphore);
+   sem_destroy(&semaphore);
+
+   return(IARM_RESULT_SUCCESS);
+}

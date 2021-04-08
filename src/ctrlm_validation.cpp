@@ -367,7 +367,7 @@ gboolean ctrlm_validation_end(ctrlm_network_id_t network_id, ctrlm_controller_id
    return(false);
 }
 
-gboolean ctrlm_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_controller_type_t controller_type, ctrlm_rcu_binding_type_t binding_type, ctrlm_rcu_configuration_result_t configuration_result) {
+gboolean ctrlm_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_controller_type_t controller_type, ctrlm_rcu_binding_type_t binding_type, ctrlm_controller_status_t *status, ctrlm_rcu_configuration_result_t configuration_result) {
    LOG_INFO("%s: (%u, %u) result <%s>\n", __FUNCTION__, network_id, controller_id, ctrlm_rcu_configuration_result_str(configuration_result));
    if(ctrlm_validation_is_in_progress() && ctrlm_validation_on_this_network(network_id) && ctrlm_validation_on_this_controller(controller_id)) {
       if(!g_ctrlm_validation.configuration_in_progress) {
@@ -377,7 +377,7 @@ gboolean ctrlm_configuration_complete(ctrlm_network_id_t network_id, ctrlm_contr
       // Cancel validation response timer
       ctrlm_timeout_destroy(&g_ctrlm_validation.timeout_source_id);
 
-      ctrlm_rcu_iarm_event_configuration_complete(network_id, controller_id, controller_type, binding_type, configuration_result);
+      ctrlm_rcu_iarm_event_configuration_complete(network_id, controller_id, controller_type, binding_type, status, configuration_result);
 
       g_ctrlm_validation.configuration_in_progress = FALSE;
       return(true);

@@ -96,7 +96,7 @@
 /// these names to allow the client code to function correctly if the values change.
 
 #define CTRLM_MAIN_IARM_BUS_NAME                                 "Ctrlm"                                ///< Control Manager's IARM Bus Name
-#define CTRLM_MAIN_IARM_BUS_API_REVISION                         (12)                                   ///< Revision of the Control Manager Main IARM API
+#define CTRLM_MAIN_IARM_BUS_API_REVISION                         (14)                                   ///< Revision of the Control Manager Main IARM API
 
 #define CTRLM_MAIN_IARM_CALL_STATUS_GET                          "Main_StatusGet"                       ///< Retrieves Control Manager's Status information
 #define CTRLM_MAIN_IARM_CALL_NETWORK_STATUS_GET                  "Main_NetworkStatusGet"                ///< Retrieves the network's Status information
@@ -109,6 +109,7 @@
 #define CTRLM_MAIN_IARM_CALL_CONTROLLER_UNBIND                   "Main_ControllerUnbind"                ///< Removes a binding between the target and the specified controller
 #define CTRLM_MAIN_IARM_CALL_IR_REMOTE_USAGE_GET                 "Main_IrRemoteUsageGet"                ///< Retrieves the ir remote usage info
 #define CTRLM_MAIN_IARM_CALL_LAST_KEY_INFO_GET                   "Main_LastKeyInfoGet"                  ///< Retrieves the last key info
+#define CTRLM_MAIN_IARM_CALL_LAST_KEYPRESS_GET                   "Main_LastKeyPressGet"                 ///< Retrieves the last key press (TODO: replace CTRLM_MAIN_IARM_CALL_LAST_KEY_INFO_GET with this)
 #define CTRLM_MAIN_IARM_CALL_CONTROL_SERVICE_SET_VALUES          "Main_ControlService_SetValues"        ///< IARM Call to set control service values
 #define CTRLM_MAIN_IARM_CALL_CONTROL_SERVICE_GET_VALUES          "Main_ControlService_GetValues"        ///< IARM Call to get control service values
 #define CTRLM_MAIN_IARM_CALL_CONTROL_SERVICE_CAN_FIND_MY_REMOTE  "Main_ControlService_CanFindMyRemote"  ///< IARM Call to get control service find my remote
@@ -291,7 +292,8 @@ typedef enum {
    CTRLM_VOICE_IARM_EVENT_JSON_STREAM_END           = 32, ///< Generated on voice stream end, payload is JSON for consumption by Thunder Plugin
    CTRLM_VOICE_IARM_EVENT_JSON_SESSION_END          = 33, ///< Generated on voice session end, payload is JSON for consumption by Thunder Plugin
    CTRLM_RCU_IARM_EVENT_RCU_STATUS                  = 34, ///< Generated when someting changes in the BLE remote
-   CTRLM_MAIN_IARM_EVENT_MAX                        = 35  ///< Placeholder for the last event (used in registration)
+   CTRLM_RCU_IARM_EVENT_RF4CE_PAIRING_WINDOW_TIMEOUT = 35, ///< Indicates that a battery milestone event occured
+   CTRLM_MAIN_IARM_EVENT_MAX                        = 36  ///< Placeholder for the last event (used in registration)
 } ctrlm_main_iarm_event_t;
 
 /// @brief Remote Control Key Status
@@ -624,6 +626,7 @@ typedef struct {
 /// @details The Control Manager Status structure is used in the CTRLM_MAIN_IARM_CALL_LAST_KEY_INFO_GET call. See the @link CTRLM_IPC_MAIN_CALLS Calls@endlink section for more details on invoking this call.
 typedef struct {
    unsigned char            api_revision;                                       ///< Revision of this API
+   ctrlm_network_id_t       network_id;                                         ///< IN - identifier of network on which the controller is bound
    ctrlm_iarm_call_result_t result;                                             ///< OUT - The result of the operation.
    int                      controller_id;                                      ///< OUT - The controller id of the last key press.
    unsigned char            source_type;                                        ///< OUT - The source type of the last key press.

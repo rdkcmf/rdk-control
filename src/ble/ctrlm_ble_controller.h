@@ -34,6 +34,8 @@
 
 #define CTRLM_BLE_LEN_VOICE_METRICS                      (44)
 
+#define BROADCAST_PRODUCT_NAME_IR_DEVICE                 ("IR Device")
+
 #define XCONF_PRODUCT_NAME_PR1                           ("PR1-10")
 #define BROADCAST_PRODUCT_NAME_PR1                       ("Platco PR1")
 #define XCONF_PRODUCT_NAME_LC103                         ("LC103-10")
@@ -46,6 +48,7 @@
 //////////////////////////////////////////
 
 typedef enum {
+   BLE_CONTROLLER_TYPE_IR,
    BLE_CONTROLLER_TYPE_PR1,
    BLE_CONTROLLER_TYPE_LC103,
    BLE_CONTROLLER_TYPE_EC302,
@@ -124,6 +127,7 @@ public:
    void                          setTouchModeSettable(bool param);
 
    time_t                        getLastKeyTime();
+   guint16                       getLastKeyCode();
    void                          process_event_key(ctrlm_key_status_t key_status, guint16 key_code);
    
    void                          update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost);

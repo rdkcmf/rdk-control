@@ -168,13 +168,14 @@ void ctrlm_rcu_iarm_event_validation_end(ctrlm_network_id_t network_id, ctrlm_co
    }
 }
 
-void ctrlm_rcu_iarm_event_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_controller_type_t controller_type, ctrlm_rcu_binding_type_t binding_type, ctrlm_rcu_configuration_result_t configuration_result) {
+void ctrlm_rcu_iarm_event_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_controller_type_t controller_type, ctrlm_rcu_binding_type_t binding_type, ctrlm_controller_status_t *status, ctrlm_rcu_configuration_result_t configuration_result) {
    ctrlm_rcu_iarm_event_configuration_complete_t msg;
    init_iarm_event_struct(msg, network_id, controller_id);
    msg.binding_type    = binding_type;
    msg.result          = configuration_result;
    strncpy(msg.controller_type, ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH);
    msg.controller_type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
+   memcpy(&msg.status, status, sizeof(ctrlm_controller_status_t));
 
    LOG_INFO("%s: (%u, %u) Controller Type <%s> Binding Type <%s> Result <%s>\n", __FUNCTION__, network_id, controller_id, msg.controller_type, ctrlm_rcu_binding_type_str(binding_type), ctrlm_rcu_configuration_result_str(configuration_result));
    IARM_Result_t result = IARM_Bus_BroadcastEvent(CTRLM_MAIN_IARM_BUS_NAME, CTRLM_RCU_IARM_EVENT_CONFIGURATION_COMPLETE, &msg, sizeof(msg));
@@ -354,6 +355,20 @@ void ctrlm_rcu_iarm_event_remote_reboot(ctrlm_network_id_t network_id, ctrlm_con
       LOG_INFO("%s: (%u, %u) Voltage <%d> Reboot Reason <%s>\n", __FUNCTION__, network_id, controller_id, voltage, ctrlm_rf4ce_reboot_reason_str(reason));
    }
    IARM_Result_t result = IARM_Bus_BroadcastEvent(CTRLM_MAIN_IARM_BUS_NAME, CTRLM_RCU_IARM_EVENT_REMOTE_REBOOT, &msg, sizeof(msg));
+   if(IARM_RESULT_SUCCESS != result) {
+      LOG_ERROR("%s: IARM Bus Error!\n", __FUNCTION__);
+   }
+}
+
+void ctrlm_rcu_iarm_event_rf4ce_pairing_window_timeout() {
+   ctrlm_rcu_iarm_event_rf4ce_pairing_window_timeout_t msg;
+   ctrlm_rcu_validation_result_t                       validation_result = CTRLM_RCU_VALIDATION_RESULT_TIMEOUT;
+
+   msg.api_revision      = CTRLM_RCU_IARM_BUS_API_REVISION;
+   msg.validation_result = validation_result;
+
+   LOG_INFO("%s: Result <%s>\n", __FUNCTION__, ctrlm_rcu_validation_result_str(validation_result));
+   IARM_Result_t result = IARM_Bus_BroadcastEvent(CTRLM_MAIN_IARM_BUS_NAME, CTRLM_RCU_IARM_EVENT_RF4CE_PAIRING_WINDOW_TIMEOUT, &msg, sizeof(msg));
    if(IARM_RESULT_SUCCESS != result) {
       LOG_ERROR("%s: IARM Bus Error!\n", __FUNCTION__);
    }

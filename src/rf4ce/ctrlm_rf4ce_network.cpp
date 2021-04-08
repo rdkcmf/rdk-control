@@ -523,6 +523,16 @@ ctrlm_rcu_binding_type_t ctrlm_obj_network_rf4ce_t::ctrlm_binding_type_get(ctrlm
    return(controllers_[controller_id]->binding_type_get());
 }
 
+void ctrlm_obj_network_rf4ce_t::ctrlm_controller_status_get(ctrlm_controller_id_t controller_id, void *status) {
+   THREAD_ID_VALIDATE();
+   if(!controller_exists(controller_id)) {
+      LOG_ERROR("%s: Invalid Controller Id\n", __FUNCTION__);
+      return;
+   }
+
+   controllers_[controller_id]->rf4ce_controller_status((ctrlm_controller_status_t *)status);
+}
+
 ctrlm_rf4ce_controller_type_t ctrlm_obj_network_rf4ce_t::controller_type_from_user_string(guchar *user_string) {
    THREAD_ID_VALIDATE();
    ctrlm_rf4ce_controller_type_t controller_type = RF4CE_CONTROLLER_TYPE_UNKNOWN;

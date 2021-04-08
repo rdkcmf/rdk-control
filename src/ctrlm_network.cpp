@@ -375,6 +375,10 @@ ctrlm_rcu_binding_type_t ctrlm_obj_network_t::ctrlm_binding_type_get(ctrlm_contr
    return(CTRLM_RCU_BINDING_TYPE_INVALID);
 }
 
+void ctrlm_obj_network_t::ctrlm_controller_status_get(ctrlm_controller_id_t controller_id, void *status) {
+  LOG_WARN("%s: request is not valid for %s network\n", __FUNCTION__, name_get());
+}
+
 void ctrlm_obj_network_t::ind_process_voice_session_request(void *data, int size){
   LOG_WARN("%s: request is not valid for %s network\n", __FUNCTION__, name_get());
 }
@@ -682,6 +686,18 @@ void ctrlm_obj_network_t::req_process_get_rcu_status(void *data, int size){
    ctrlm_main_queue_msg_get_rcu_status_t *dqm = (ctrlm_main_queue_msg_get_rcu_status_t *)data;
    g_assert(dqm);
    g_assert(size == sizeof(ctrlm_main_queue_msg_get_rcu_status_t));
+
+   // post the semaphore just to ensure nothing blocks
+   if(dqm->semaphore) {
+      sem_post(dqm->semaphore);
+   }
+}
+
+void ctrlm_obj_network_t::req_process_get_last_keypress(void *data, int size){
+   LOG_WARN("%s: request is not valid for %s network\n", __FUNCTION__, name_get());
+   ctrlm_main_queue_msg_get_last_keypress_t *dqm = (ctrlm_main_queue_msg_get_last_keypress_t *)data;
+   g_assert(dqm);
+   g_assert(size == sizeof(ctrlm_main_queue_msg_get_last_keypress_t));
 
    // post the semaphore just to ensure nothing blocks
    if(dqm->semaphore) {

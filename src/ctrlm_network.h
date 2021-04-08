@@ -57,6 +57,12 @@ typedef struct {
 
 typedef struct {
    ctrlm_main_queue_msg_header_t             header;
+   ctrlm_main_iarm_call_last_key_info_t     *params;
+   sem_t *                                   semaphore;
+} ctrlm_main_queue_msg_get_last_keypress_t;
+
+typedef struct {
+   ctrlm_main_queue_msg_header_t             header;
    ctrlm_iarm_call_StartPairing_params_t    *params;
    sem_t *                                   semaphore;
 } ctrlm_main_queue_msg_start_pairing_t;
@@ -138,6 +144,7 @@ public:
    virtual void         controller_list_get(std::vector<ctrlm_controller_id_t>& list) const;
    virtual ctrlm_rcu_controller_type_t ctrlm_controller_type_get(ctrlm_controller_id_t controller_id);
    virtual ctrlm_rcu_binding_type_t    ctrlm_binding_type_get(ctrlm_controller_id_t controller_id);
+   virtual void         ctrlm_controller_status_get(ctrlm_controller_id_t controller_id, void *status);
    virtual bool         controller_exists(ctrlm_controller_id_t controller_id);
    virtual void         controller_exists(void *data, int size);
    virtual void         controller_unbind(ctrlm_controller_id_t controller_id, ctrlm_unbind_reason_t reason);
@@ -176,6 +183,8 @@ public:
    virtual void         req_process_start_pairing(void *data, int size);
    virtual void         req_process_pair_with_code(void *data, int size);
    virtual void         req_process_get_rcu_status(void *data, int size);
+   virtual void         req_process_get_last_keypress(void *data, int size);
+
    virtual void         req_process_ir_set_code(void *data, int size);
    virtual void         req_process_ir_clear_codes(void *data, int size);
    virtual void         req_process_find_my_remote(void *data, int size);

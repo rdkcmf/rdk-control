@@ -258,6 +258,7 @@ public:
    virtual void                         controller_list_get(std::vector<ctrlm_controller_id_t>& list) const;
    virtual ctrlm_rcu_controller_type_t  ctrlm_controller_type_get(ctrlm_controller_id_t controller_id);
    virtual ctrlm_rcu_binding_type_t     ctrlm_binding_type_get(ctrlm_controller_id_t controller_id);
+   virtual void                         ctrlm_controller_status_get(ctrlm_controller_id_t controller_id, void *status);
    void                                 pan_id_get(guint16  *pan_id);
    void                                 ieee_address_get(unsigned long long  *ieee_address);
    void                                 short_address_get(ctrlm_hal_rf4ce_short_address_t  *short_address);

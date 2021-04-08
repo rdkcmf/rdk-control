@@ -217,7 +217,7 @@ void ctrlm_db_ble_read_sw_revision(ctrlm_network_id_t network_id, ctrlm_controll
 void ctrlm_db_ble_read_serial_number(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string &value);
 void ctrlm_db_ble_read_ieee_address(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long long &value);
 void ctrlm_db_ble_read_time_binding(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &value);
-void ctrlm_db_ble_read_last_key_time(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &value);
+void ctrlm_db_ble_read_last_key_press(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &value, guint16 &key_code);
 void ctrlm_db_ble_read_battery_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int &value);
 void ctrlm_db_ble_read_device_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int &value);
 void ctrlm_db_ble_read_voice_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
@@ -233,7 +233,7 @@ void ctrlm_db_ble_write_sw_revision(ctrlm_network_id_t network_id, ctrlm_control
 void ctrlm_db_ble_write_serial_number(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value);
 void ctrlm_db_ble_write_ieee_address(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long long value);
 void ctrlm_db_ble_write_time_binding(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t value);
-void ctrlm_db_ble_write_last_key_time(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t value);
+void ctrlm_db_ble_write_last_key_press(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t value, guint16 key_code);
 void ctrlm_db_ble_write_battery_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int value);
 void ctrlm_db_ble_write_device_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int value);
 void ctrlm_db_ble_write_voice_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);

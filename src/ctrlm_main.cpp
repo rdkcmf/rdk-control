@@ -2228,8 +2228,14 @@ gpointer ctrlm_main_thread(gpointer param) {
          case CTRLM_MAIN_QUEUE_MSG_TYPE_BIND_CONFIGURATION_COMPLETE: {
             ctrlm_main_queue_msg_bind_configuration_complete_t *dqm = (ctrlm_main_queue_msg_bind_configuration_complete_t *)msg;
             LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_BIND_CONFIGURATION_COMPLETE\n", __FUNCTION__);
+            ctrlm_controller_status_t status;
+            if(dqm->result == CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS) {
+               obj_net->ctrlm_controller_status_get(dqm->controller_id, &status);
+            } else {
+               memset(&status, 0, sizeof(ctrlm_controller_status_t));
+            }
 
-            ctrlm_configuration_complete(hdr->network_id, dqm->controller_id, obj_net->ctrlm_controller_type_get(dqm->controller_id), obj_net->ctrlm_binding_type_get(dqm->controller_id), dqm->result);
+            ctrlm_configuration_complete(hdr->network_id, dqm->controller_id, obj_net->ctrlm_controller_type_get(dqm->controller_id), obj_net->ctrlm_binding_type_get(dqm->controller_id), &status, dqm->result);
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_VOICE_SETTINGS_UPDATE: {
@@ -5056,6 +5062,7 @@ void ctrlm_close_pairing_window_(ctrlm_network_id_t network_id, ctrlm_close_pair
          case(CTRLM_CLOSE_PAIRING_WINDOW_REASON_TIMEOUT): {
             ctrlm_pairing_window_bind_status_set_(CTRLM_BIND_STATUS_BIND_WINDOW_TIMEOUT);
             g_ctrlm.autobind = true;
+            ctrlm_rcu_iarm_event_rf4ce_pairing_window_timeout();
             break;
          }
          default: {

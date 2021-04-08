@@ -2768,7 +2768,7 @@ void ctrlm_db_ble_read_time_binding(ctrlm_network_id_t network_id, ctrlm_control
    }
 }
 
-void ctrlm_db_ble_read_last_key_time(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &value) {
+void ctrlm_db_ble_read_last_key_press(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &time, guint16 &key_code) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
@@ -2776,7 +2776,12 @@ void ctrlm_db_ble_read_last_key_time(ctrlm_network_id_t network_id, ctrlm_contro
    if (0 > ctrlm_db_read_uint64(table, "last_key_time", &data)) {
       LOG_WARN("%s: Failed to load last_key_time from db\n", __FUNCTION__);
    } else {
-      value = (time_t) data;
+      time = (time_t) data;
+   }
+   if (0 > ctrlm_db_read_uint64(table, "last_key_code", &data)) {
+      LOG_WARN("%s: Failed to load last_key_code from db\n", __FUNCTION__);
+   } else {
+      key_code = (time_t) data;
    }
 }
 
@@ -2834,49 +2839,49 @@ void ctrlm_db_ble_write_controller_name(ctrlm_network_id_t network_id, ctrlm_con
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "controller_name", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "controller_name", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_controller_manufacturer(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "controller_manufacturer", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "controller_manufacturer", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_controller_model(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "controller_model", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "controller_model", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_fw_revision(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "fw_revision", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "fw_revision", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_hw_revision(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "hw_revision", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "hw_revision", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_sw_revision(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "sw_revision", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "sw_revision", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_serial_number(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_blob(table, "serial_number", (const guchar*) value.c_str(), value.length());
+   ctrlm_db_write_blob(table, "serial_number", (const guchar*) value.c_str(), value.empty() ? 1 : value.length());
 }
 
 void ctrlm_db_ble_write_ieee_address(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long long value) {
@@ -2893,11 +2898,12 @@ void ctrlm_db_ble_write_time_binding(ctrlm_network_id_t network_id, ctrlm_contro
    ctrlm_db_write_uint64(table, "time_binding", (guint64) value);
 }
 
-void ctrlm_db_ble_write_last_key_time(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t value) {
+void ctrlm_db_ble_write_last_key_press(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t time, guint16 key_code) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_write_uint64(table, "last_key_time", (guint64) value);
+   ctrlm_db_write_uint64(table, "last_key_time", (guint64) time);
+   ctrlm_db_write_uint64(table, "last_key_code", (guint64) key_code);
 }
 
 void ctrlm_db_ble_write_battery_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int value) {

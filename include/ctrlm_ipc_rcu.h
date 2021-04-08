@@ -46,7 +46,7 @@
 #define CTRLM_RCU_IARM_CALL_REVERSE_CMD                  "Rcu_ReverseCmd"           ///< IARM Call to Trigger Remote Controller Action
 #define CTRLM_RCU_IARM_CALL_RF4CE_POLLING_ACTION         "Rcu_Rf4cePollingAction"   ///< IARM Call to Send Remote Heartbeat Response Polling Action
 
-#define CTRLM_RCU_IARM_BUS_API_REVISION                  (11)    ///< Revision of the RCU IARM API
+#define CTRLM_RCU_IARM_BUS_API_REVISION                  (12)    ///< Revision of the RCU IARM API
 #define CTRLM_RCU_VALIDATION_KEY_QTY                      (3)    ///< Number of validation keys used in internal validation
 #define CTRLM_RCU_MAX_SETUP_COMMAND_SIZE                  (5)    ///< Maximum setup command size (numbers entered after setup key)
 #define CTRLM_RCU_VERSION_LENGTH                         (18)    ///< Maximum length of the version string
@@ -559,6 +559,7 @@ typedef struct {
    ctrlm_rcu_configuration_result_t result;                                            ///< Result of the configuration attempt
    ctrlm_rcu_binding_type_t         binding_type;                                      ///< Type of binding that was performed
    char                             controller_type[CTRLM_RCU_MAX_USER_STRING_LENGTH]; ///< Remote control's type string
+   ctrlm_controller_status_t        status;                                            ///< Remote control's status
 } ctrlm_rcu_iarm_event_configuration_complete_t;
 
 /// @brief Structure of Remote Control's Setup Key IARM event
@@ -630,6 +631,13 @@ typedef struct {
    ctrlm_rcu_battery_event_t  battery_event; ///< Battery event
    unsigned char              percent;       ///< Battery percentage
 } ctrlm_rcu_iarm_event_battery_t;
+
+/// @brief Structure of Remote Control's remote reboot IARM event
+/// @details This event notifies listeners that a remote rebooot event has occurred.
+typedef struct {
+   unsigned char                 api_revision;       ///< Revision of this API
+   ctrlm_rcu_validation_result_t validation_result;  ///< Result of the validation
+} ctrlm_rcu_iarm_event_rf4ce_pairing_window_timeout_t;
 
 typedef struct {
    time_t        time_uptime_start;

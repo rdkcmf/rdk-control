@@ -46,6 +46,7 @@
 #include <algorithm>
 #include <time.h>
 #include <unordered_map>
+#include "irMgr.h"   // for IARM_BUS_IRMGR_KEYSRC_
 
 using namespace std;
 
@@ -262,6 +263,18 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
    // Get the controllers from DB
    controllers_load();
 
+   // Make sure an IR controller object is present, primarily to keep track of last key press
+   ctrlm_controller_id_t ir_controller_id;
+   if (false == getControllerId(0, &ir_controller_id)) {
+      // IR controller does not exist, so create it
+      LOG_INFO("%s: controller <%s> does not exist in DB, adding now...\n", __PRETTY_FUNCTION__, BROADCAST_PRODUCT_NAME_IR_DEVICE);
+      ctrlm_hal_ble_rcu_data_t rcu_data;
+      memset(&rcu_data, 0, sizeof(rcu_data));
+      rcu_data.ieee_address = 0;
+      strcpy(rcu_data.name, BROADCAST_PRODUCT_NAME_IR_DEVICE);
+      controller_add(rcu_data);
+   }
+
    // The controller list reported by the HAL is the source of truth
    if (hal_api_get_devices_) {
       vector<unsigned long long> hal_devices;
@@ -280,7 +293,8 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
             }
          }
          for(auto const &it : controllers_) {
-            if (hal_devices.end() == std::find(hal_devices.begin(), hal_devices.end(), it.second->getMacAddress())) {
+            if (BLE_CONTROLLER_TYPE_IR != it.second->getControllerType() && 
+               (hal_devices.end() == std::find(hal_devices.begin(), hal_devices.end(), it.second->getMacAddress()))) {
                LOG_INFO("%s: Controller (ID = %u), MAC Address: <0x%llX> not paired according to HAL, so removing...\n", __FUNCTION__, it.first, it.second->getMacAddress());
                //remote stored in network database is not a paired remote as reported by the HAL, so remove it.
                controller_remove(it.first);
@@ -844,6 +858,55 @@ void ctrlm_obj_network_ble_t::req_process_get_rcu_status(void *data, int size) {
    }
 }
 
+void ctrlm_obj_network_ble_t::req_process_get_last_keypress(void *data, int size) {
+   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   THREAD_ID_VALIDATE();
+   ctrlm_main_queue_msg_get_last_keypress_t *dqm = (ctrlm_main_queue_msg_get_last_keypress_t *)data;
+
+   g_assert(dqm);
+   g_assert(size == sizeof(ctrlm_main_queue_msg_get_last_keypress_t));
+
+   dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR;
+
+   if (!ready_) {
+      LOG_FATAL("%s: Network is not ready!\n", __PRETTY_FUNCTION__);
+   } else {
+      dqm->params->is_screen_bind_mode    = false;
+      dqm->params->remote_keypad_config   = CTRLM_REMOTE_KEYPAD_CONFIG_NA;
+
+      //Find the controller ID of the most recent keypress
+      time_t lastKeypressTime = 0;
+      ctrlm_controller_id_t lastKeypressControllerID = 0;
+      for (auto &controller : controllers_) {
+         if (controller.second->getLastKeyTime() >= lastKeypressTime) {
+            lastKeypressTime = controller.second->getLastKeyTime();
+            lastKeypressControllerID = controller.first;
+         }
+      }
+      if (controller_exists(lastKeypressControllerID)) {
+         dqm->params->controller_id          = lastKeypressControllerID;
+         dqm->params->source_key_code        = controllers_[lastKeypressControllerID]->getLastKeyCode();
+         dqm->params->timestamp              = controllers_[lastKeypressControllerID]->getLastKeyTime() * 1000LL; //Not sure why its converted to long long, but I'm staying consistent with rf4ce
+         
+         strncpy(dqm->params->source_name, controllers_[lastKeypressControllerID]->getName().c_str(), sizeof(dqm->params->source_name));
+         dqm->params->source_name[CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1] = '\0';
+
+         if (BLE_CONTROLLER_TYPE_IR == controllers_[lastKeypressControllerID]->getControllerType()) {
+            dqm->params->controller_id = -1;
+            dqm->params->source_type = IARM_BUS_IRMGR_KEYSRC_IR;
+         } else {
+            dqm->params->source_type = IARM_BUS_IRMGR_KEYSRC_RF;
+         }
+         dqm->params->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+      } else {
+         LOG_ERROR("%s: No controller keypresses found, returning error...\n", __PRETTY_FUNCTION__);
+      }
+   }
+   if(dqm->semaphore) {
+      sem_post(dqm->semaphore);
+   }
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrade_image_info_t &image_info) {
@@ -1211,29 +1274,31 @@ void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_p
    msg->status = state_;
    msg->ir_state = ir_state_;
 
-   msg->num_remotes = controllers_.size();
    int i = 0;
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
-      msg->remotes[i].controller_id = it->second->controller_id_get();
-      msg->remotes[i].deviceid      = it->second->getDeviceID();
-      msg->remotes[i].batterylevel  = it->second->getBatteryPercent();
-      msg->remotes[i].connected     = (it->second->getConnected()) ? 1 : 0;
+      if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType()) {
+         msg->remotes[i].controller_id = it->second->controller_id_get();
+         msg->remotes[i].deviceid      = it->second->getDeviceID();
+         msg->remotes[i].batterylevel  = it->second->getBatteryPercent();
+         msg->remotes[i].connected     = (it->second->getConnected()) ? 1 : 0;
 
-      strncpy(msg->remotes[i].ieee_address_str, ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].btlswver, it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].hwrev, it->second->getHwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].rcuswver, it->second->getSwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].ieee_address_str, ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].btlswver, it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].hwrev, it->second->getHwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].rcuswver, it->second->getSwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN);
 
-      strncpy(msg->remotes[i].make, it->second->getManufacturer().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].model, it->second->getModel().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].name, it->second->getName().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].serialno, it->second->getSerialNumber().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].make, it->second->getManufacturer().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].model, it->second->getModel().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].name, it->second->getName().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].serialno, it->second->getSerialNumber().c_str(), CTRLM_MAX_PARAM_STR_LEN);
 
-      strncpy(msg->remotes[i].tv_code, it->second->get_irdb_entry_id_name_tv().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-      strncpy(msg->remotes[i].avr_code, it->second->get_irdb_entry_id_name_avr().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].tv_code, it->second->get_irdb_entry_id_name_tv().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         strncpy(msg->remotes[i].avr_code, it->second->get_irdb_entry_id_name_avr().c_str(), CTRLM_MAX_PARAM_STR_LEN);
 
-      i++;
+         i++;
+      }
    }
+   msg->num_remotes = i;
 }
 
 void ctrlm_obj_network_ble_t::iarm_event_rcu_status() {
@@ -1363,17 +1428,18 @@ void ctrlm_obj_network_ble_t::ind_process_keypress(void *data, int size) {
       return;
    }
 
+   ctrlm_key_status_t key_status = CTRLM_KEY_STATUS_INVALID;
+   switch (dqm->event.value) {
+      case 0: { key_status = CTRLM_KEY_STATUS_UP; break; }
+      case 1: { key_status = CTRLM_KEY_STATUS_DOWN; break; }
+      case 2: { key_status = CTRLM_KEY_STATUS_REPEAT; break; }
+      default: break;
+   }
+
    ctrlm_controller_id_t controller_id;
    if (true == getControllerId(dqm->ieee_address, &controller_id)) {
-      ctrlm_key_status_t key_status = CTRLM_KEY_STATUS_INVALID;
-      switch (dqm->event.value) {
-         case 0: { key_status = CTRLM_KEY_STATUS_UP; break; }
-         case 1: { key_status = CTRLM_KEY_STATUS_DOWN; break; }
-         case 2: { key_status = CTRLM_KEY_STATUS_REPEAT; break; }
-         default: break;
-      }
-      LOG_INFO("%s: MAC Address <0x%llX>, timestamp: %ld.%06ld, code = <0x%X>, status = <%s>\n", __FUNCTION__, dqm->ieee_address, 
-         dqm->event.time.tv_sec, dqm->event.time.tv_usec, mask_key_codes_get() ? 0xFF : dqm->event.code, ctrlm_key_status_str(key_status));
+      LOG_INFO("%s: %s - MAC Address <%s>, code = <0x%X>, status = <%s>\n", __FUNCTION__, ctrlm_ble_controller_type_str(controllers_[controller_id]->getControllerType()), 
+         ctrlm_convert_mac_long_to_string(dqm->ieee_address).c_str(), mask_key_codes_get() ? 0xFF : dqm->event.code, ctrlm_key_status_str(key_status));
 
       controllers_[controller_id]->process_event_key(key_status, dqm->event.code);
    } else {
@@ -1579,7 +1645,7 @@ bool ctrlm_obj_network_ble_t::getControllerId(unsigned long long ieee_address, c
       }
    }
    if ( !found ) {
-      LOG_WARN("%s: Controller matching ieee_address (0x%llX) NOT FOUND.\n", __FUNCTION__, ieee_address);
+      LOG_DEBUG("%s: Controller matching ieee_address (0x%llX) NOT FOUND.\n", __FUNCTION__, ieee_address);
    }
    return found;
 }
@@ -1683,13 +1749,16 @@ void ctrlm_obj_network_ble_t::controller_list_get(std::vector<ctrlm_controller_i
 
 void ctrlm_obj_network_ble_t::printStatus() {
    LOG_WARN("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", __FUNCTION__);
-   LOG_INFO("%s: Remotes (%d):\n", __FUNCTION__, controllers_.size());
+   // Make sure to ignore the IR controller
+   LOG_INFO("%s: Remotes (%d):\n", __FUNCTION__, controllers_.size() - 1);
 
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
-      it->second->print_status();
+      if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType()) {
+         it->second->print_status();
+      }
    }
-   LOG_INFO("%s: status:    <%s>\n", __FUNCTION__, ctrlm_ble_utils_RcuStateToString(state_));
-   LOG_INFO("%s: IR status: <%s>\n", __FUNCTION__, ctrlm_ir_state_str(ir_state_));
+   LOG_INFO("%s: BLE Network Status:    <%s>\n", __FUNCTION__, ctrlm_ble_utils_RcuStateToString(state_));
+   LOG_INFO("%s: IR Programming Status: <%s>\n", __FUNCTION__, ctrlm_ir_state_str(ir_state_));
    LOG_WARN("%s: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n", __FUNCTION__);
 }
 
@@ -1743,7 +1812,7 @@ json_t *ctrlm_obj_network_ble_t::xconf_export_controllers() {
             strncpy(product_name, XCONF_PRODUCT_NAME_EC302, CTRLM_MAX_PARAM_STR_LEN);
             break;
          default:
-            LOG_WARN("%s: controller of type %d ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(ctrlType.first));
+            LOG_WARN("%s: controller of type %s ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(ctrlType.first));
             continue;
       }
 

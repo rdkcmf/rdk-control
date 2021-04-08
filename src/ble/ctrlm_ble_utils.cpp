@@ -72,6 +72,7 @@ const char *ctrlm_ble_utils_RcuStateToString(ctrlm_ble_state_t state)
 
 const char *ctrlm_ble_controller_type_str(ctrlm_ble_controller_type_t controller_type) {
     switch(controller_type) {
+        case BLE_CONTROLLER_TYPE_IR:      return("INFRARED_CONTROLLER");
         case BLE_CONTROLLER_TYPE_PR1:     return("BLE_CONTROLLER_PR1");
         case BLE_CONTROLLER_TYPE_LC103:   return("BLE_CONTROLLER_LC103");
         case BLE_CONTROLLER_TYPE_EC302:   return("BLE_CONTROLLER_EC302");

@@ -100,7 +100,7 @@ void ctrlm_obj_controller_ble_t::db_load() {
    ctrlm_db_ble_read_controller_model(network_id, controller_id, model_);
    ctrlm_db_ble_read_ieee_address(network_id, controller_id, ieee_address_);
    ctrlm_db_ble_read_time_binding(network_id, controller_id, time_binding_);
-   ctrlm_db_ble_read_last_key_time(network_id, controller_id, last_key_time_);
+   ctrlm_db_ble_read_last_key_press(network_id, controller_id, last_key_time_, last_key_code_);
    ctrlm_db_ble_read_battery_percent(network_id, controller_id, battery_percent_);
    ctrlm_db_ble_read_fw_revision(network_id, controller_id, fw_revision_);
    string rev;
@@ -147,7 +147,7 @@ void ctrlm_obj_controller_ble_t::db_store() {
    ctrlm_db_ble_write_controller_model(network_id, controller_id, model_);
    ctrlm_db_ble_write_ieee_address(network_id, controller_id, ieee_address_);
    ctrlm_db_ble_write_time_binding(network_id, controller_id, time_binding_);
-   ctrlm_db_ble_write_last_key_time(network_id, controller_id, last_key_time_);
+   ctrlm_db_ble_write_last_key_press(network_id, controller_id, last_key_time_, last_key_code_);
    ctrlm_db_ble_write_battery_percent(network_id, controller_id, battery_percent_);
    ctrlm_db_ble_write_fw_revision(network_id, controller_id, fw_revision_);
    ctrlm_db_ble_write_hw_revision(network_id, controller_id, hw_revision_.toString());
@@ -176,7 +176,9 @@ ctrlm_ble_controller_type_t ctrlm_obj_controller_ble_t::getControllerType(void) 
 }
 
 void ctrlm_obj_controller_ble_t::setControllerType(std::string productName) {
-   if (productName.find(BROADCAST_PRODUCT_NAME_PR1) != std::string::npos) {
+   if (productName.find(BROADCAST_PRODUCT_NAME_IR_DEVICE) != std::string::npos) {
+      controller_type_ = BLE_CONTROLLER_TYPE_IR;
+   } else if (productName.find(BROADCAST_PRODUCT_NAME_PR1) != std::string::npos) {
       controller_type_ = BLE_CONTROLLER_TYPE_PR1;
    } else if (productName.find(BROADCAST_PRODUCT_NAME_EC302) != std::string::npos) {
       controller_type_ = BLE_CONTROLLER_TYPE_EC302;
@@ -416,6 +418,10 @@ time_t ctrlm_obj_controller_ble_t::getLastKeyTime() {
    return last_key_time_;
 }
 
+guint16 ctrlm_obj_controller_ble_t::getLastKeyCode() {
+   return last_key_code_;
+}
+
 void ctrlm_obj_controller_ble_t::process_event_key(ctrlm_key_status_t key_status, guint16 key_code) {
    last_key_status_ = key_status;
    last_key_code_   = key_code;
@@ -428,7 +434,7 @@ void ctrlm_obj_controller_ble_t::last_key_time_update() {
 
    if(last_key_time_ > last_key_time_flush_) {
       last_key_time_flush_ = last_key_time_ + LAST_KEY_DATABASE_FLUSH_INTERVAL;
-      ctrlm_db_ble_write_last_key_time(network_id_get(), controller_id_get(), last_key_time_);
+      ctrlm_db_ble_write_last_key_press(network_id_get(), controller_id_get(), last_key_time_, last_key_code_);
    }
 }
 
@@ -663,7 +669,7 @@ void ctrlm_obj_controller_ble_t::print_status() {
    LOG_INFO("%s: Friendly Name   : %s\n", __FUNCTION__, product_name_.c_str());
    LOG_INFO("%s: Manufacturer    : %s\n", __FUNCTION__, manufacturer_.c_str());
    LOG_INFO("%s: Model           : %s\n", __FUNCTION__, model_.c_str());
-   LOG_INFO("%s: MAC Address     : 0x%llX\n", __FUNCTION__, ieee_address_);
+   LOG_INFO("%s: MAC Address     : %s\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
    LOG_INFO("%s: Device ID       : %d\n", __FUNCTION__, device_id_);
    LOG_INFO("%s: Connected       : %s\n", __FUNCTION__, (connected_==true) ? "true" : "false");
    LOG_INFO("%s: Battery Level   : %d%%\n", __FUNCTION__, battery_percent_);
@@ -673,7 +679,8 @@ void ctrlm_obj_controller_ble_t::print_status() {
    LOG_INFO("%s: Serial Number   : %s\n", __FUNCTION__, serial_number_.c_str());
    LOG_INFO("%s:\n", __FUNCTION__);
    LOG_INFO("%s: Bound Time      : %s\n", __FUNCTION__, time_binding_str);
-   LOG_INFO("%s: Last Key Press  : %s\n", __FUNCTION__, time_last_key_str);
+   LOG_INFO("%s: Last Key Code   : 0x%X\n", __FUNCTION__, last_key_code_);
+   LOG_INFO("%s: Last Key Time   : %s\n", __FUNCTION__, time_last_key_str);
    LOG_INFO("%s: Voice Cmd Count Today        : %lu\n", __FUNCTION__, voice_cmd_count_today_);
    LOG_INFO("%s: Voice Packets Sent Today     : %lu\n", __FUNCTION__, voice_packets_sent_today_);
    LOG_INFO("%s: Voice Packets Lost Today     : %lu\n", __FUNCTION__, voice_packets_lost_today_);

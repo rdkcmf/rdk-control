@@ -60,6 +60,7 @@ using namespace std;
 #define CTRLM_HAL_BLE_SKY_RCU_DBUS_GET_PROPERTIES           "org.freedesktop.DBus.Properties.Get"
 
 #define CODE_VOICE_KEY      66
+#define KEY_INPUT_DEVICE_FILE_IR     "/dev/input/event0"
 #define KEY_INPUT_DEVICE_BASE_DIR    "/dev/input/"
 #define KEY_INPUT_DEVICE_BASE_FILE   "event"
 
@@ -172,6 +173,7 @@ class rcu_metadata_t {
 
         GDBusProxy *gdbus_proxy_device_ifce;
         GDBusProxy *gdbus_proxy_upgrade_ifce;
+        string      input_device_filename;
         int         input_device_fd;
         int         device_minor_id;
 };
@@ -404,6 +406,9 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
 
     ctrlm_hal_ble_DaemonInit();
     g_ctrlm_hal_ble->set_running(true);
+
+    // initialize the IR input device
+    g_ctrlm_hal_ble->rcu_metadata[0].input_device_filename = KEY_INPUT_DEVICE_FILE_IR;
 
     memcpy(&g_ctrlm_hal_ble->main_init, main_init_, sizeof(ctrlm_hal_ble_main_init_t));
     if (g_ctrlm_hal_ble->main_init.cfm_init != 0) {
@@ -1710,7 +1715,7 @@ static int ctrlm_hal_ble_OpenKeyInputDevice(unsigned long long ieee_address)
                     if (rc < 0) {
                         LOG_ERROR("%s: Failed to init libevdev (%s)\n", __FUNCTION__, strerror(-rc));   //on failure, rc is negative errno
                     } else {
-                        // LOG_DEBUG("%s: Input device name: <%s> ID: bus %#x vendor %#x product %#x, phys = <%s>, unique = <%s>\n", __FUNCTION__,libevdev_get_name(evdev),libevdev_get_id_bustype(evdev),libevdev_get_id_vendor(evdev),libevdev_get_id_product(evdev),libevdev_get_phys(evdev),libevdev_get_uniq(evdev));
+                        // LOG_DEBUG("%s: Input device <%s> name: <%s> ID: bus %#x vendor %#x product %#x, phys = <%s>, unique = <%s>\n", __FUNCTION__,keyInputFilename.c_str(),libevdev_get_name(evdev),libevdev_get_id_bustype(evdev),libevdev_get_id_vendor(evdev),libevdev_get_id_product(evdev),libevdev_get_phys(evdev),libevdev_get_uniq(evdev));
                         unsigned long long evdev_macaddr = ctrlm_convert_mac_string_to_long(libevdev_get_uniq(evdev));
                         if (evdev_macaddr == ieee_address) {
                             LOG_INFO("%s, %d: Input Dev Node (%s) for device (0x%llX) FOUND, returning file descriptor: <%d>\n", 
@@ -1753,45 +1758,48 @@ static int ctrlm_hal_ble_HandleKeypress(struct input_event *event, unsigned long
     if (event->code == 0) {
         return 0;
     }
-    switch (event->code) {
-        case CODE_VOICE_KEY:
-            if (1 == event->value) {
-                LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
-                LOG_INFO("%s: CODE_VOICE_KEY button PRESSED event for device: 0x%llX\n", __FUNCTION__, macAddr);
-                LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
+    // if macAddr == 0, that means this keypress is coming from the IR input device, so don't try to trigger a voice session
+    if (macAddr != 0) {
+        switch (event->code) {
+            case CODE_VOICE_KEY:
+                if (1 == event->value) {
+                    LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
+                    LOG_INFO("%s: CODE_VOICE_KEY button PRESSED event for device: 0x%llX\n", __FUNCTION__, macAddr);
+                    LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
 
-                if (NULL == g_ctrlm_hal_ble->main_init.req_voice_session_begin) {
-                    LOG_WARN("%s: req_voice_session_begin is NULL!!\n", __FUNCTION__);
-                } else {
-                    ctrlm_hal_ble_ReqVoiceSession_params_t req_params;
-                    req_params.ieee_address = macAddr;
-                    // Send voice session begin request up to the BLE network
-                    if (CTRLM_HAL_RESULT_SUCCESS != g_ctrlm_hal_ble->main_init.req_voice_session_begin(g_ctrlm_hal_ble->main_init.network_id, &req_params)) {
-                        LOG_ERROR("%s: voice session begin request FAILED\n", __FUNCTION__);
+                    if (NULL == g_ctrlm_hal_ble->main_init.req_voice_session_begin) {
+                        LOG_WARN("%s: req_voice_session_begin is NULL!!\n", __FUNCTION__);
+                    } else {
+                        ctrlm_hal_ble_ReqVoiceSession_params_t req_params;
+                        req_params.ieee_address = macAddr;
+                        // Send voice session begin request up to the BLE network
+                        if (CTRLM_HAL_RESULT_SUCCESS != g_ctrlm_hal_ble->main_init.req_voice_session_begin(g_ctrlm_hal_ble->main_init.network_id, &req_params)) {
+                            LOG_ERROR("%s: voice session begin request FAILED\n", __FUNCTION__);
+                        }
                     }
                 }
-            }
-            else if (0 == event->value) {
-                LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
-                LOG_INFO("%s: CODE_VOICE_KEY button RELEASED event for device: 0x%llX\n", __FUNCTION__, macAddr);
-                LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
+                else if (0 == event->value) {
+                    LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
+                    LOG_INFO("%s: CODE_VOICE_KEY button RELEASED event for device: 0x%llX\n", __FUNCTION__, macAddr);
+                    LOG_INFO("%s: ------------------------------------------------------------------------\n", __FUNCTION__);
 
-                if (NULL == g_ctrlm_hal_ble->main_init.req_voice_session_end) {
-                    LOG_WARN("%s: req_voice_session_end is NULL!!\n", __FUNCTION__);
-                } else {
-                    ctrlm_hal_ble_ReqVoiceSession_params_t req_params;
-                    req_params.ieee_address = macAddr;
-                    // Send voice session begin request up to the BLE network
-                    if (CTRLM_HAL_RESULT_SUCCESS != g_ctrlm_hal_ble->main_init.req_voice_session_end(g_ctrlm_hal_ble->main_init.network_id, &req_params)) {
-                        LOG_ERROR("%s: voice session end request FAILED\n", __FUNCTION__);
+                    if (NULL == g_ctrlm_hal_ble->main_init.req_voice_session_end) {
+                        LOG_WARN("%s: req_voice_session_end is NULL!!\n", __FUNCTION__);
+                    } else {
+                        ctrlm_hal_ble_ReqVoiceSession_params_t req_params;
+                        req_params.ieee_address = macAddr;
+                        // Send voice session begin request up to the BLE network
+                        if (CTRLM_HAL_RESULT_SUCCESS != g_ctrlm_hal_ble->main_init.req_voice_session_end(g_ctrlm_hal_ble->main_init.network_id, &req_params)) {
+                            LOG_ERROR("%s: voice session end request FAILED\n", __FUNCTION__);
+                        }
                     }
                 }
-            }
-            else if (2 == event->value) {
-                // This is the key repeat event sent while holding down the button
-            }
-            break;
-        default: break;
+                else if (2 == event->value) {
+                    // This is the key repeat event sent while holding down the button
+                }
+                break;
+            default: break;
+        }
     }
 
     if (event->value >= 0 && event->value < 3) {
@@ -1836,8 +1844,14 @@ void keyMonitorThread_FindRcuInputDevices(ctrlm_hal_ble_global_t *metadata, std:
     for (auto it = metadata->rcu_metadata.begin(); it != metadata->rcu_metadata.end(); it++) {
         if (it->second.input_device_fd < 0) {
             // We have an rcu in the metadata without an input device opened.
-            // Loop through the linux input device nodes to find the one corresponding to this ieee_address
-            int input_device_fd = ctrlm_hal_ble_OpenKeyInputDevice(it->first);
+            int input_device_fd = -1;
+            if (it->first == 0) {
+                //this is a special case for the IR input device
+                input_device_fd = open(it->second.input_device_filename.c_str(), O_RDONLY|O_NONBLOCK);
+            } else {
+                // Loop through the linux input device nodes to find the one corresponding to this ieee_address
+                input_device_fd = ctrlm_hal_ble_OpenKeyInputDevice(it->first);
+            }
             if (input_device_fd < 0) {
                 // LOG_DEBUG("%s: Did not find input device for RCU 0x%llX\n", __FUNCTION__, it->first);
             } else {
@@ -1853,8 +1867,9 @@ void keyMonitorThread_FindRcuInputDevices(ctrlm_hal_ble_global_t *metadata, std:
                     LOG_ERROR("%s: fstat() failed: error = <%d>, <%s>", __FUNCTION__, errsv, strerror(errsv));
                 } else {
                     it->second.device_minor_id = minor(sb.st_rdev);
-                    LOG_INFO("%s: it->second.device_minor_id = <%d>, reporting status change up to the network\n", __FUNCTION__, it->second.device_minor_id);
-                    if (NULL != metadata->main_init.ind_status) {
+                    // if it->first == 0, then this is the IR input device, so don't indicate up remote status
+                    if (it->first != 0 && NULL != metadata->main_init.ind_status) {
+                        LOG_INFO("%s: it->second.device_minor_id = <%d>, reporting status change up to the network\n", __FUNCTION__, it->second.device_minor_id);
                         // send deviceid up to the network
                         ctrlm_hal_ble_RcuStatusData_t rcu_status;
                         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_DEVICE_ID;
@@ -1893,7 +1908,7 @@ void *ctrlm_hal_ble_KeyMonitorThread(void *data)
 
         keyMonitorThread_ReadMessageQueue();
         keyMonitorThread_FindRcuInputDevices(metadata, rcu_metadata, rfds, nfds);
-        
+
         //nfds is the highest-numbered file descriptor in the set, plus 1.
         nfds++;
         if (nfds <= 0) {
