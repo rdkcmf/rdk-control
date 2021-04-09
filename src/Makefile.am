@@ -131,6 +131,30 @@ controlMgr_SOURCES += ../cpc/auth/ctrlm_auth_thunder.cpp
 else
 controlMgr_SOURCES += ../cpc/auth/ctrlm_auth_legacy.cpp
 endif
+
+if AUTH_RECEIVER_ID
+AM_CPPFLAGS += -DAUTH_RECEIVER_ID
+endif
+
+if AUTH_DEVICE_ID
+AM_CPPFLAGS += -DAUTH_DEVICE_ID
+endif
+
+if AUTH_ACCOUNT_ID
+AM_CPPFLAGS += -DAUTH_ACCOUNT_ID
+endif
+
+if AUTH_PARTNER_ID
+AM_CPPFLAGS += -DAUTH_PARTNER_ID
+endif
+
+if AUTH_EXPERIENCE
+AM_CPPFLAGS += -DAUTH_EXPERIENCE
+endif
+
+if AUTH_SAT_TOKEN
+AM_CPPFLAGS += -DAUTH_SAT_TOKEN
+endif
 endif
 
 if IRDB_UEI_ENABLED
@@ -146,6 +170,10 @@ else
 controlMgr_SOURCES += irdb/ctrlm_irdb_factory.cpp           \
                       stubs/stubs_voice_packet_analysis.cpp
 
+endif
+
+if VOICE_NEXTGEN_MAC
+AM_CPPFLAGS += -DVOICE_NEXTGEN_MAC
 endif
 
 if BREAKPAD_ENABLED

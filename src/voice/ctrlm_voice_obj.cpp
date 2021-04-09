@@ -1465,22 +1465,30 @@ bool ctrlm_voice_t::voice_stb_data_test_get() const {
 }
 
 bool ctrlm_voice_t::voice_session_has_stb_data() {
+#if defined(AUTH_RECEIVER_ID) || defined(AUTH_DEVICE_ID)
     if(this->receiver_id == "" && this->device_id == "") {
         LOG_INFO("%s: No receiver/device id\n", __FUNCTION__);
         return(false);
     }
+#endif
+#ifdef AUTH_PARTNER_ID
     if(this->partner_id == "") {
         LOG_INFO("%s: No partner id\n", __FUNCTION__);
         return(false);
     }
+#endif
+#ifdef AUTH_EXPERIENCE
     if(this->experience == "") {
         LOG_INFO("%s: No experience tag\n", __FUNCTION__);
         return(false);
     }
+#endif
+#ifdef AUTH_SAT_TOKEN
     if(this->sat_token_required && this->sat_token == "") {
         LOG_INFO("%s: No SAT token\n", __FUNCTION__);
         return(false);
     }
+#endif
     return(true);
 }
 

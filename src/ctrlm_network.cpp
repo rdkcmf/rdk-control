@@ -140,7 +140,6 @@ const char * ctrlm_obj_network_t::version_get() const {
 
 void ctrlm_obj_network_t::receiver_id_set(const string& receiver_id) {
    THREAD_ID_VALIDATE();
-   LOG_INFO("%s: Receiver Id <%s>\n", __FUNCTION__, receiver_id.c_str());
    receiver_id_ = receiver_id;
 }
 
@@ -151,7 +150,6 @@ string ctrlm_obj_network_t::receiver_id_get() const {
 
 void ctrlm_obj_network_t::device_id_set(const string& device_id) {
    THREAD_ID_VALIDATE();
-    LOG_INFO("%s: Device Id <%s>\n", __FUNCTION__, device_id.c_str());
     device_id_ = device_id;
 }
 
@@ -162,7 +160,6 @@ string ctrlm_obj_network_t::device_id_get() const {
 
 void ctrlm_obj_network_t::service_account_id_set(const string& service_account_id) {
    THREAD_ID_VALIDATE();
-   LOG_INFO("%s: Service Account Id <%s>\n", __FUNCTION__, service_account_id.c_str());
    service_account_id_ = service_account_id;
 }
 
@@ -173,7 +170,6 @@ string ctrlm_obj_network_t::service_account_id_get() const {
 
 void ctrlm_obj_network_t::partner_id_set(const string& partner_id) {
    THREAD_ID_VALIDATE();
-   LOG_INFO("%s: Partner Id <%s>\n", __FUNCTION__, partner_id.c_str());
    partner_id_ = partner_id;
 }
 
@@ -184,7 +180,6 @@ string ctrlm_obj_network_t::partner_id_get() const {
  
 void ctrlm_obj_network_t::experience_set(const string& experience) {
    THREAD_ID_VALIDATE();
-   LOG_INFO("%s: Experience Tag <%s>\n", __FUNCTION__, experience.c_str());
    experience_ = experience;
 }
 

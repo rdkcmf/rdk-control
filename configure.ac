@@ -111,6 +111,48 @@ AC_ARG_ENABLE([auththunder],
 esac],[auththunder=false])
 AM_CONDITIONAL([AUTH_THUNDER], [test x$auththunder = xtrue])
 
+AC_ARG_ENABLE([auth-receiver-id],
+[  --enable-auth-receiver-id    Enable auth receiver id support],
+[auth_receiver_id=true],
+[auth_receiver_id=false])
+AM_CONDITIONAL([AUTH_RECEIVER_ID], [test x$auth_receiver_id = xtrue])
+
+AC_ARG_ENABLE([auth-device-id],
+[  --enable-auth-device-id    Enable auth device id support],
+[auth_device_id=true],
+[auth_device_id=false])
+AM_CONDITIONAL([AUTH_DEVICE_ID], [test x$auth_device_id = xtrue])
+
+AC_ARG_ENABLE([auth-account-id],
+[  --enable-auth-account-id    Enable auth account id support],
+[auth_account_id=true],
+[auth_account_id=false])
+AM_CONDITIONAL([AUTH_ACCOUNT_ID], [test x$auth_account_id = xtrue])
+
+AC_ARG_ENABLE([auth-partner-id],
+[  --enable-auth-partner-id    Enable auth partner id support],
+[auth_partner_id=true],
+[auth_partner_id=false])
+AM_CONDITIONAL([AUTH_PARTNER_ID], [test x$auth_partner_id = xtrue])
+
+AC_ARG_ENABLE([auth-experience],
+[  --enable-auth-experience    Enable auth experience support],
+[auth_experience=true],
+[auth_experience=false])
+AM_CONDITIONAL([AUTH_EXPERIENCE], [test x$auth_experience = xtrue])
+
+AC_ARG_ENABLE([auth-sat-token],
+[  --enable-auth-sat-token    Enable auth sat token support],
+[auth_sat_token=true],
+[auth_sat_token=false])
+AM_CONDITIONAL([AUTH_SAT_TOKEN], [test x$auth_sat_token = xtrue])
+
+AC_ARG_ENABLE([voice-nextgen-mac],
+[  --enable-voice-nextgen-mac    Enable mac address for voice nextgen api],
+[voice_nextgen_mac=true],
+[voice_nextgen_mac=false])
+AM_CONDITIONAL([VOICE_NEXTGEN_MAC], [test x$voice_nextgen_mac = xtrue])
+
 AC_ARG_ENABLE([irdbuei],
 [  --enable-irdbuei    Turn on UEI IRDB support],
 [case "${enableval}" in

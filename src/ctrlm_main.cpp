@@ -273,12 +273,34 @@ typedef struct {
 static ctrlm_global_t g_ctrlm;
 
 // Prototypes
+#ifdef AUTH_ENABLED
+static gboolean ctrlm_has_authservice_data(void);
+static gboolean ctrlm_load_authservice_data(void);
+#ifdef AUTH_RECEIVER_ID
 static gboolean ctrlm_load_receiver_id(void);
+static void     ctrlm_main_has_receiver_id_set(gboolean has_id);
+#endif
+#ifdef AUTH_DEVICE_ID
 static gboolean ctrlm_load_device_id(void);
+static void     ctrlm_main_has_device_id_set(gboolean has_id);
+#endif
+#ifdef AUTH_ACCOUNT_ID
 static gboolean ctrlm_load_service_account_id(void);
+static void     ctrlm_main_has_service_account_id_set(gboolean has_id);
+#endif
+#ifdef AUTH_PARTNER_ID
 static gboolean ctrlm_load_partner_id(void);
+static void     ctrlm_main_has_partner_id_set(gboolean has_id);
+#endif
+#ifdef AUTH_EXPERIENCE
 static gboolean ctrlm_load_experience(void);
+static void     ctrlm_main_has_experience_set(gboolean has_experience);
+#endif
+#ifdef AUTH_SAT_TOKEN
 static gboolean ctrlm_load_service_access_token(void);
+static void     ctrlm_main_has_service_access_token_set(gboolean has_token);
+#endif
+#endif
 static gboolean ctrlm_load_version(void);
 static gboolean ctrlm_load_device_mac(void);
 static gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, json_t **json_obj_voice, json_t **json_obj_device_update, json_t **json_obj_validation, json_t **json_obj_vsdk);
@@ -313,12 +335,6 @@ static void     ctrlm_main_iarm_call_autobind_config_set_(ctrlm_main_iarm_call_a
 static void     ctrlm_main_iarm_call_precommission_config_set_(ctrlm_main_iarm_call_precommision_config_t *config);
 static void     ctrlm_main_iarm_call_factory_reset_(ctrlm_main_iarm_call_factory_reset_t *reset);
 static void     ctrlm_main_iarm_call_controller_unbind_(ctrlm_main_iarm_call_controller_unbind_t *unbind);
-static void     ctrlm_main_has_receiver_id_set(gboolean has_id);
-static void     ctrlm_main_has_device_id_set(gboolean has_id);
-static void     ctrlm_main_has_service_account_id_set(gboolean has_id);
-static void     ctrlm_main_has_partner_id_set(gboolean has_id);
-static void     ctrlm_main_has_experience_set(gboolean has_experience);
-static void     ctrlm_main_has_service_access_token_set(gboolean has_token);
 static void     ctrlm_main_update_export_controller_list(void);
 static void     ctrlm_main_iarm_call_ir_remote_usage_get_(ctrlm_main_iarm_call_ir_remote_usage_t *ir_remote_usage);
 static void     ctrlm_main_iarm_call_pairing_metrics_get_(ctrlm_main_iarm_call_pairing_metrics_t *pairing_metrics);
@@ -506,6 +522,12 @@ int main(int argc, char *argv[]) {
    g_ctrlm.power_state                    = CTRLM_POWER_STATE_ON;
 
    g_ctrlm.service_access_token.clear();
+   g_ctrlm.has_receiver_id                = false;
+   g_ctrlm.has_device_id                  = false;
+   g_ctrlm.has_service_account_id         = false;
+   g_ctrlm.has_partner_id                 = false;
+   g_ctrlm.has_experience                 = false;
+   g_ctrlm.has_service_access_token       = false;
 
    g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_UNKNOWN;
    g_ctrlm.last_key_info.is_screen_bind_mode  = false;
@@ -557,35 +579,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.authservice = new ctrlm_auth_legacy_t(g_ctrlm.server_url_authservice);
 #endif
 
-   LOG_INFO("ctrlm_main: load receiver id\n");
-   if(!ctrlm_load_receiver_id()) {
-      LOG_WARN("ctrlm_main: failed to load receiver id\n");
-   }
-
-   LOG_INFO("ctrlm_main: load device id\n");
-   if(!ctrlm_load_device_id()) {
-       LOG_WARN("ctrlm_main: failed to load device id\n");
-   }
-
-   LOG_INFO("ctrlm_main: load service account id\n");
-   if(!ctrlm_load_service_account_id()) {
-      LOG_WARN("ctrlm_main: failed to load service account id\n");
-   }
-
-   LOG_INFO("ctrlm_main: load partner id\n");
-   if(!ctrlm_load_partner_id()) {
-      LOG_WARN("ctrlm_main: failed to load partner id\n");
-   }
- 
-   LOG_INFO("ctrlm_main: load experience\n");
-   if(!ctrlm_load_experience()) {
-      LOG_WARN("ctrlm_main: failed to load experience\n");
-   }
-
-   LOG_INFO("ctrlm_main: load service access token\n");
-   if(!ctrlm_load_service_access_token()) {
-      LOG_WARN("ctrlm_main: failed to load service access token\n");
-   }
+   ctrlm_load_authservice_data();
 #endif // AUTH_ENABLED
 
 #ifdef USE_VOICE_SDK
@@ -695,14 +689,6 @@ int main(int argc, char *argv[]) {
    LOG_INFO("ctrlm_main: init voice\n");
 #ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_configure_config_file_json(json_obj_voice, json_obj_vsdk);
-   g_ctrlm.voice_session->voice_stb_data_stb_name_set(g_ctrlm.stb_name);
-#ifdef AUTH_ENABLED
-   g_ctrlm.voice_session->voice_stb_data_account_number_set(g_ctrlm.service_account_id);
-   g_ctrlm.voice_session->voice_stb_data_receiver_id_set(g_ctrlm.receiver_id);
-   g_ctrlm.voice_session->voice_stb_data_device_id_set(g_ctrlm.device_id);
-   g_ctrlm.voice_session->voice_stb_data_partner_id_set(g_ctrlm.partner_id);
-   g_ctrlm.voice_session->voice_stb_data_experience_set(g_ctrlm.experience);
-#endif
 #else
    ctrlm_voice_init(json_obj_voice);
 #endif
@@ -732,7 +718,7 @@ int main(int argc, char *argv[]) {
 
 #ifdef AUTH_ENABLED
    // Authservice check
-   if(!ctrlm_main_has_receiver_id_get() || !ctrlm_main_has_device_id_get() || !ctrlm_main_has_service_account_id_get() || !ctrlm_main_has_partner_id_get() || !ctrlm_main_has_experience_get() || ctrlm_main_needs_service_access_token_get()) {
+   if(!ctrlm_has_authservice_data()) {
        LOG_INFO("%s: Starting polling authservice for device data\n", __FUNCTION__);
        g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
    }
@@ -1196,6 +1182,14 @@ gboolean ctrlm_load_device_mac(void) {
 }
 
 #ifdef AUTH_ENABLED
+#ifdef AUTH_RECEIVER_ID
+gboolean ctrlm_main_has_receiver_id_get(void) {
+   return(g_ctrlm.has_receiver_id);
+}
+
+void ctrlm_main_has_receiver_id_set(gboolean has_id) {
+   g_ctrlm.has_receiver_id = has_id;
+}
 
 gboolean ctrlm_load_receiver_id(void) {
    if(!g_ctrlm.authservice->get_receiver_id(g_ctrlm.receiver_id)) {
@@ -1215,6 +1209,16 @@ gboolean ctrlm_load_receiver_id(void) {
    ctrlm_main_has_receiver_id_set(true);
    return(true);
 }
+#endif
+
+#ifdef AUTH_DEVICE_ID
+void ctrlm_main_has_device_id_set(gboolean has_id) {
+   g_ctrlm.has_device_id   = has_id;
+}
+
+gboolean ctrlm_main_has_device_id_get(void) {
+   return(g_ctrlm.has_device_id);
+}
 
 gboolean ctrlm_load_device_id(void) {
    if(!g_ctrlm.authservice->get_device_id(g_ctrlm.device_id)) {
@@ -1232,6 +1236,16 @@ gboolean ctrlm_load_device_id(void) {
    }
    ctrlm_main_has_device_id_set(true);
    return(true);
+}
+#endif
+
+#ifdef AUTH_ACCOUNT_ID
+gboolean ctrlm_main_has_service_account_id_get(void) {
+   return(g_ctrlm.has_service_account_id);
+}
+
+void ctrlm_main_has_service_account_id_set(gboolean has_id) {
+   g_ctrlm.has_service_account_id = has_id;
 }
 
 gboolean ctrlm_load_service_account_id(void) {
@@ -1251,6 +1265,16 @@ gboolean ctrlm_load_service_account_id(void) {
    ctrlm_main_has_service_account_id_set(true);
    return(true);
 }
+#endif
+
+#ifdef AUTH_PARTNER_ID
+gboolean ctrlm_main_has_partner_id_get(void) {
+   return(g_ctrlm.has_partner_id);
+}
+
+void ctrlm_main_has_partner_id_set(gboolean has_id) {
+   g_ctrlm.has_partner_id = has_id;
+}
 
 gboolean ctrlm_load_partner_id(void) {
    if(!g_ctrlm.authservice->get_partner_id(g_ctrlm.partner_id)) {
@@ -1269,7 +1293,17 @@ gboolean ctrlm_load_partner_id(void) {
    ctrlm_main_has_partner_id_set(true);
    return(true);
 }
- 
+#endif
+
+#ifdef AUTH_EXPERIENCE
+gboolean ctrlm_main_has_experience_get(void) {
+   return(g_ctrlm.has_experience);
+}
+
+void ctrlm_main_has_experience_set(gboolean has_experience) {
+   g_ctrlm.has_experience = has_experience;
+}
+
 gboolean ctrlm_load_experience(void) {
    if(!g_ctrlm.authservice->get_experience(g_ctrlm.experience)) {
       ctrlm_main_has_experience_set(false);
@@ -1286,6 +1320,19 @@ gboolean ctrlm_load_experience(void) {
    }
    ctrlm_main_has_experience_set(true);
    return(true);
+}
+#endif
+
+#ifdef AUTH_SAT_TOKEN
+gboolean ctrlm_main_needs_service_access_token_get(void) {
+   if(g_ctrlm.sat_enabled) {
+      return(!g_ctrlm.has_service_access_token);
+   }
+   return false;
+}
+
+void ctrlm_main_has_service_access_token_set(gboolean has_token) {
+   g_ctrlm.has_service_access_token = has_token;
 }
 
 gboolean ctrlm_load_service_access_token(void) {
@@ -1322,40 +1369,130 @@ gboolean ctrlm_load_service_access_token(void) {
    g_ctrlm.service_access_token_expiration_tag = ctrlm_timeout_create(timeout * 1000, ctrlm_authservice_expired, (void *)(expired ? 1 : 0));
    return(true);
 }
-
-#else
-
-gboolean ctrlm_load_receiver_id(void) {
-   ctrlm_main_has_receiver_id_set(false);
-   return(false);
-}
-
-gboolean ctrlm_load_device_id(void) {
-   ctrlm_main_has_device_id_set(false);
-   return(false);
-}
-
-gboolean ctrlm_load_service_account_id(void) {
-   ctrlm_main_has_service_account_id_set(false);
-   return(false);
-}
-
-gboolean ctrlm_load_partner_id(void) {
-   ctrlm_main_has_partner_id_set(false);
-   return(false);
-}
-
-gboolean ctrlm_load_experience(void) {
-   ctrlm_main_has_experience_set(false);
-   return(false);
-}
-
-gboolean ctrlm_load_service_access_token(void) {
-   ctrlm_main_has_service_access_token_set(false);
-   return(false);
-}
-
 #endif
+#endif
+
+gboolean ctrlm_has_authservice_data(void) {
+   gboolean ret = TRUE;
+#ifdef AUTH_ENABLED
+#ifdef AUTH_RECEIVER_ID
+   if(!ctrlm_main_has_receiver_id_get()) {
+      ret = FALSE;
+   }
+#endif
+
+#ifdef AUTH_DEVICE_ID
+   if(!ctrlm_main_has_device_id_get()) {
+      ret = FALSE;
+   }
+#endif
+
+#ifdef AUTH_ACCOUNT_ID
+   if(!ctrlm_main_has_service_account_id_get()) {
+      ret = FALSE;
+   }
+#endif
+
+#ifdef AUTH_PARTNER_ID
+   if(!ctrlm_main_has_partner_id_get()) {
+      ret = FALSE;
+   }
+#endif
+
+#ifdef AUTH_EXPERIENCE
+   if(!ctrlm_main_has_experience_get()) {
+      ret = FALSE;
+   }
+#endif
+
+#ifdef AUTH_SAT_TOKEN
+   if(ctrlm_main_needs_service_access_token_get()) {
+      ret = FALSE;
+   }
+#endif
+#endif
+
+   return(ret);
+}
+
+gboolean ctrlm_load_authservice_data(void) {
+   gboolean ret = TRUE;
+#ifdef AUTH_ENABLED
+#ifdef AUTH_RECEIVER_ID
+   if(!ctrlm_main_has_receiver_id_get()) {
+      LOG_INFO("%s: load receiver id\n", __FUNCTION__);
+      if(!ctrlm_load_receiver_id()) {
+         LOG_WARN("%s: failed to load receiver id\n", __FUNCTION__);
+         ret = FALSE;
+      } else {
+         LOG_INFO("%s: load receiver id successfully <%s>\n", __FUNCTION__, g_ctrlm.receiver_id.c_str());
+      }
+   }
+#endif
+
+#ifdef AUTH_DEVICE_ID
+   if(!ctrlm_main_has_device_id_get()) {
+      LOG_INFO("%s: load device id\n", __FUNCTION__);
+      if(!ctrlm_load_device_id()) {
+         LOG_WARN("%s: failed to load device id\n", __FUNCTION__);
+         ret = FALSE;
+      } else {
+         LOG_INFO("%s: load device id successfully <%s>\n", __FUNCTION__, g_ctrlm.device_id.c_str());
+      }
+   }
+#endif
+
+#ifdef AUTH_ACCOUNT_ID
+   if(!ctrlm_main_has_service_account_id_get()) {
+      LOG_INFO("%s: load account id\n", __FUNCTION__);
+      if(!ctrlm_load_service_account_id()) {
+         LOG_WARN("%s: failed to load account id\n", __FUNCTION__);
+         ret = FALSE;
+      } else {
+         LOG_INFO("%s: load account id successfully <%s>\n", __FUNCTION__, g_ctrlm.service_account_id.c_str());
+      }
+   }
+#endif
+
+#ifdef AUTH_PARTNER_ID
+   if(!ctrlm_main_has_partner_id_get()) {
+      LOG_INFO("%s: load partner id\n", __FUNCTION__);
+      if(!ctrlm_load_partner_id()) {
+         LOG_WARN("%s: failed to load partner id\n", __FUNCTION__);
+         ret = FALSE;
+      } else {
+         LOG_INFO("%s: load partner id successfully <%s>\n", __FUNCTION__, g_ctrlm.partner_id.c_str());
+      }
+   }
+#endif
+
+#ifdef AUTH_EXPERIENCE
+   if(!ctrlm_main_has_experience_get()) {
+      LOG_INFO("%s: load experience\n", __FUNCTION__);
+      if(!ctrlm_load_experience()) {
+         LOG_WARN("%s: failed to load experience\n", __FUNCTION__);
+         ret = FALSE;
+      } else {
+         LOG_INFO("%s: load experience successfully <%s>\n", __FUNCTION__, g_ctrlm.experience.c_str());
+      }
+   }
+#endif
+
+#ifdef AUTH_SAT_TOKEN
+   if(ctrlm_main_needs_service_access_token_get()) {
+      LOG_INFO("%s: load sat token\n", __FUNCTION__);
+      if(!ctrlm_load_service_access_token()) {
+         LOG_WARN("%s: failed to load sat token\n", __FUNCTION__);
+         ret = FALSE;
+      } else {
+         LOG_INFO("%s: load sat token successfully\n", __FUNCTION__);
+      }
+   }
+#endif
+#endif
+
+   return(ret);
+}
 
 gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, json_t **json_obj_voice, json_t **json_obj_device_update, json_t **json_obj_validation, json_t **json_obj_vsdk) {
    const gchar *config_fn_opt = "/opt/ctrlm_config.json";
@@ -1615,6 +1752,7 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
          LOG_INFO("%s: %-28s - ABSENT\n", __FUNCTION__, text);
       }
 
+#if defined(AUTH_ENABLED) && defined(AUTH_DEVICE_ID)
       json_obj = json_object_get(json_obj_ctrlm, JSON_STR_NAME_CTRLM_GLOBAL_DEVICE_ID);
       text = "Device ID";
       if(json_obj != NULL && json_is_string(json_obj) && (strlen(json_string_value(json_obj)) != 0)) {
@@ -1624,6 +1762,7 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
       } else {
          LOG_INFO("%s: %-24s - ABSENT\n", __FUNCTION__, text);
       }
+#endif
    }
 
    LOG_INFO("%s: Database Path                <%s>\n",  __FUNCTION__, g_ctrlm.db_path.c_str());
@@ -1766,11 +1905,6 @@ gboolean ctrlm_networks_pre_init(json_t *json_obj_net_rf4ce, json_t *json_config
    }
 
    for(auto const &itr : g_ctrlm.networks) {
-      if(ctrlm_main_has_receiver_id_get())        { itr.second->receiver_id_set(g_ctrlm.receiver_id);               }
-      if(ctrlm_main_has_device_id_get())          { itr.second->device_id_set(g_ctrlm.device_id);                   }
-      if(ctrlm_main_has_service_account_id_get()) { itr.second->service_account_id_set(g_ctrlm.service_account_id); }
-      if(ctrlm_main_has_partner_id_get())         { itr.second->partner_id_set(g_ctrlm.partner_id);                 }
-      if(ctrlm_main_has_experience_get())         { itr.second->experience_set(g_ctrlm.experience);                 }
       itr.second->stb_name_set(g_ctrlm.stb_name);
       itr.second->mask_key_codes_set(g_ctrlm.mask_key_codes_json);
    }
@@ -2292,56 +2426,8 @@ gpointer ctrlm_main_thread(gpointer param) {
             LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL\n", __FUNCTION__);
             ctrlm_main_queue_msg_authservice_poll_t *dqm = (ctrlm_main_queue_msg_authservice_poll_t *) msg;
 
-            if(!ctrlm_main_has_receiver_id_get()) {
-               if(!ctrlm_load_receiver_id()) {
-                  LOG_WARN("%s: Receiver ID not avaliable yet...\n", __FUNCTION__);
-                  dqm->ret = TRUE;
-               } else {
-                  LOG_INFO("%s: Receiver ID retrieved < %s >\n", __FUNCTION__, g_ctrlm.receiver_id.c_str());
-               }
-            }
-            if(!ctrlm_main_has_device_id_get()) {
-               if(!ctrlm_load_device_id()) {
-                  LOG_WARN("%s: Device ID not available yet...\n", __FUNCTION__);
-                  dqm->ret = TRUE;
-               } else {
-                  LOG_INFO("%s: Device ID retrieved < %s >\n", __FUNCTION__, g_ctrlm.device_id.c_str());
-               }
-
-            }
-
-            if(!ctrlm_main_has_service_account_id_get()) {
-               if(!ctrlm_load_service_account_id()) {
-                  LOG_WARN("%s: Service Account ID not avaliable yet...\n", __FUNCTION__);
-                  dqm->ret = TRUE;
-               } else {
-                  LOG_INFO("%s: Service Account ID retrieved < %s >\n", __FUNCTION__, g_ctrlm.service_account_id.c_str());
-               }
-            }
-
-            if(!ctrlm_main_has_partner_id_get()) {
-               if(!ctrlm_load_partner_id()) {
-                  LOG_WARN("%s: Partner ID not avaliable yet...\n", __FUNCTION__);
-                  dqm->ret = TRUE;
-               } else {
-                  LOG_INFO("%s: Partner ID retrieved < %s >\n", __FUNCTION__, g_ctrlm.partner_id.c_str());
-               }
-            }
- 
-            if(!ctrlm_main_has_experience_get()) {
-               if(!ctrlm_load_experience()) {
-                  LOG_WARN("%s: Experience Tag not available yet...\n", __FUNCTION__);
-                  dqm->ret = TRUE;
-               } else {
-                  LOG_INFO("%s: Experience Tag retrieved < %s >\n", __FUNCTION__, g_ctrlm.experience.c_str());
-               }
-            }
-
-            if(ctrlm_main_needs_service_access_token_get()) {
-               if(!ctrlm_load_service_access_token()) {
-                  LOG_WARN("%s: Service access token not avaliable yet...\n", __FUNCTION__);
-                  dqm->ret = TRUE;
-               }
+            if(!ctrlm_load_authservice_data()) {
+               dqm->ret = TRUE;
             }
 
             if(dqm->semaphore != NULL) {
@@ -4225,57 +4311,6 @@ void ctrlm_discovery_remote_type_set(const char *remote_type_str) {
 
 const char* ctrlm_minidump_path_get() {
     return g_ctrlm.minidump_path.c_str();
-}
-
-gboolean ctrlm_main_has_receiver_id_get(void) {
-   return(g_ctrlm.has_receiver_id);
-}
-
-void ctrlm_main_has_receiver_id_set(gboolean has_id) {
-   g_ctrlm.has_receiver_id = has_id;
-}
-
-void ctrlm_main_has_device_id_set(gboolean has_id) {
-   g_ctrlm.has_device_id   = has_id;
-}
-
-gboolean ctrlm_main_has_device_id_get(void) {
-   return(g_ctrlm.has_device_id);
-}
-
-gboolean ctrlm_main_has_service_account_id_get(void) {
-   return(g_ctrlm.has_service_account_id);
-}
-
-void ctrlm_main_has_service_account_id_set(gboolean has_id) {
-   g_ctrlm.has_service_account_id = has_id;
-}
-
-gboolean ctrlm_main_has_partner_id_get(void) {
-   return(g_ctrlm.has_partner_id);
-}
-
-void ctrlm_main_has_partner_id_set(gboolean has_id) {
-   g_ctrlm.has_partner_id = has_id;
-}
- 
-gboolean ctrlm_main_has_experience_get(void) {
-   return(g_ctrlm.has_experience);
-}
-
-void ctrlm_main_has_experience_set(gboolean has_experience) {
-   g_ctrlm.has_experience = has_experience;
-}
-
-gboolean ctrlm_main_needs_service_access_token_get(void) {
-   if(g_ctrlm.sat_enabled) {
-      return(!g_ctrlm.has_service_access_token);
-   }
-   return false;
-}
-
-void ctrlm_main_has_service_access_token_set(gboolean has_token) {
-   g_ctrlm.has_service_access_token = has_token;
 }
 
 void ctrlm_main_sat_enabled_set(gboolean sat_enabled) {
