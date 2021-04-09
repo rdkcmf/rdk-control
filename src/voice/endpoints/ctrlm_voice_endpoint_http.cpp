@@ -1,0 +1,361 @@
+/*
+ * If not stated otherwise in this file or this component's license file the
+ * following copyright and licenses apply:
+ *
+ * Copyright 2020 RDK Management
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+*/
+#include "ctrlm_voice_endpoint_http.h"
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+
+// Structures
+typedef struct {
+    sem_t                       *semaphore;
+    uuid_t                       uuid;
+    xrsr_src_t                   src;
+    xrsr_session_configuration_t *configuration;
+    void                         *stream_params;
+    rdkx_timestamp_t              timestamp;
+} ctrlm_voice_session_begin_cb_http_t;
+
+// Timestamps and stats are not pointers to avoid corruption
+typedef struct {
+    uuid_t                uuid;
+    xrsr_src_t            src;
+    rdkx_timestamp_t      timestamp;
+} ctrlm_voice_stream_begin_cb_http_t;
+
+typedef struct {
+    uuid_t               uuid;
+    xrsr_stream_stats_t  stats;
+    rdkx_timestamp_t     timestamp;
+} ctrlm_voice_stream_end_cb_http_t;
+
+typedef struct {
+    uuid_t                uuid;
+    xrsr_session_stats_t  stats;
+    rdkx_timestamp_t      timestamp;
+} ctrlm_voice_session_end_cb_http_t;
+// End Structures
+
+// Function Implementations
+ctrlm_voice_endpoint_http_t::ctrlm_voice_endpoint_http_t(ctrlm_voice_t *voice_obj) : ctrlm_voice_endpoint_t(voice_obj) {
+    this->xrsv_obj_http = NULL;
+}
+
+ctrlm_voice_endpoint_http_t::~ctrlm_voice_endpoint_http_t() {
+    if(this->xrsv_obj_http) {
+        xrsv_http_destroy(this->xrsv_obj_http);
+        this->xrsv_obj_http = NULL;
+    }
+}
+
+bool ctrlm_voice_endpoint_http_t::open() {
+    if(this->voice_obj == NULL) {
+        LOG_ERROR("%s: Voice object NULL\n", __FUNCTION__);
+        return(false);
+    }
+
+    std::string device_id      = this->voice_obj->voice_stb_data_device_id_get();
+    std::string receiver_id    = this->voice_obj->voice_stb_data_receiver_id_get();
+    std::string partner_id     = this->voice_obj->voice_stb_data_partner_id_get();
+    std::string experience     = this->voice_obj->voice_stb_data_experience_get();
+    std::string app_id         = this->voice_obj->voice_stb_data_app_id_http_get();
+    std::string language       = this->voice_obj->voice_stb_data_guide_language_get().c_str();
+
+    xrsv_http_params_t    params_http = {
+       .device_id        = device_id.c_str(),
+       .receiver_id      = receiver_id.c_str(),
+       .partner_id       = partner_id.c_str(),
+       .experience       = experience.c_str(),
+       .app_id           = app_id.c_str(),
+       .language         = language.c_str(),
+       .test_flag        = this->voice_obj->voice_stb_data_test_get(),
+       .user_data        = (void *)this
+   };
+
+   if((this->xrsv_obj_http = xrsv_http_create(&params_http)) == NULL) {
+      LOG_ERROR("%s: Failed to open speech vrex HTTP\n", __FUNCTION__);
+      return(false);
+   }
+
+   return(true);
+}
+
+bool ctrlm_voice_endpoint_http_t::get_handlers(xrsr_handlers_t *handlers) {
+    if(handlers == NULL) {
+        LOG_ERROR("%s: Handler struct NULL\n", __FUNCTION__);
+        return(false);
+    }
+
+    if(this->voice_obj == NULL || this->xrsv_obj_http == NULL) {
+        LOG_ERROR("%s: Voice obj or Xrsv obj NULL\n", __FUNCTION__);
+        return(false);
+    }
+
+    xrsv_http_handlers_t handlers_xrsv;
+    memset(handlers, 0, sizeof(xrsr_handlers_t));
+    memset(&handlers_xrsv, 0, sizeof(handlers_xrsv));
+
+    // Set up handlers
+    handlers_xrsv.session_begin = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin;
+    handlers_xrsv.session_end   = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_end;
+    handlers_xrsv.stream_begin  = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_stream_begin;
+    handlers_xrsv.stream_end    = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_stream_end;
+    handlers_xrsv.connected     = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_connected;
+    handlers_xrsv.disconnected  = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_disconnected;
+    handlers_xrsv.recv_msg      = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_recv_msg;
+
+    if(!xrsv_http_handlers(this->xrsv_obj_http, &handlers_xrsv, handlers)) {
+        LOG_ERROR("%s: failed to get handlers http\n", __FUNCTION__);
+        return(false);
+    }
+    return(true);
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stb_data_receiver_id_set(std::string &receiver_id) {
+    if(this->xrsv_obj_http) {
+        xrsv_http_update_receiver_id(this->xrsv_obj_http, receiver_id.c_str());
+    }
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stb_data_device_id_set(std::string &device_id) {
+    if(this->xrsv_obj_http) {
+        xrsv_http_update_device_id(this->xrsv_obj_http, device_id.c_str());
+    }
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stb_data_partner_id_set(std::string &partner_id) {
+    if(this->xrsv_obj_http) {
+        xrsv_http_update_partner_id(this->xrsv_obj_http, partner_id.c_str());
+    }
+}
+ 
+void ctrlm_voice_endpoint_http_t::voice_stb_data_experience_set(std::string &experience) {
+    if(this->xrsv_obj_http) {
+        xrsv_http_update_experience(this->xrsv_obj_http, experience.c_str());
+    }
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stb_data_guide_language_set(const char *language) {
+   if(this->xrsv_obj_http) {
+       xrsv_http_update_language(this->xrsv_obj_http, language);
+   }
+}
+
+// Class Callbacks
+void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, int size) {
+    ctrlm_voice_session_begin_cb_http_t *dqm = (ctrlm_voice_session_begin_cb_http_t *)data;
+    if(NULL == data) {
+        LOG_ERROR("%s: NULL data\n", __FUNCTION__);
+        return;
+    }
+    ctrlm_voice_session_info_t info;
+    std::string sat;
+    xrsr_session_configuration_http_t *http = &dqm->configuration->http;
+    std::ostringstream user_agent;
+    LOG_INFO("%s: session begin\n", __FUNCTION__);
+
+    if(NULL == http) {
+        LOG_ERROR("%s: http configuration null\n", __FUNCTION__);
+        return;
+    }
+
+    this->voice_obj->voice_session_info(&info);
+    sat = this->voice_obj->voice_stb_data_sat_get();
+    user_agent << "rmtType=" << info.controller_name.c_str() << "; rmtSVer=" << info.controller_version_sw.c_str() << "; rmtHVer=" << info.controller_version_hw.c_str() << "; stbName=" << info.stb_name.c_str() << "; rmtVolt=" << std::setprecision(3) << info.controller_voltage << "V";
+
+    // User agent and SAT Token
+    if(sat != "") {
+        LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
+    }
+    strncpy(http->sat_token, sat.c_str(), sizeof(http->sat_token));
+    strncpy(http->user_agent, user_agent.str().c_str(), sizeof(http->user_agent));
+
+    if(dqm->src == XRSR_SRC_RCU_PTT && this->query_str_qty > 0) { // Add the application defined query string parameters
+       http->query_strs = this->query_strs;
+    }
+
+    this->server_ret_code = 0;
+
+    ctrlm_voice_session_begin_cb_t session_begin;
+    uuid_copy(session_begin.header.uuid, dqm->uuid);
+    session_begin.header.timestamp     = dqm->timestamp;
+    session_begin.src                  = dqm->src;
+    session_begin.configuration        = dqm->configuration;
+    session_begin.endpoint             = this;
+    session_begin.keyword_verification = false; // Possibly could change in future, but meets current use cases.
+
+    this->voice_obj->voice_session_begin_callback(&session_begin);
+    sem_post(dqm->semaphore);
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stream_begin_callback_http(void *data, int size) {
+    ctrlm_voice_stream_begin_cb_http_t *dqm = (ctrlm_voice_stream_begin_cb_http_t *)data;
+    if(NULL == dqm) {
+        LOG_ERROR("%s: NULL data\n", __FUNCTION__);
+        return;
+    }
+    if(false == this->voice_obj->voice_session_id_is_current(dqm->uuid)) {
+        return;
+    }
+    ctrlm_voice_stream_begin_cb_t stream_begin;
+    uuid_copy(stream_begin.header.uuid, dqm->uuid);
+    stream_begin.header.timestamp = dqm->timestamp;
+    stream_begin.src              = dqm->src;
+    this->voice_obj->voice_stream_begin_callback(&stream_begin);
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stream_end_callback_http(void *data, int size) {
+    ctrlm_voice_stream_end_cb_http_t *dqm = (ctrlm_voice_stream_end_cb_http_t *)data;
+    if(NULL == dqm) {
+        LOG_ERROR("%s: NULL data\n", __FUNCTION__);
+        return;
+    }
+    if(false == this->voice_obj->voice_session_id_is_current(dqm->uuid)) {
+        return;
+    }
+
+    ctrlm_voice_stream_end_cb_t stream_end;
+    uuid_copy(stream_end.header.uuid, dqm->uuid);
+    stream_end.header.timestamp = dqm->timestamp;
+    stream_end.stats            = dqm->stats;
+    this->voice_obj->voice_stream_end_callback(&stream_end);
+}
+
+void ctrlm_voice_endpoint_http_t::voice_session_end_callback_http(void *data, int size) {
+    ctrlm_voice_session_end_cb_http_t *dqm = (ctrlm_voice_session_end_cb_http_t *)data;
+    if(NULL == data) {
+        LOG_ERROR("%s: NULL data\n", __FUNCTION__);
+        return;
+    }
+    if(false == this->voice_obj->voice_session_id_is_current(dqm->uuid)) {
+        return;
+    }
+    bool success = true;
+    xrsr_session_stats_t *stats = &dqm->stats;
+    
+    if(stats == NULL) {
+        LOG_ERROR("%s: stats are NULL\n", __FUNCTION__);
+        return;
+    }
+
+    // Check if HTTP was successful
+    if((stats->reason != XRSR_SESSION_END_REASON_EOS && stats->reason != XRSR_SESSION_END_REASON_TERMINATE) || (stats->ret_code_library != 0)  || (stats->ret_code_protocol != 200) || (this->server_ret_code != 0)) {
+        success = false;
+    }
+
+    // Check for SAT errors
+    if(this->server_ret_code == 116 || this->server_ret_code == 117 || this->server_ret_code == 118 ||
+       this->server_ret_code == 119 || this->server_ret_code == 120 || this->server_ret_code == 121 ||
+       this->server_ret_code == 123) {
+        LOG_INFO("%s: SAT Error Code from server <%ld>\n", __FUNCTION__, this->server_ret_code);
+        ctrlm_main_invalidate_service_access_token();
+    }
+
+    ctrlm_voice_session_end_cb_t session_end;
+    uuid_copy(session_end.header.uuid, dqm->uuid);
+    session_end.header.timestamp = dqm->timestamp;
+    session_end.success          = success;
+    session_end.stats            = dqm->stats;
+    this->voice_obj->voice_session_end_callback(&session_end);
+}
+void ctrlm_voice_endpoint_http_t::voice_session_recv_msg_http(const char *transcription, long ret_code) {
+    this->voice_obj->voice_session_transcription_callback(transcription);
+    this->voice_obj->voice_server_return_code_callback(ret_code);
+    this->server_ret_code = ret_code;
+}
+// End Class Callbacks
+
+// Static Callbacks
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, rdkx_timestamp_t *timestamp, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    ctrlm_voice_session_begin_cb_http_t msg;
+    sem_t semaphore;
+    memset(&msg, 0, sizeof(msg));
+    sem_init(&semaphore, 0, 0);
+
+    if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+        // This is a controller, make sure session request / controller info is satisfied
+        LOG_DEBUG("%s: Checking if VSR is done\n", __FUNCTION__);
+        sem_wait(endpoint->voice_session_vsr_semaphore_get());
+    }
+    
+    uuid_copy(msg.uuid, uuid);
+    msg.semaphore     = &semaphore;
+    msg.src           = src;
+    msg.configuration = configuration;
+    msg.stream_params = NULL;
+    msg.timestamp     = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
+    ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http, &msg, sizeof(msg), (void *)endpoint);
+    sem_wait(&semaphore);
+    sem_destroy(&semaphore);
+}
+
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    ctrlm_voice_session_end_cb_http_t msg;
+    uuid_copy(msg.uuid, uuid);
+    SET_IF_VALID(msg.stats, stats);
+    msg.timestamp = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
+    ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_http_t::voice_session_end_callback_http, &msg, sizeof(msg), (void *)endpoint);
+}
+
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_stream_begin(const uuid_t uuid, xrsr_src_t src, rdkx_timestamp_t *timestamp, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    ctrlm_voice_stream_begin_cb_http_t msg;
+    uuid_copy(msg.uuid, uuid);
+    msg.src           = src;
+    msg.timestamp     = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
+    ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_http_t::voice_stream_begin_callback_http, &msg, sizeof(msg), (void *)endpoint);
+}
+
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_stream_end(const uuid_t uuid, xrsr_stream_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    ctrlm_voice_stream_end_cb_http_t msg;
+    uuid_copy(msg.uuid, uuid);
+    SET_IF_VALID(msg.stats, stats);
+    msg.timestamp     = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
+    ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_http_t::voice_stream_end_callback_http, &msg, sizeof(msg), (void *)endpoint);
+}
+
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_connected(const uuid_t uuid, rdkx_timestamp_t *timestamp, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    ctrlm_voice_cb_header_t data;
+    uuid_copy(data.uuid, uuid);
+    data.timestamp = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
+    endpoint->voice_obj->voice_server_connected_callback(&data);
+}
+
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_disconnected(const uuid_t uuid, rdkx_timestamp_t *timestamp, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    ctrlm_voice_disconnected_cb_t data;
+    uuid_copy(data.header.uuid, uuid);
+    data.retry            = false;
+    data.header.timestamp = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
+    endpoint->voice_obj->voice_server_disconnected_callback(&data);
+}
+
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_recv_msg(xrsv_http_recv_msg_t *msg, void *user_data) {
+    ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
+    if(msg) {
+        endpoint->voice_session_recv_msg_http(msg->transcription, msg->ret_code);
+    }
+}
+// End Static Callbacks
+
+// End Function Implementations
+
