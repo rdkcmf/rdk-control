@@ -116,6 +116,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_FindMe(ctrlm_hal_ble_FindMe_params_t
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetDaemonLogLevel(daemon_logging_t *logging);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_SetDaemonLogLevel(daemon_logging_t logging);
 
+static void ctrlm_hal_ble_FwUpgrade_ResultCB(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_params_t params);
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_GetRcuUnpairReason_params_t *params);
@@ -997,6 +998,28 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_SetDaemonLogLevel(daemon_logging_t l
     return ret;
 }
 
+static void ctrlm_hal_ble_FwUpgrade_ResultCB(GDBusProxy   *proxy,
+                                             GAsyncResult *res,
+                                             gpointer      user_data)
+{
+    LOG_DEBUG ("%s, Enter...\n", __FUNCTION__);
+    GError *error = NULL;
+    GVariant *reply;
+
+    reply = g_dbus_proxy_call_finish (proxy, res, &error);
+    if (NULL == reply) {
+        // Will return NULL if there's an error reported
+        if (NULL != error) {
+            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
+        }
+        g_clear_error (&error);
+        LOG_ERROR("%s: RCU firmware upgrade request FAILED!!\n", __FUNCTION__);
+    } else {
+        LOG_INFO("%s: RCU firmware upgrade request SUCCESSFUL.\n", __FUNCTION__);
+    }
+    if (NULL != reply) { g_variant_unref(reply); }
+}
+
 static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_params_t params)
 {
     ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
@@ -1029,7 +1052,8 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_pa
                                                     &reply,
                                                     CTRLM_BLE_G_DBUS_CALL_TIMEOUT_DEFAULT,
                                                     NULL,
-                                                    fd_list);
+                                                    fd_list,
+                                                    true, (GAsyncReadyCallback)ctrlm_hal_ble_FwUpgrade_ResultCB);
             if (NULL != reply) { g_variant_unref(reply); }
         }
         if (NULL != fd_list) { g_object_unref(fd_list); }
@@ -1367,8 +1391,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_dbusSendMethodCall (GDBusProxy         *
         return CTRLM_HAL_RESULT_ERROR;
     }
     if (true == call_async) {
-        // Use g_dbus default timeout (25 seconds) for async calls, because programming IR can take a while.
-        g_dbus_proxy_call (gdbus_proxy, apcMethod, params, G_DBUS_CALL_FLAGS_NONE, -1, NULL, callback, NULL);
+        g_dbus_proxy_call_with_unix_fd_list (gdbus_proxy,apcMethod, params, G_DBUS_CALL_FLAGS_NONE, -1, in_fds, NULL, callback, NULL);
     } else {
         *reply = g_dbus_proxy_call_with_unix_fd_list_sync (gdbus_proxy, apcMethod, params, G_DBUS_CALL_FLAGS_NONE, dbus_call_timeout, in_fds, out_fds, NULL, &error);
         if (NULL == *reply) {
