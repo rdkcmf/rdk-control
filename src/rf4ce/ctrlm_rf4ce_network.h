@@ -40,6 +40,7 @@
 #define CTRLM_RF4CE_AUTOBIND_OCTET_MENU  ((JSON_INT_VALUE_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG_QTY_FAIL << 3) | JSON_INT_VALUE_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG_QTY_PASS)
 
 #define CTRLM_RF4CE_MAX_DEVICE_QTY (8)
+#define CTRLM_RF4CE_MAX_PAYLOAD_LEN (95)
 
 #define MSO_VOICE_CMD_ID_VOICE_SESSION_REQUEST  (0x01)
 #define MSO_VOICE_CMD_ID_VOICE_SESSION_RESPONSE (0x02)
@@ -125,7 +126,7 @@ typedef struct {
    ctrlm_timestamp_t             timestamp;
    ctrlm_hal_rf4ce_profile_id_t  profile_id;
    unsigned char                 length;
-   unsigned char *               data;
+   unsigned char                 data[CTRLM_RF4CE_MAX_PAYLOAD_LEN];
 } ctrlm_main_queue_msg_rf4ce_ind_data_t;
 
 typedef struct {

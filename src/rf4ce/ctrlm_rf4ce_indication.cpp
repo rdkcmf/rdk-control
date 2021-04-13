@@ -307,6 +307,9 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_data(ctrlm_network_id_t network_id, ctrlm
    if(params.length == 0) {
       LOG_WARN("%s: Packet with NWK Payload length 0 (Profile ID 0x%02X)!\n", __FUNCTION__, params.profile_id);
       return(CTRLM_HAL_RESULT_ERROR);
+   } else if(params.length > CTRLM_RF4CE_MAX_PAYLOAD_LEN) {
+      LOG_WARN("%s: Packet with NWK Payload length greater than max! (Profile ID 0x%02X, Length %d)\n", __FUNCTION__, params.profile_id, params.length);
+      return(CTRLM_HAL_RESULT_ERROR);
    }
 
    if(params.profile_id == CTRLM_RF4CE_PROFILE_ID_VOICE) {
@@ -325,36 +328,24 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_data(ctrlm_network_id_t network_id, ctrlm
    }
 
    // Allocate a message and send it to Control Manager's queue
-   int msg_size = sizeof(ctrlm_main_queue_msg_rf4ce_ind_data_t) + params.length;
-   ctrlm_main_queue_msg_rf4ce_ind_data_t *msg = (ctrlm_main_queue_msg_rf4ce_ind_data_t *)g_malloc(msg_size);
-   
-   if(NULL == msg) {
-      LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
-      g_assert(0);
-      return(CTRLM_HAL_RESULT_ERROR_OUT_OF_MEMORY);
-   }
+   ctrlm_main_queue_msg_rf4ce_ind_data_t msg;
 
-   msg->controller_id     = controller_id;
-   msg->timestamp         = params.timestamp;
-   msg->profile_id        = params.profile_id;
-   msg->length            = params.length;
-   msg->data              = (guchar *)&msg[1];
+   memset(&msg, 0, sizeof(msg));
+   msg.controller_id     = controller_id;
+   msg.timestamp         = params.timestamp;
+   msg.profile_id        = params.profile_id;
+   msg.length            = params.length;
    if(params.data != NULL) {
-      memcpy(msg->data, params.data, params.length);
+      memcpy(msg.data, params.data, params.length);
    } else {
-      if(params.length != params.cb_data_read(params.length, msg->data, params.cb_data_param)) {
+      if(params.length != params.cb_data_read(params.length, msg.data, params.cb_data_param)) {
          LOG_ERROR("%s: unable to read data!\n", __FUNCTION__);
-         g_free(msg);
          return(CTRLM_HAL_RESULT_ERROR);
       }
    }
 
-   ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_rf4ce_t::ind_process_data, (void *)msg, msg_size, NULL, network_id);
-   
-   if(msg) {
-      g_free(msg);
-   }
-   
+   ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_rf4ce_t::ind_process_data, (void *)&msg, sizeof(msg), NULL, network_id);
+
    return(CTRLM_HAL_RESULT_SUCCESS);
 }
 
