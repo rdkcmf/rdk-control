@@ -23,14 +23,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <semaphore.h>
+#include "include/ctrlm_ipc.h"
+#include "include/ctrlm_ipc_voice.h"
 #include "ctrlm_voice_obj.h"
 #include "ctrlm.h"
 #include "ctrlm_tr181.h"
 #include "ctrlm_utils.h"
 #include "ctrlm_database.h"
 #include "ctrlm_network.h"
-#include "include/ctrlm_ipc.h"
-#include "include/ctrlm_ipc_voice.h"
 #include "jansson.h"
 #include "xrsr.h"
 #include "xrsv_http.h"
@@ -101,6 +101,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->voice_ipc                       = NULL;
     this->endpoint_current                = NULL;
     this->end_reason                      = CTRLM_VOICE_SESSION_END_REASON_DONE;
+    this->keyword_verified                = false;
 
     voice_session_info_reset();
 
@@ -146,6 +147,7 @@ ctrlm_voice_t::~ctrlm_voice_t() {
     /* Close Voice SDK */
 }
 
+//TODO this needs to query the hardware, have requested info from Sky. Will be fixed by LLAMA-1478
 bool ctrlm_voice_t::privacy_mode(void) {
    return (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
 }
@@ -1600,6 +1602,7 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
        this->network_id = CTRLM_MAIN_NETWORK_ID_DSP;
        this->controller_id = CTRLM_MAIN_CONTROLLER_ID_DSP;
        this->network_type = CTRLM_NETWORK_TYPE_DSP;
+       this->keyword_verified = false;
        LOG_INFO("%s setting network and controller to DSP from device type\n",__FUNCTION__);
     }
     this->ipc_common_data.network_id        = this->network_id;
@@ -1760,6 +1763,10 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
 
     if(this->voice_device == CTRLM_VOICE_DEVICE_FF && this->status.status == VOICE_COMMAND_STATUS_PENDING) {
         this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
+    }
+
+    if(this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) {
+       keyword_power_state_change(this->keyword_verified);
     }
 
     if(this->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
@@ -1935,6 +1942,8 @@ void ctrlm_voice_t::voice_action_keyword_verification_callback(bool success, rdk
             this->audio_state_set(true);
         }
     }
+
+    this->keyword_verified = success;
 }
 
 void ctrlm_voice_t::voice_session_transcription_callback(const char *transcription) {
@@ -2177,6 +2186,18 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
     // End print configuration
 }
 
+void ctrlm_voice_t::keyword_power_state_change(bool success) {
+   if(CTRLM_POWER_STATE_STANDBY == ctrlm_main_get_power_state()) {
+      if(success) {
+         LOG_INFO("%s: Standby, keyword verified, go full power\n", __FUNCTION__);
+         ctrlm_voice_iarm_set_power_state_on();
+         ctrlm_power_state_change(CTRLM_POWER_STATE_ON); //In ctrlmTestApp test case system state is already on and PwrMgr will ignore the call, so make this one as well
+      } else {
+         LOG_INFO("%s: Standby, keyword not verified, remain in standby\n", __FUNCTION__);
+      }
+   }
+}
+
 // Helper Functions end
 
 // RF4CE HAL callbacks
@@ -2289,16 +2310,39 @@ void ctrlm_voice_t::voice_set_ipc(ctrlm_voice_ipc_t *ipc) {
 }
 
 void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
-   LOG_INFO("%s: entering power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
 
    bool success = true;
    switch(power_state) {
+      case CTRLM_POWER_STATE_STANDBY:
+         if(privacy_mode()) {
+            LOG_INFO("%s: privacy mode, skip standby, go to deep sleep\n", __FUNCTION__);
+            if(!xrsr_power_mode_set(XRSR_POWER_MODE_SLEEP)) {
+               success = false;
+            }
+         } else {
+            if(!xrsr_power_mode_set(XRSR_POWER_MODE_LOW)) {
+               success = false;
+            }
+         }
+         break;
       case CTRLM_POWER_STATE_DEEP_SLEEP:
          if(!xrsr_power_mode_set(XRSR_POWER_MODE_SLEEP)) {
             success = false;
          }
          break;
       case CTRLM_POWER_STATE_ON: {
+            bool update = false;
+            ctrlm_voice_device_status_t status;
+            //Handle case of device put into privacy mode while in standby
+            if(privacy_mode()) {
+               #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
+               status = CTRLM_VOICE_DEVICE_STATUS_PRIVACY;
+               #else
+               status = CTRLM_VOICE_DEVICE_STATUS_DISABLED;
+               #endif
+               this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, status, &update);
+            }
+
             if(!xrsr_power_mode_set(XRSR_POWER_MODE_FULL)) {
                success = false;
             }

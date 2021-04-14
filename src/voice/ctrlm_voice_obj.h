@@ -22,12 +22,12 @@
 #include <iostream>
 #include <vector>
 #include <uuid/uuid.h>
+#include "include/ctrlm_ipc.h"
+#include "include/ctrlm_ipc_voice.h"
 #include "ctrlm.h"
 #include "ctrlm_voice.h"
 #include "ctrlm_xraudio_hal.h"
 #include "ctrlm_config.h"
-#include "include/ctrlm_ipc.h"
-#include "include/ctrlm_ipc_voice.h"
 #include "jansson.h"
 #include "xr_timestamp.h"
 #include "ctrlm_voice_types.h"
@@ -302,7 +302,7 @@ typedef struct {
    std::string                     controller_version_hw;
    double                          controller_voltage;
    std::string                     stb_name;
-   unsigned long                   ffv_leading_samples;
+   uint32_t                        ffv_leading_samples; //This was a long. We can't have that many samples and "if(stream_params->keyword_sample_begin > info.ffv_leading_samples)" evaluates to true if keyword_sample_begin is < 0 and ffv_leading_samples is long
    bool                            has_stream_params;
    voice_session_req_stream_params stream_params;
 } ctrlm_voice_session_info_t;
@@ -488,6 +488,8 @@ public:
     uint32_t                 packets_lost;
     double                   confidence;
     bool                     dual_sensitivity_immediate;
+    bool                     keyword_verified;
+    ctrlm_power_state_t      power_state;
 
     bool                     session_active_server;
     bool                     session_active_controller;
@@ -514,6 +516,7 @@ public:
    void                 set_audio_mode(ctrlm_voice_audio_settings_t *settings);
    void                 audio_state_set(bool session);
    bool                 privacy_mode(void);
+   void                 keyword_power_state_change(bool success);
 
 };
 

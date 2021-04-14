@@ -312,6 +312,8 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
               keyword_verification = true;
           }
        }
+       ws->keyword_begin = stream_params->keyword_sample_begin;
+       ws->keyword_duration = stream_params->keyword_sample_end - stream_params->keyword_sample_begin;
        LOG_INFO("%s: session begin - ptt <%s> keyword begin <%u> end <%u> doa <%u> gain <%4.1f> db\n", __FUNCTION__, (stream_params->push_to_talk ? "TRUE" : "FALSE"), stream_params->keyword_sample_begin, stream_params->keyword_sample_end, stream_params->keyword_doa, stream_params->dynamic_gain);
     }
     // End handle stream parameters

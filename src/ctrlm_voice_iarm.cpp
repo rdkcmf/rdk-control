@@ -29,6 +29,8 @@
 #include "ctrlm_voice_session.h"
 #ifdef USE_VOICE_SDK
 #include "ctrlm_voice_obj.h"
+#include "pwrMgr.h"
+#include "comcastIrKeyCodes.h" //just for the power button code
 #endif
 
 IARM_Result_t ctrlm_voice_handle_settings_from_server(void *arg);
@@ -165,6 +167,18 @@ IARM_Result_t ctrlm_voice_handle_settings_from_server(void *arg) {
    }
 
    return(IARM_RESULT_SUCCESS);
+}
+
+void ctrlm_voice_iarm_set_power_state_on(void) {
+   IARM_Bus_PWRMgr_SetPowerState_Param_t param;
+   param.newState = IARM_BUS_PWRMGR_POWERSTATE_ON;
+   param.keyCode = KED_FP_POWER;
+
+   IARM_Result_t result = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_SetPowerState,
+           (void *)&param, sizeof(param));
+   if(IARM_RESULT_SUCCESS != result) {
+      LOG_ERROR("%s: IARM Bus Error!\n", __FUNCTION__);
+   }
 }
 #endif
 

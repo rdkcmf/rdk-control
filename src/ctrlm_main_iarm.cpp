@@ -726,12 +726,30 @@ IARM_Result_t ctrlm_event_handler_power_pre_change(void* pArgs)
     msg->header.type = CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
     switch(pParams->newState) {
        case IARM_BUS_PWRMGR_POWERSTATE_ON:
-       //Today STANDBY is just ON. Soon it will be handled as Networked Standby for Llama
        case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
        case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: msg->new_state = CTRLM_POWER_STATE_ON;         break;
        case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP:
        case IARM_BUS_PWRMGR_POWERSTATE_OFF:                 msg->new_state = CTRLM_POWER_STATE_DEEP_SLEEP; break;
     }
+
+#ifdef USE_VOICE_SDK
+    //Deep Sleep may set Networked Standby
+    if(CTRLM_POWER_STATE_DEEP_SLEEP == msg->new_state) {
+       IARM_Bus_PWRMgr_NetworkStandbyMode_Param_t param;
+       IARM_Result_t res = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetNetworkStandbyMode,
+               (void *)&param, sizeof(param));
+
+       if (res == IARM_RESULT_SUCCESS) {
+          if(true == param.bStandbyMode) {
+             LOG_INFO("%s: deep sleep message set Network Standby flag\n", __FUNCTION__);
+             msg->new_state = CTRLM_POWER_STATE_STANDBY;
+          }
+       } else {
+          LOG_ERROR("%s: IARM query for network standby mode failed!\n", __FUNCTION__);
+          //Don't return error here, just go to deep sleep
+       }
+    }
+#endif
 
     LOG_INFO("%s: Power State set to %s >\n", __FUNCTION__, ctrlm_power_state_str(msg->new_state));
     ctrlm_main_queue_msg_push(msg);
@@ -961,4 +979,46 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_status(void *arg) {
    sem_destroy(&semaphore);
 
    return(IARM_RESULT_SUCCESS);
+}
+
+ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void) {
+   IARM_Result_t err;
+   IARM_Bus_PWRMgr_GetPowerState_Param_t param;
+   ctrlm_power_state_t power_state = CTRLM_POWER_STATE_ON;
+
+   err = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetPowerState, (void *)&param, sizeof(param));
+   if(err == IARM_RESULT_SUCCESS) {
+      switch(param.curState) {
+         case IARM_BUS_PWRMGR_POWERSTATE_ON:
+         case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
+         case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: power_state = CTRLM_POWER_STATE_ON;         break;
+         case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP:
+         case IARM_BUS_PWRMGR_POWERSTATE_OFF:                 power_state = CTRLM_POWER_STATE_DEEP_SLEEP; break;
+      }
+
+       #ifdef USE_VOICE_SDK
+       //Deep Sleep may set Networked Standby
+       if(CTRLM_POWER_STATE_DEEP_SLEEP == power_state) {
+          IARM_Bus_PWRMgr_NetworkStandbyMode_Param_t param;
+          IARM_Result_t res = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetNetworkStandbyMode,
+                  (void *)&param, sizeof(param));
+
+          if (res == IARM_RESULT_SUCCESS) {
+             if(true == param.bStandbyMode) {
+                LOG_INFO("%s: deep sleep has networked standby flag\n", __FUNCTION__);
+                power_state = CTRLM_POWER_STATE_STANDBY;
+             }
+          } else {
+             LOG_ERROR("%s: IARM query for network standby mode failed!\n", __FUNCTION__);
+             //Don't return error here, just go to deep sleep
+          }
+       }
+       #endif
+
+      LOG_INFO("%s: power state is : <%s>\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+      } else {
+         LOG_ERROR("%s: IARM bus failed to read power state, defaulting to %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+      }
+
+   return power_state;
 }

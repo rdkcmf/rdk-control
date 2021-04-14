@@ -522,7 +522,7 @@ int main(int argc, char *argv[]) {
    //g_ctrlm.precomission_table             = g_hash_table_new(g_str_hash, g_str_equal);
    g_ctrlm.loading_db                     = false;
    g_ctrlm.return_code                    = 0;
-   g_ctrlm.power_state                    = CTRLM_POWER_STATE_ON;
+   g_ctrlm.power_state                    = ctrlm_main_iarm_call_get_power_state();
 
    g_ctrlm.service_access_token.clear();
    g_ctrlm.has_receiver_id                = false;
@@ -2418,21 +2418,23 @@ gpointer ctrlm_main_thread(gpointer param) {
                LOG_ERROR("%s: Power State Change msg NULL\n", __FUNCTION__);
                break;
             }
-            dqm->old_state = g_ctrlm.power_state;
-            g_ctrlm.power_state = dqm->new_state;
-            // Set Power change in Networks
-            for(auto const &itr : g_ctrlm.networks) {
-               itr.second->power_state_change(dqm);
+            if(g_ctrlm.power_state == dqm->new_state ) {
+               LOG_INFO("%s: already in power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
+            } else {
+               dqm->old_state = g_ctrlm.power_state;
+               g_ctrlm.power_state = dqm->new_state;
+               // Set Power change in Networks
+               for(auto const &itr : g_ctrlm.networks) {
+                  itr.second->power_state_change(dqm);
+               }
+
+               // Set Power change in DB
+               ctrlm_db_power_state_change(dqm);
+
+               #ifdef USE_VOICE_SDK
+               g_ctrlm.voice_session->voice_power_state_change(g_ctrlm.power_state);
+               #endif
             }
-
-            // Set Power change in DB
-            LOG_INFO("%s: calling DB\n", __FUNCTION__);
-            ctrlm_db_power_state_change(dqm);
-
-            #ifdef USE_VOICE_SDK
-            g_ctrlm.voice_session->voice_power_state_change(dqm->new_state);
-            #endif
-
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL: {
@@ -5604,3 +5606,6 @@ gboolean ctrlm_start_iarm(gpointer user_data) {
    return false;
 }
 
+ctrlm_power_state_t ctrlm_main_get_power_state(void) {
+   return(g_ctrlm.power_state);
+}

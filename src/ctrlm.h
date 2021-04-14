@@ -429,6 +429,9 @@ gboolean ctrlm_main_iarm_call_control_service_start_pairing_mode(ctrlm_main_iarm
 gboolean ctrlm_main_iarm_call_control_service_end_pairing_mode(ctrlm_main_iarm_call_control_service_pairing_mode_t *pairing);
 gboolean ctrlm_main_iarm_call_chip_status_get(ctrlm_main_iarm_call_chip_status_t *status);
 
+ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void);
+ctrlm_power_state_t ctrlm_main_get_power_state(void);
+
 void        ctrlm_main_iarm_event_binding_line_of_sight(gboolean active);
 void        ctrlm_main_iarm_event_autobind_line_of_sight(gboolean active);
 void        ctrlm_main_iarm_event_binding_button(gboolean active);
