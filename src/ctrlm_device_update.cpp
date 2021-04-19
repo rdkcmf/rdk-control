@@ -973,30 +973,39 @@ gboolean ctrlm_device_update_image_info_get(string filename, ctrlm_device_update
 }
 
 void ctrlm_device_update_tmp_dir_make() {
-	//TODO should we check for existence before calling system command
    LOG_INFO("%s: <%s>\n", __FUNCTION__, g_ctrlm_device_update.prefs.temp_file_path.c_str());
-   string cmd = "mkdir " + g_ctrlm_device_update.prefs.temp_file_path;
-   system(cmd.c_str());
+   errno = 0;
+   if(0 != mkdir(g_ctrlm_device_update.prefs.temp_file_path.c_str(), S_IRWXU | S_IRWXG)){
+      int errsv = errno;
+      LOG_ERROR("%s: Failed to mkdir, mkdir error (%s)\n", __FUNCTION__, strerror(errsv));
+      return;
+   }
 }
 
 void ctrlm_device_update_tmp_dir_remove() {
    LOG_INFO("%s: <%s>\n", __FUNCTION__, g_ctrlm_device_update.prefs.temp_file_path.c_str());
-   string cmd = "rm -rf " + g_ctrlm_device_update.prefs.temp_file_path;
-   system(cmd.c_str());
+   if( true != ctrlm_utils_rm_rf(g_ctrlm_device_update.prefs.temp_file_path) ) {
+      LOG_WARN("%s: Failed to remove \"%s\" due to ctrlm_utils_rm_rf call error\n", __FUNCTION__, g_ctrlm_device_update.prefs.temp_file_path.c_str());
+   }
 }
 
 void ctrlm_device_update_rf4ce_tmp_dir_make() {
    string dir = g_ctrlm_device_update.prefs.temp_file_path + "rf4ce/";
    LOG_INFO("%s: <%s>\n", __FUNCTION__, dir.c_str());
-   string cmd = "mkdir " + dir;
-   system(cmd.c_str());
+   errno = 0;
+   if(0 != mkdir(dir.c_str(), S_IRWXU | S_IRWXG)){
+      int errsv = errno;
+      LOG_ERROR("%s: Failed to mkdir, mkdir error (%s)\n", __FUNCTION__, strerror(errsv));
+      return;
+   }
 }
 
 void ctrlm_device_update_rf4ce_tmp_dir_remove() {
    string dir = g_ctrlm_device_update.prefs.temp_file_path + "rf4ce/";
    LOG_INFO("%s: <%s>\n", __FUNCTION__, dir.c_str());
-   string cmd = "rm -rf " + dir;
-   system(cmd.c_str());
+   if( true != ctrlm_utils_rm_rf(dir) ) {
+      LOG_WARN("%s: Failed to remove \"%s\" due to ctrlm_utils_rm_rf call error\n", __FUNCTION__, dir.c_str());
+   }
 }
 
 gboolean ctrlm_device_update_rf4ce_check_dir_exists(string path){
@@ -1023,17 +1032,25 @@ void ctrlm_device_update_rf4ce_archive_extract(string file_path_archive, string 
       ctrlm_device_update_rf4ce_tmp_dir_make();
    }
    LOG_INFO("%s: <%s> <%s>\n", __FUNCTION__, file_name_archive.c_str(), dir.c_str());
-   string cmd = "mkdir " + dir;
-   system(cmd.c_str());
-   cmd = "tar -xzpf  " + file_path_archive + " -C " + dir;
-   system(cmd.c_str());
+   errno = 0;
+   if(0 != mkdir(dir.c_str(), S_IRWXU | S_IRWXG)){
+      int errsv = errno;
+      LOG_ERROR("%s: Failed to mkdir, mkdir error (%s)\n", __FUNCTION__, strerror(errsv));
+      return;
+   }
+
+   if( true != ctrlm_tar_archive_extract(file_path_archive, dir) ) {
+      LOG_WARN("%s: Failed to extract the archive due to ctrlm_tar_archive_extract call error\n", __FUNCTION__);
+      return;
+   }
 }
 
 void ctrlm_device_update_rf4ce_archive_remove(string file_name_archive) {
    string dir = g_ctrlm_device_update.prefs.temp_file_path + "rf4ce/" + file_name_archive + "/";
    LOG_INFO("%s: <%s> <%s>\n", __FUNCTION__, file_name_archive.c_str(), dir.c_str());
-   string cmd = "rm -rf " + dir;
-   system(cmd.c_str());
+   if( true != ctrlm_utils_rm_rf(dir) ) {
+      LOG_WARN("%s: Failed to remove \"%s\" due to ctrlm_utils_rm_rf call error\n", __FUNCTION__, dir.c_str());
+   }
 }
 
 guint32 ctrlm_device_update_request_timeout_get(void) {
