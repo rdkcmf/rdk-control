@@ -1698,12 +1698,26 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         LOG_ERROR("%s: stats are NULL\n", __FUNCTION__);
         return;
     }
-    LOG_INFO("%s: audio sent bytes <%u> samples <%u> reason <%s> voice command status <%s>\n", __FUNCTION__, this->audio_sent_bytes, this->audio_sent_samples, xrsr_session_end_reason_str(stats->reason), ctrlm_voice_command_status_str(this->status.status));
 
-    if(CTRLM_VOICE_DEVICE_FF == this->voice_device && this->status.status == VOICE_COMMAND_STATUS_PENDING) { // Set voice command status
-        this->status.status = (stats->reason == XRSR_SESSION_END_REASON_EOS) ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE;
-        this->voice_status_set();
+    if(this->status.status == VOICE_COMMAND_STATUS_PENDING) {
+        switch(this->voice_device) {
+            case CTRLM_VOICE_DEVICE_FF: {
+                this->status.status = (stats->reason == XRSR_SESSION_END_REASON_EOS) ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE;
+                this->voice_status_set();
+                break;
+            }
+            case CTRLM_VOICE_DEVICE_MICROPHONE: {
+                this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
+                // No need to set, as it's not a controller
+                break;
+            }
+            default: {
+                break;
+            }
+        }
     }
+
+    LOG_INFO("%s: audio sent bytes <%u> samples <%u> reason <%s> voice command status <%s>\n", __FUNCTION__, this->audio_sent_bytes, this->audio_sent_samples, xrsr_session_end_reason_str(stats->reason), ctrlm_voice_command_status_str(this->status.status));
 
     // Update device status
     sem_wait(&this->device_status_semaphore);
