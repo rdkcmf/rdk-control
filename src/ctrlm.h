@@ -227,7 +227,7 @@ typedef struct {
 
 typedef struct {
    ctrlm_main_queue_msg_type_t       type;
-   gboolean                          ret;
+   gboolean                         *ret;
    sem_t                            *semaphore;
 } ctrlm_main_queue_msg_authservice_poll_t;
 

@@ -99,7 +99,6 @@ using namespace std;
 #define CTRLM_RF4CE_LEN_PAIRING_METRICS sizeof(ctrlm_pairing_metrics_t)
 
 #define CTRLM_MAIN_QUEUE_REPEAT_DELAY   (5000)
-#define CTRLM_MAIN_SAT_POLL_BEFORE_EXPIRE (10)
 
 #define NETWORK_ID_BASE_RF4CE   1
 #define NETWORK_ID_BASE_IP      11
@@ -197,6 +196,7 @@ typedef struct {
    string                             service_access_token;
    time_t                             service_access_token_expiration;
    guint                              service_access_token_expiration_tag;
+   sem_t                              service_access_token_semaphore;
    string                             image_name;
    string                             image_branch;
    string                             image_version;
@@ -531,6 +531,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.has_partner_id                 = false;
    g_ctrlm.has_experience                 = false;
    g_ctrlm.has_service_access_token       = false;
+   sem_init(&g_ctrlm.service_access_token_semaphore, 0, 1);
 
    g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_UNKNOWN;
    g_ctrlm.last_key_info.is_screen_bind_mode  = false;
@@ -773,6 +774,8 @@ int main(int argc, char *argv[]) {
       g_ctrlm.irdb = NULL;
    }
 
+   sem_destroy(&g_ctrlm.service_access_token_semaphore);
+
 #if AUTH_ENABLED
    if(g_ctrlm.authservice != NULL) {
       delete g_ctrlm.authservice;
@@ -942,16 +945,14 @@ void ctrlm_vsdk_thread_poll(void *data) {
 
 #ifdef AUTH_ENABLED
 static gboolean ctrlm_authservice_expired(gpointer user_data) {
-   int expired = (int)user_data; // 1 means we are being called because token was ALREADY expired, 0 means we are transitioning from OK to expired.
-   if(expired == 0) {
-      LOG_WARN("%s: SAT Token is about to expire... Polling authservice again.\n", __FUNCTION__);
-   }
-   ctrlm_main_has_service_access_token_set(false);
-   return(ctrlm_authservice_poll(NULL));
+   LOG_WARN("%s: SAT Token is expired...\n", __FUNCTION__);
+   ctrlm_main_invalidate_service_access_token();
+   return(FALSE);
 }
 
 gboolean ctrlm_authservice_poll(gpointer user_data) {
    ctrlm_main_queue_msg_authservice_poll_t *msg = (ctrlm_main_queue_msg_authservice_poll_t *)g_malloc(sizeof(ctrlm_main_queue_msg_authservice_poll_t));
+   gboolean ret = FALSE;
 
    if(NULL == msg) {
       LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
@@ -965,7 +966,7 @@ gboolean ctrlm_authservice_poll(gpointer user_data) {
    sem_init(&semaphore, 0, 0);
 
    msg->type        = CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL;
-   msg->ret         = FALSE;
+   msg->ret         = &ret;
    msg->semaphore   = &semaphore;
    ctrlm_main_queue_msg_push(msg);
 
@@ -973,11 +974,11 @@ gboolean ctrlm_authservice_poll(gpointer user_data) {
    sem_wait(&semaphore);
    sem_destroy(&semaphore);
 
-   if(msg->ret == FALSE) {
+   if(ret == FALSE) {
       g_ctrlm.authservice_poll_tag = 0;
    }
 
-   return msg->ret;
+   return ret;
 }
 #endif
 
@@ -1338,48 +1339,47 @@ gboolean ctrlm_load_experience(void) {
 
 #ifdef AUTH_SAT_TOKEN
 gboolean ctrlm_main_needs_service_access_token_get(void) {
+   gboolean ret = false;
+   sem_wait(&g_ctrlm.service_access_token_semaphore);
    if(g_ctrlm.sat_enabled) {
-      return(!g_ctrlm.has_service_access_token);
+      ret = !g_ctrlm.has_service_access_token;
    }
-   return false;
+   sem_post(&g_ctrlm.service_access_token_semaphore);
+   return ret;
 }
 
 void ctrlm_main_has_service_access_token_set(gboolean has_token) {
+   sem_wait(&g_ctrlm.service_access_token_semaphore);
    g_ctrlm.has_service_access_token = has_token;
+   sem_post(&g_ctrlm.service_access_token_semaphore);
 }
 
 gboolean ctrlm_load_service_access_token(void) {
-   static int expired = 0;
    if(!g_ctrlm.authservice->get_sat(g_ctrlm.service_access_token, g_ctrlm.service_access_token_expiration)) {
       ctrlm_main_has_service_access_token_set(false);
       return(false);
    }
    time_t current = time(NULL);
-   time_t timeout = g_ctrlm.service_access_token_expiration - current;
-   if(timeout <= 0) {
-      if(expired == 0) {
-         LOG_WARN("%s: SAT Token received from authservice is expired!", __FUNCTION__);
-      } else {
-         if(expired % 10 == 0) {
-            printf("!"); fflush(stdout);
-         }
-      }
-      expired += 1;
-      timeout = 1;
-   } else {
-      ctrlm_main_has_service_access_token_set(true);
-      LOG_INFO("%s: SAT Token retrieved and expires in %ld seconds\n", __FUNCTION__, timeout);
-      LOG_DEBUG("%s: <%s>\n", __FUNCTION__, g_ctrlm.service_access_token.c_str());
-      timeout = (timeout - CTRLM_MAIN_SAT_POLL_BEFORE_EXPIRE > 0 ? timeout - CTRLM_MAIN_SAT_POLL_BEFORE_EXPIRE : timeout); // Poll 10 seconds before the SAT expires if SAT is valid for more than 30 seconds
-      expired = 0;
-      LOG_INFO("%s: Setting SAT timer for %ld seconds\n", __FUNCTION__, timeout);
-#ifdef USE_VOICE_SDK
-      g_ctrlm.voice_session->voice_stb_data_sat_set(g_ctrlm.service_access_token);
-#else
-      ctrlm_voice_service_access_token_set(g_ctrlm.service_access_token, g_ctrlm.service_access_token_expiration);
-#endif
+   if(g_ctrlm.service_access_token_expiration - current <= 0) {
+      LOG_WARN("%s: SAT Token retrieved is already expired...\n", __FUNCTION__);
+      ctrlm_main_has_service_access_token_set(false);
+      return(false);
    }
-   g_ctrlm.service_access_token_expiration_tag = ctrlm_timeout_create(timeout * 1000, ctrlm_authservice_expired, (void *)(expired ? 1 : 0));
+
+   ctrlm_main_has_service_access_token_set(true);
+   LOG_INFO("%s: SAT Token retrieved and expires in %ld seconds\n", __FUNCTION__, g_ctrlm.service_access_token_expiration - current);
+   LOG_DEBUG("%s: <%s>\n", __FUNCTION__, g_ctrlm.service_access_token.c_str());
+#ifdef USE_VOICE_SDK
+   g_ctrlm.voice_session->voice_stb_data_sat_set(g_ctrlm.service_access_token);
+#else
+   ctrlm_voice_service_access_token_set(g_ctrlm.service_access_token, g_ctrlm.service_access_token_expiration);
+#endif
+
+   if(!g_ctrlm.authservice->supports_sat_expiration()) {
+      time_t timeout = g_ctrlm.service_access_token_expiration - current;
+      LOG_INFO("%s: Setting SAT Timer for %ld seconds\n", __FUNCTION__, timeout);
+      g_ctrlm.service_access_token_expiration_tag = ctrlm_timeout_create(timeout * 1000, ctrlm_authservice_expired, NULL);
+   }
    return(true);
 }
 #endif
@@ -2440,7 +2440,9 @@ gpointer ctrlm_main_thread(gpointer param) {
             ctrlm_main_queue_msg_authservice_poll_t *dqm = (ctrlm_main_queue_msg_authservice_poll_t *) msg;
 
             if(!ctrlm_load_authservice_data()) {
-               dqm->ret = TRUE;
+               if(dqm->ret) {
+                  *dqm->ret = TRUE;
+               }
             }
 
             if(dqm->semaphore != NULL) {
@@ -4332,13 +4334,20 @@ void ctrlm_main_sat_enabled_set(gboolean sat_enabled) {
 
 void ctrlm_main_invalidate_service_access_token(void) {
    if(g_ctrlm.sat_enabled) {
+      sem_wait(&g_ctrlm.service_access_token_semaphore);
       if(g_ctrlm.has_service_access_token) {
          LOG_INFO("%s: Invalidating SAT Token...\n", __FUNCTION__);
          g_ctrlm.has_service_access_token = false;
          #ifdef AUTH_ENABLED
-         g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+         if(g_ctrlm.service_access_token_expiration_tag != 0) {
+            ctrlm_timeout_destroy(&g_ctrlm.service_access_token_expiration_tag);
+         }
+         if(g_ctrlm.authservice_poll_tag == 0) {
+            g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+         }
          #endif
       }
+      sem_post(&g_ctrlm.service_access_token_semaphore);
    }
 }
 
