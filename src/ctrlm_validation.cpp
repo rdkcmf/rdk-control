@@ -553,6 +553,7 @@ void ctrlm_validation_random_code(ctrlm_network_id_t network_id, ctrlm_controlle
       case CTRLM_RCU_CONTROLLER_TYPE_XR15:
       case CTRLM_RCU_CONTROLLER_TYPE_XR15V2:
       case CTRLM_RCU_CONTROLLER_TYPE_XR18:
+      case CTRLM_RCU_CONTROLLER_TYPE_XRA:
       case CTRLM_RCU_CONTROLLER_TYPE_XR19: {
          for(unsigned long index = 0; index < CTRLM_RCU_VALIDATION_KEY_QTY; index++) {
             g_ctrlm_validation.golden_code[index] = ctrlm_validation_random_number();

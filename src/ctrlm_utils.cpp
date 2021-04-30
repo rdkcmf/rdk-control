@@ -575,6 +575,7 @@ const char *ctrlm_rcu_controller_type_str(ctrlm_rcu_controller_type_t controller
       case CTRLM_RCU_CONTROLLER_TYPE_XR16:    return("XR16");
       case CTRLM_RCU_CONTROLLER_TYPE_XR18:    return("XR18");
       case CTRLM_RCU_CONTROLLER_TYPE_XR19:    return("XR19");
+      case CTRLM_RCU_CONTROLLER_TYPE_XRA:     return("XRA");
       case CTRLM_RCU_CONTROLLER_TYPE_UNKNOWN: return("UNKNOWN");
       case CTRLM_RCU_CONTROLLER_TYPE_INVALID: return("INVALID");
    }
@@ -1388,6 +1389,7 @@ bool ctrlm_is_voice_assistant(ctrlm_rcu_controller_type_t controller_type) {
    case CTRLM_RCU_CONTROLLER_TYPE_XR15V2:
    case CTRLM_RCU_CONTROLLER_TYPE_XR16:
    case CTRLM_RCU_CONTROLLER_TYPE_XR18:
+   case CTRLM_RCU_CONTROLLER_TYPE_XRA:
    case CTRLM_RCU_CONTROLLER_TYPE_UNKNOWN:
    case CTRLM_RCU_CONTROLLER_TYPE_INVALID:
       return(false);
@@ -1407,6 +1409,8 @@ ctrlm_remote_keypad_config ctrlm_get_remote_keypad_config(const char *remote_typ
       remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_NO_SETUP_KEY_WITH_NO_NUMBER_KEYS;
    } else if(strncmp("XR19-", remote_type, 5) == 0) {
       remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_VOICE_ASSISTANT;
+   } else if (strncmp("XRA-", remote_type, 4) == 0) {
+      remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_NO_SETUP_KEY_WITH_NUMBER_KEYS;
    }
    return(remote_keypad_config);
 }

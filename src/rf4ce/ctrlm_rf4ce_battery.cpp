@@ -241,8 +241,9 @@ guchar ctrlm_obj_controller_rf4ce_t::battery_level_percent(unsigned char voltage
       }
       case RF4CE_CONTROLLER_TYPE_XR15:
       case RF4CE_CONTROLLER_TYPE_XR15V2: 
-      case RF4CE_CONTROLLER_TYPE_XR16: {
-         //XR15 and XR16 uses the same table as XR11 FIX
+      case RF4CE_CONTROLLER_TYPE_XR16:
+      case RF4CE_CONTROLLER_TYPE_XRA: {
+         //XR15, XR16, and XRA uses the same table as XR11 FIX
          if(voltage_loaded > V2P_INDEX_XR11_FIX_PERCENT_100) {
             return(100);
          } else if(voltage_loaded < V2P_INDEX_XR11_FIX_PERCENT_ZERO) {

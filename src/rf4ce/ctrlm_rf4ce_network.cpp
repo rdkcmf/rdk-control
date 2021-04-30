@@ -506,6 +506,7 @@ ctrlm_rcu_controller_type_t ctrlm_obj_network_rf4ce_t::ctrlm_controller_type_get
       case RF4CE_CONTROLLER_TYPE_XR16:    return(CTRLM_RCU_CONTROLLER_TYPE_XR16);
       case RF4CE_CONTROLLER_TYPE_XR18:    return(CTRLM_RCU_CONTROLLER_TYPE_XR18);
       case RF4CE_CONTROLLER_TYPE_XR19:    return(CTRLM_RCU_CONTROLLER_TYPE_XR19);
+      case RF4CE_CONTROLLER_TYPE_XRA:     return(CTRLM_RCU_CONTROLLER_TYPE_XRA);
       case RF4CE_CONTROLLER_TYPE_UNKNOWN: return(CTRLM_RCU_CONTROLLER_TYPE_UNKNOWN);
       case RF4CE_CONTROLLER_TYPE_INVALID: return(CTRLM_RCU_CONTROLLER_TYPE_INVALID);
    }
@@ -555,6 +556,8 @@ ctrlm_rf4ce_controller_type_t ctrlm_obj_network_rf4ce_t::controller_type_from_us
       controller_type = RF4CE_CONTROLLER_TYPE_XR16;
    } else if(0 == strncmp(product_name, "XR19-", 5)) {
       controller_type = RF4CE_CONTROLLER_TYPE_XR19;
+   } else if(0 == strncmp(product_name, "XRA-", 4)) {
+      controller_type = RF4CE_CONTROLLER_TYPE_XRA;
    } else {
       LOG_ERROR("%s: Unsupported controller type <%s> 0x%02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X\n", __FUNCTION__, product_name, user_string[0], user_string[1], user_string[2],  user_string[3],  user_string[4],  user_string[5],  user_string[6],  user_string[7],
                                                                                                                                                              user_string[8], user_string[9], user_string[10], user_string[11], user_string[12], user_string[13], user_string[14], user_string[15]);
@@ -2108,6 +2111,9 @@ json_t *ctrlm_obj_network_rf4ce_t::xconf_export_controllers() {
          case  RF4CE_CONTROLLER_TYPE_XR19:
             strncpy(product_name,RF4CE_PRODUCT_NAME_XR19,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
             break;   
+         case  RF4CE_CONTROLLER_TYPE_XRA:
+            strncpy(product_name,RF4CE_PRODUCT_NAME_XRA,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+            break;
          default:
             // currently no other remotes are downloadable so dont include them in xconf export
             LOG_INFO("%s: controller of type %d ignored\n", __FUNCTION__, obj_controller_rf4ce->controller_type_get());
@@ -2833,6 +2839,20 @@ void ctrlm_obj_network_rf4ce_t::default_polling_configuration() {
 
           break;
         }
+        case RF4CE_CONTROLLER_TYPE_XRA: {
+          // Default XRA Polling Methods
+          controller_polling_methods_[i]                               = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_XRAV1_METHODS;
+          // Default XRA Heartbeat Configuration
+          controller_polling_configuration_heartbeat_[i].trigger       = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_XRAV1_HEARTBEAT_TRIGGER;
+          controller_polling_configuration_heartbeat_[i].kp_counter    = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_XRAV1_HEARTBEAT_KP_COUNTER;
+          controller_polling_configuration_heartbeat_[i].time_interval = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_XRAV1_HEARTBEAT_TIME_INTERVAL;
+          controller_polling_configuration_heartbeat_[i].reserved      = 0;
+          // Default XRA MAC Configuration
+          controller_polling_configuration_mac_[i].trigger       = POLLING_TRIGGER_FLAG_TIME;
+          controller_polling_configuration_mac_[i].time_interval = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_XRAV1_MAC_TIME_INTERVAL;
+
+          break;
+        }
         default: {
           // Default Polling Methods
           controller_polling_methods_[i]                               = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_DEFAULT_METHODS;
@@ -2908,6 +2928,10 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
         }
         case RF4CE_CONTROLLER_TYPE_XR19: {
            controller_tr181_str = CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_XR19V1;
+           break;
+        }
+        case RF4CE_CONTROLLER_TYPE_XRA: {
+           controller_tr181_str = CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_XRAV1;
            break;
         }
         default: {

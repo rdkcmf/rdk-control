@@ -214,6 +214,7 @@ class ctrlm_obj_network_rf4ce_t;
 #define RF4CE_PRODUCT_NAME_XR16                            ("XR16-10")
 #define RF4CE_PRODUCT_NAME_XR19                            ("XR19-10")
 #define RF4CE_PRODUCT_NAME_XR5                             ("XR5-40")
+#define RF4CE_PRODUCT_NAME_XRA                             ("XRA-10")
 #define RF4CE_XR11_VERSION_HARDWARE_MANUFACTURER           (2)
 #define RF4CE_XR11_VERSION_HARDWARE_MODEL                  (2)
 #define RF4CE_XR11_VERSION_HARDWARE_REVISION_MIN           (1)
@@ -373,8 +374,9 @@ typedef enum {
    RF4CE_CONTROLLER_TYPE_XR16    = 5,
    RF4CE_CONTROLLER_TYPE_XR18    = 6,
    RF4CE_CONTROLLER_TYPE_XR19    = 7,
-   RF4CE_CONTROLLER_TYPE_UNKNOWN = 8,
-   RF4CE_CONTROLLER_TYPE_INVALID = 9
+   RF4CE_CONTROLLER_TYPE_XRA     = 8,
+   RF4CE_CONTROLLER_TYPE_UNKNOWN = 9,
+   RF4CE_CONTROLLER_TYPE_INVALID = 10
 } ctrlm_rf4ce_controller_type_t;
 
 typedef enum {

@@ -414,7 +414,7 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_get(gboolean target, ctrlm_timestam
             if(!target) {
                // This rib entry is the last entry read by the remote after binding is completed
                if((controller_type_ == RF4CE_CONTROLLER_TYPE_XR11 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR15 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR15V2 ||
-                   controller_type_ == RF4CE_CONTROLLER_TYPE_XR16 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR18) &&
+                   controller_type_ == RF4CE_CONTROLLER_TYPE_XR16 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR18 || controller_type_ == RF4CE_CONTROLLER_TYPE_XRA) &&
                   validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS && configuration_result_ == CTRLM_RCU_CONFIGURATION_RESULT_PENDING) {
                   LOG_INFO("%s: (%u, %u) Configuration Complete\n", __FUNCTION__, network_id_get(), controller_id_get());
                   configuration_result_ = CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS;

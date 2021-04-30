@@ -92,6 +92,7 @@ const char *ctrlm_rf4ce_controller_type_str(ctrlm_rf4ce_controller_type_t contro
    case RF4CE_CONTROLLER_TYPE_XR16:    return("XR16");
    case RF4CE_CONTROLLER_TYPE_XR18:    return("XR18");
    case RF4CE_CONTROLLER_TYPE_XR19:    return("XR19");
+   case RF4CE_CONTROLLER_TYPE_XRA:     return("XRA");
    case RF4CE_CONTROLLER_TYPE_UNKNOWN: return("UNKNOWN");
    case RF4CE_CONTROLLER_TYPE_INVALID: return("INVALID");
    }
@@ -143,6 +144,7 @@ const char *ctrlm_rf4ce_controller_polling_configuration_str(ctrlm_rf4ce_control
    case RF4CE_CONTROLLER_TYPE_XR16:    return("xr16v1");
    case RF4CE_CONTROLLER_TYPE_XR18:    return("xr18");
    case RF4CE_CONTROLLER_TYPE_XR19:    return("xr19v1");
+   case RF4CE_CONTROLLER_TYPE_XRA:     return("xrav1");
    case RF4CE_CONTROLLER_TYPE_UNKNOWN: return("unknown");
    default:                            break;
    }
@@ -287,7 +289,8 @@ gboolean ctrlm_rf4ce_is_voice_remote(const char * user_string) {
    if((strcmp("XR11-20", user_string)==0) ||
       (strcmp("XR15-10", user_string)==0) ||
       (strcmp("XR15-20", user_string)==0) ||
-      (strcmp("XR16-10", user_string)==0)) {
+      (strcmp("XR16-10", user_string)==0) ||
+      (strcmp("XRA-10", user_string) ==0)) {
          return(true);
      }
    return(false);
@@ -339,6 +342,7 @@ gboolean ctrlm_rf4ce_has_battery(ctrlm_rf4ce_controller_type_t controller_type) 
    case RF4CE_CONTROLLER_TYPE_XR15:
    case RF4CE_CONTROLLER_TYPE_XR15V2:
    case RF4CE_CONTROLLER_TYPE_XR16:
+   case RF4CE_CONTROLLER_TYPE_XRA:
       return(true);
    case RF4CE_CONTROLLER_TYPE_XR18:
    case RF4CE_CONTROLLER_TYPE_XR19:
@@ -360,6 +364,7 @@ gboolean ctrlm_rf4ce_has_dsp(ctrlm_rf4ce_controller_type_t controller_type) {
    case RF4CE_CONTROLLER_TYPE_XR15V2:
    case RF4CE_CONTROLLER_TYPE_XR16:
    case RF4CE_CONTROLLER_TYPE_XR18:
+   case RF4CE_CONTROLLER_TYPE_XRA:
    case RF4CE_CONTROLLER_TYPE_UNKNOWN:
    case RF4CE_CONTROLLER_TYPE_INVALID:
       return(false);
@@ -379,6 +384,8 @@ ctrlm_remote_keypad_config ctrlm_rf4ce_get_remote_keypad_config(const char *remo
       remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_NO_SETUP_KEY_WITH_NO_NUMBER_KEYS;
    } else if(strncmp("XR19-", remote_type, 5) == 0) {
       remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_VOICE_ASSISTANT;
+   } else if(strncmp("XRA-", remote_type, 4) == 0) {
+      remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_NO_SETUP_KEY_WITH_NUMBER_KEYS;
    }
    return(remote_keypad_config);
 }

@@ -270,6 +270,7 @@ void ctrlm_device_update_init(json_t *json_obj_device_update) {
    g_ctrlm_device_update.prefs.update_dirs.push_back(JSON_ARRAY_VAL_STR_DEVICE_UPDATE_XR15V2);
    g_ctrlm_device_update.prefs.update_dirs.push_back(JSON_ARRAY_VAL_STR_DEVICE_UPDATE_XR16V1);
    g_ctrlm_device_update.prefs.update_dirs.push_back(JSON_ARRAY_VAL_STR_DEVICE_UPDATE_XR19V1);
+   g_ctrlm_device_update.prefs.update_dirs.push_back(JSON_ARRAY_VAL_STR_DEVICE_UPDATE_XRAV1);
   
 #ifdef XR15_704
    g_ctrlm_device_update.xr15_crash_update                = false;
@@ -752,6 +753,8 @@ void ctrlm_device_update_process_device_file(string file_path_archive, string de
                controller_type = RF4CE_CONTROLLER_TYPE_XR16;
             } else if(image_info.device_name == "XR19-10") {
                controller_type = RF4CE_CONTROLLER_TYPE_XR19;
+            } else if(image_info.device_name == "XRA-10") {
+               controller_type = RF4CE_CONTROLLER_TYPE_XRA;
             }  else {
                LOG_ERROR("%s: Unsupported device <%s>\n", __FUNCTION__, device_name.c_str());
                break;

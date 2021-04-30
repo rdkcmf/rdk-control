@@ -579,6 +579,8 @@ const char *controller_name_to_audio_profile(const char *controller) {
         return("XR16");
     } else if(!strncmp(controller, "AX062", 5)) { //xi6v
         return("XI6V");
+    } else if(!strncmp(controller, "XRA-", 4)) {
+        return("XRA");
     }
     return("GENERIC");
 }

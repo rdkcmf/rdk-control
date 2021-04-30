@@ -157,6 +157,17 @@
                "kp_counter"              :         0,
                "time_interval"           :      3000
             }
+         },
+         "xrav1" : {
+            "methods"                    :         2,
+            "heartbeat" : {
+               "trigger"                 :         1,
+               "kp_counter"              :         0,
+               "time_interval"           :  86400000
+            },
+            "mac" : {
+               "time_interval"           :      3000
+            }
          }
       },
       "asb" : {
@@ -259,7 +270,8 @@
          "XR15v1",
          "XR15v2",
          "XR16v1",
-         "XR19v1"
+         "XR19v1",
+         "XRAv1"
       ]
    },
    "vsdk" : {

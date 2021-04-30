@@ -340,6 +340,10 @@ void ctrlm_obj_controller_rf4ce_t::controller_chipset_from_product_name(void) {
      // XR19-10
      controller_type_ = RF4CE_CONTROLLER_TYPE_XR19;
      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
+   } else if(0 == strncmp(product_name_, "XRA-", 4)) {
+      // XRA-10
+      controller_type_ = RF4CE_CONTROLLER_TYPE_XRA;
+      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
    } else {
       LOG_ERROR("%s: Unsupported controller type <%s>\n", __FUNCTION__, product_name_);
    }
