@@ -3660,6 +3660,18 @@ void ctrlm_obj_controller_rf4ce_t::property_write_ir_rf_database_status(guchar s
          (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",(ir_rf_database_status_ & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
 }
 
+static gboolean ir_rf_database_status_download_timeout(gpointer data) {
+   LOG_INFO("%s\n", __FUNCTION__);
+   ctrlm_obj_controller_rf4ce_t *rf4ce_controller = (ctrlm_obj_controller_rf4ce_t *)data;
+   ctrlm_main_queue_handler_push(CTRLM_HANDLER_CONTROLLER, (ctrlm_msg_handler_controller_t)&ctrlm_obj_controller_rf4ce_t::ir_rf_database_status_download_reset, NULL, 0, rf4ce_controller);
+   return(FALSE);
+}
+
+void ctrlm_obj_controller_rf4ce_t::ir_rf_database_status_download_reset(void *data, int size) {
+   LOG_INFO("%s: Resetting IR RF Status Download flag.\n", __FUNCTION__);
+   ir_rf_database_status_ = IR_RF_DATABASE_STATUS_DEFAULT;
+}
+
 guchar ctrlm_obj_controller_rf4ce_t::property_read_ir_rf_database_status(guchar *data, guchar length, bool target) {
    if(length != CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
@@ -3710,6 +3722,11 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_ir_rf_database_status(guchar 
             __FUNCTION__, (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO",
             (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO",
             (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",(ir_rf_database_status_ & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
+   }
+
+   if(ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) {
+      LOG_INFO("%s: Creating timer for download flag reset\n", __FUNCTION__);
+      ctrlm_timeout_create(200, ir_rf_database_status_download_timeout, (void *)this);
    }
    
    return(CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS);

@@ -750,6 +750,8 @@ public:
  
    void controller_destroy();
 
+   void ir_rf_database_status_download_reset(void *data, int size);
+
 private:
    ctrlm_obj_network_rf4ce_t *             obj_network_rf4ce_;
    bool                                    loading_db_;

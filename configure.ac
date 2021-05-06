@@ -93,6 +93,12 @@ AC_ARG_ENABLE([asb],
 esac],[asb=false])
 AM_CONDITIONAL([ASB_ENABLED], [test x$asb = xtrue])
 
+AC_ARG_ENABLE([thunder],
+[  --enable-thunder    Enable thunder support],
+[thunder=true],
+[thunder=false])
+AM_CONDITIONAL([THUNDER_ENABLED], [test x$thunder = xtrue])
+
 AC_ARG_ENABLE([auth],
 [  --enable-auth    Turn on auth service support],
 [case "${enableval}" in
@@ -153,23 +159,27 @@ AC_ARG_ENABLE([voice-nextgen-mac],
 [voice_nextgen_mac=false])
 AM_CONDITIONAL([VOICE_NEXTGEN_MAC], [test x$voice_nextgen_mac = xtrue])
 
-AC_ARG_ENABLE([irdbuei],
-[  --enable-irdbuei    Turn on UEI IRDB support],
+AC_ARG_ENABLE([irdb],
+[  --enable-irdb    Turn on IRDB support],
 [case "${enableval}" in
-  yes) irdbuei=true ;;
-  no)  irdbuei=false ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-irdbuei]) ;;
-esac],[irdbuei=false])
-AM_CONDITIONAL([IRDB_UEI_ENABLED], [test x$irdbuei = xtrue])
+  uei)     irdb=uei ;;
+  ruwido)  irdb=ruwido ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-irdb]) ;;
+esac],[irdb=false])
+AM_CONDITIONAL([IRDB_UEI_ENABLED],    [test x$irdb = xuei])
+AM_CONDITIONAL([IRDB_RUWIDO_ENABLED], [test x$irdb = xruwido])
 
-AC_ARG_ENABLE([irdbruwido],
-[  --enable-irdbruwido    Turn on RUWIDO IRDB support],
+AC_ARG_ENABLE([irdb-mode],
+[  --enable-irdb-mode    Configure IRDB mode],
 [case "${enableval}" in
-  yes) irdbruwido=true ;;
-  no)  irdbruwido=false ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-irdbruwido]) ;;
-esac],[irdbruwido=false])
-AM_CONDITIONAL([IRDB_RUWIDO_ENABLED], [test x$irdbruwido = xtrue])
+  hybrid)     irdb_mode=hybrid ;;
+  offline)    irdb_mode=offline ;;
+  online)     irdb_mode=online ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-irdb-mode]) ;;
+esac],[irdb_mode=false])
+AM_CONDITIONAL([IRDB_MODE_HYBRID],  [test x$irdb_mode = xhybrid])
+AM_CONDITIONAL([IRDB_MODE_OFFLINE], [test x$irdb_mode = xoffline])
+AM_CONDITIONAL([IRDB_MODE_ONLINE],  [test x$irdb_mode = xonline])
 
 AC_ARG_ENABLE([breakpad],
 [  --enable-breakpad    Turn on breakpad support],

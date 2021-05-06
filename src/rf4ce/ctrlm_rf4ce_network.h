@@ -34,6 +34,7 @@
 #include "ctrlm_voice.h"
 #include "ctrlm_device_update.h"
 #include "json_config.h"
+#include "ctrlm_rf4ce_ir_rf_db.h"
 
 #define CTRLM_RF4CE_AUTOBIND_OCTET       ((JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_FAIL << 3) | JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS)
 #define CTRLM_RF4CE_AUTOBIND_OCTET_RESET (0x40 | (JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_FAIL << 3) | JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS)
@@ -330,7 +331,6 @@ public:
    #endif
    guchar                               property_read_ir_rf_database(guchar index, guchar *data, guchar length);
    guchar                               property_write_ir_rf_database(guchar index, guchar *data, guchar length);
-   guchar                               write_ir_rf_database(guchar index, guchar *data, guchar length);
    void                                 ir_rf_database_read_from_db();
    void                                 attributes_from_db();
    guchar                               property_read_target_irdb_status(guchar *data, guchar length);
@@ -471,7 +471,7 @@ private:
    discovery_deadlines_t             discovery_deadlines_screen_bind_;
    ctrlm_bind_validation_failed_timeout_t bind_validation_failed_timeout_;
 
-   std::map<guchar, std::vector<guchar> *> ir_rf_database_;
+   ctrlm_rf4ce_ir_rf_db_t                  ir_rf_database_;
 
    // Bastille 37 vulnerability attribute
    ctrlm_rf4ce_pairing_blackout_t    blackout_;

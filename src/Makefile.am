@@ -24,7 +24,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/                     \
               -I$(top_srcdir)/src/irdb/ipc/        \
               -I$(top_srcdir)/src/voice/           \
               -I$(top_srcdir)/src/voice/endpoints/ \
-              -I$(top_srcdir)/src/voice/ipc/
+              -I$(top_srcdir)/src/voice/ipc/       \
+              -I$(top_srcdir)/src/thunder/
 
 AM_LDFLAGS = -larchive
 
@@ -81,7 +82,9 @@ controlMgr_SOURCES  += rf4ce/ctrlm_rf4ce_battery.cpp       \
                        rf4ce/ctrlm_rf4ce_rcu.cpp           \
                        rf4ce/ctrlm_rf4ce_rib.cpp           \
                        rf4ce/ctrlm_rf4ce_utils.cpp         \
-                       rf4ce/ctrlm_rf4ce_validation.cpp
+                       rf4ce/ctrlm_rf4ce_validation.cpp    \
+                       rf4ce/ctrlm_rf4ce_ir_rf_db.cpp      \
+                       rf4ce/ctrlm_rf4ce_ir_rf_db_entry.cpp
 endif
 
 if BLE_ENABLED
@@ -98,8 +101,14 @@ if IP_ENABLED
 AM_CPPFLAGS += -DCTRLM_NETWORK_IP -DCTRLM_IP_HAL_LOG_ENABLED
 endif
 
+if THUNDER_ENABLED
+controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin.cpp    \
+                       thunder/ctrlm_thunder_controller.cpp
+endif
+
 if CPC_ENABLED
 AM_CPPFLAGS += -DCPC_ENABLED
+AM_CPPFLAGS += -I$(top_srcdir)/cpc/plugins
 AM_LDFLAGS += -lsecure_wrapper
 
 controlMgr_SOURCES += ../cpc/ctrlm_rf4ce_voice_packet_analysis.cpp \
@@ -113,6 +122,12 @@ controlMgr_SOURCES += ../cpc/ip/ctrlm_hal_ip.cpp                   \
                       ../cpc/ip/ctrlm_ip_network.cpp               \
                       ../cpc/ip/ctrlm_ip_controller.cpp            \
                       ../cpc/ip/ctrlm_ip_util.cpp
+endif
+
+if THUNDER_ENABLED
+controlMgr_SOURCES +=  ../cpc/plugins/ctrlm_thunder_plugin_authservice.cpp \
+                       ../cpc/plugins/ctrlm_thunder_plugin_rams.cpp \
+                       ../cpc/plugins/ctrlm_thunder_plugin_remote_control.cpp
 endif
 
 if ASB_ENABLED
@@ -159,10 +174,12 @@ endif
 endif
 
 if IRDB_UEI_ENABLED
+AM_CPPFLAGS += -DIRDB_UEI
 controlMgr_SOURCES += ../cpc/irdb/ctrlm_irdb_uei.cpp
 endif
 
 if IRDB_RUWIDO_ENABLED
+AM_CPPFLAGS += -DIRDB_RUWIDO
 controlMgr_SOURCES += ../cpc/irdb/ctrlm_irdb_ruwido.cpp
 endif
 
@@ -171,6 +188,18 @@ else
 controlMgr_SOURCES += irdb/ctrlm_irdb_factory.cpp           \
                       stubs/stubs_voice_packet_analysis.cpp
 
+endif
+
+if IRDB_MODE_HYBRID
+AM_CPPFLAGS += -DIRDB_MODE_HYBRID
+endif
+
+if IRDB_MODE_OFFLINE
+AM_CPPFLAGS += -DIRDB_MODE_OFFLINE
+endif
+
+if IRDB_MODE_ONLINE
+AM_CPPFLAGS += -DIRDB_MODE_ONLINE
 endif
 
 if VOICE_NEXTGEN_MAC

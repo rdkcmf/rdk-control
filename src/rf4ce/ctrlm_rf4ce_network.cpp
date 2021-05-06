@@ -92,23 +92,6 @@ typedef struct controller_type_details_t {
       version_software_t arm_version;
 } controller_type_details_t;
 
-const ctrlm_key_code_t ir_rf_database_supported_keys[] =
-{
-    CTRLM_KEY_CODE_POWER_ON,
-    CTRLM_KEY_CODE_POWER_OFF,
-    CTRLM_KEY_CODE_POWER_TOGGLE,
-    CTRLM_KEY_CODE_VOL_UP,
-    CTRLM_KEY_CODE_VOL_DOWN,
-    CTRLM_KEY_CODE_MUTE,
-    CTRLM_KEY_CODE_INPUT_SELECT,
-    CTRLM_KEY_CODE_TV_POWER,
-    CTRLM_KEY_CODE_TV_POWER_ON,
-    CTRLM_KEY_CODE_TV_POWER_OFF,
-    CTRLM_KEY_CODE_AVR_POWER_TOGGLE,
-    CTRLM_KEY_CODE_AVR_POWER_OFF,
-    CTRLM_KEY_CODE_AVR_POWER_ON
-};
-
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 11)
 static ctrlm_hal_rf4ce_deepsleep_arguments_t dpi_args_field = {3, {{CTRLM_RF4CE_PROFILE_ID_COMCAST_RCU,   CTRLM_RF4CE_DPI_FRAME_CONTROL, 0x01, {RF4CE_FRAME_CONTROL_USER_CONTROL_PRESSED}}, // All XRC key downs
                                                              {CTRLM_RF4CE_PROFILE_ID_VOICE,         CTRLM_RF4CE_DPI_FRAME_CONTROL, 0x00, {0x00}}, // All voice packets
@@ -317,11 +300,6 @@ ctrlm_obj_network_rf4ce_t::~ctrlm_obj_network_rf4ce_t() {
            controller_remove(timeout->controller_id, true);
            g_free(timeout);
        }
-   }
-   for(map<guchar, std::vector<guchar> *>::iterator it = ir_rf_database_.begin(); it != ir_rf_database_.end(); it++) {
-      if(it->second != NULL) {
-         delete it->second;
-      }
    }
    for(map <ctrlm_controller_id_t, ctrlm_obj_controller_rf4ce_t *>::iterator it = controllers_.begin(); it != controllers_.end(); it++) {
       if(it->second != NULL) {
@@ -2347,95 +2325,71 @@ void ctrlm_obj_network_rf4ce_t::check_if_update_file_still_needed(ctrlm_main_que
 
 guchar ctrlm_obj_network_rf4ce_t::property_write_ir_rf_database(guchar index, guchar *data, guchar length) {
    THREAD_ID_VALIDATE();
-   length = write_ir_rf_database(index, data, length);
-   if(length == 0) {
-      return(0);
-   }
-   ctrlm_db_ir_rf_database_write((ctrlm_key_code_t)index, (guchar *)ir_rf_database_[index]->data(), ir_rf_database_[index]->size());
-   return(length);
-}
-
-guchar ctrlm_obj_network_rf4ce_t::write_ir_rf_database(guchar index, guchar *data, guchar length) {
-   THREAD_ID_VALIDATE();
    if(length > CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE || data == NULL) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   
-   // Store the data on the controller object
-   if(length == 0) { // Delete the entry
-      if(ir_rf_database_.count(index) == 0) {
-         LOG_INFO("%s: No IR/RF code to delete for key <%s>\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
-      } else {
-         LOG_INFO("%s: Deleting IR/RF code for key <%s>\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
-         delete ir_rf_database_[index]; // Delete the vector
-         ir_rf_database_.erase(index);  // Remove the entry from the map
-      }
 
-   } else if(ir_rf_database_.count(index) == 0) { // Create the vector
-      ir_rf_database_[index] = new vector<guchar>(data, data + length);
-      ir_rf_database_new_ = true;
-      LOG_INFO("%s: Creating IR/RF code for key <%s> length %u\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), ir_rf_database_[index]->size());
-      ctrlm_print_data_hex(__FUNCTION__, data, length, 32);
-   } else { // replace contents of the vector
-      //If the last target irdb status was not IR_RF_DB or the IR_RF codes have changed, mark this as new so ir codes are pushed to XR19
-      if(!(target_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_RF_DB) || (memcmp(data, ir_rf_database_[index]->data(), ir_rf_database_[index]->size()))) {
-         ir_rf_database_new_ = true;
+   ctrlm_rf4ce_ir_rf_db_entry_t *entry = ctrlm_rf4ce_ir_rf_db_entry_t::from_rib_binary(data, length);
+   if(entry) {
+      LOG_INFO("%s: %s\n", __FUNCTION__, entry->to_string(true).c_str());
+      this->ir_rf_database_.add_ir_code_entry(entry, (ctrlm_key_code_t)index);
+   } else {
+      if(length > 0 && data[0] == 0xC0) {
+         LOG_WARN("%s: Index <%s> set to default\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
+      } else {
+         LOG_ERROR("%s: Invalid ir rf data\n", __FUNCTION__);
+         ctrlm_print_data_hex(__FUNCTION__, data, length, 32);
       }
-      ir_rf_database_[index]->clear();
-      ir_rf_database_[index]->assign(data, data + length);
-      LOG_INFO("%s: Updating IR/RF code for key <%s> length %u\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), ir_rf_database_[index]->size());
-      ctrlm_print_data_hex(__FUNCTION__, data, length, 32);
    }
    return(length);
 }
 
 guchar ctrlm_obj_network_rf4ce_t::property_read_ir_rf_database(guchar index, guchar *data, guchar length) {
    THREAD_ID_VALIDATE();
+   uint16_t ret = 0;
    if(length != CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
+      return((guchar)ret);
    }
 
-   // Load the data from the controller object
-   if(ir_rf_database_.count(index) == 0) { // No entry for this key
-      LOG_INFO("%s: NO ENTRY FOUND for key <%s>. Use default.\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
-      data[0] = IR_RF_DATABASE_ATTRIBUTE_FLAGS_USE_DEFAULT;
-      return(1);
-   } else if(length < ir_rf_database_[index]->size()) {
-      LOG_ERROR("%s: NOT ENOUGH SPACE for key <%s> (%u, %u)\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), length, ir_rf_database_[index]->size());
-      return(0);
+   ctrlm_rf4ce_ir_rf_db_entry_t *entry = this->ir_rf_database_.get_ir_code((ctrlm_key_code_t)index);
+   if(entry) {
+      guchar *ir_data = NULL;
+      if(entry->to_binary(&ir_data, &ret)) {
+         if(ir_data) {
+            errno_t safec_rc = -1;
+            safec_rc = memcpy_s(data, length, ir_data, ret);
+            ERR_CHK(safec_rc);
+            LOG_INFO("%s: Key Code <%s>, %s\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), entry->to_string(true).c_str());
+            free(ir_data);
+            ir_data = NULL;
+         } else {
+            LOG_ERROR("%s: Key Code <%s> - ir_data is NULL\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
+         }
+      } else {
+         LOG_ERROR("%s: Key Code <%s> - to_binary failed\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
+      }
    } else {
-      errno_t safec_rc = memcpy_s(data, length, ir_rf_database_[index]->data(), ir_rf_database_[index]->size());
-      ERR_CHK(safec_rc);
+      if(length >= 83) { // This is what legacy code would return
+         errno_t safec_rc = -1;
+         LOG_INFO("%s: Key Code <%s> - DEFAULT - Returning default 83 byte payload\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
+         safec_rc = memset_s(data, length, 0, 83 * sizeof(guchar));
+         if(safec_rc < 0) ERR_CHK(safec_rc);
+         data[0] = 0xC0;
+         ret     = 83;
+      } else { // Just for sanity
+         LOG_WARN("%s: Key Code <%s> - DEFAULT - Length is not as expected, return default 1 byte payload\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
+         data[0] = 0xC0;
+         ret     = 1;
+      }
    }
-   LOG_INFO("%s: Returning IR/RF code for key <%s> length %u\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), ir_rf_database_[index]->size());
-   ctrlm_print_data_hex(__FUNCTION__, data, ir_rf_database_[index]->size(), 32);
-
-   return(ir_rf_database_[index]->size());
+   return((guchar)ret);
 }
 
 void ctrlm_obj_network_rf4ce_t::ir_rf_database_read_from_db() {
-   int      ir_rf_database_supported_keys_size = sizeof(ir_rf_database_supported_keys) / sizeof(ctrlm_key_code_t);
-
-   for(int index=0; index<ir_rf_database_supported_keys_size; index++) {
-      ctrlm_key_code_t key_code = ir_rf_database_supported_keys[index];
-      guint32  length = 0;
-      guchar * data   = NULL;
-      //Read from db
-      ctrlm_db_ir_rf_database_read(key_code, (guchar **)&data, &length);
-
-      if(data == NULL) {
-         LOG_WARN("%s: No DB entry for key code <%s>\n", __FUNCTION__, ctrlm_key_code_str(key_code));
-         continue;
-      } else if(length > CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE) {
-         LOG_WARN("%s: Length of DB entry invalid, either doesn't exist or is corrupt\n", __FUNCTION__);
-         continue;
-      }
-      //Write to the cached database
-      write_ir_rf_database(key_code, data, length);
-      g_free(data);
-   }
+   this->ir_rf_database_.load_db();
+   LOG_INFO("%s:\n%s\n", __FUNCTION__, this->ir_rf_database_.to_string(true).c_str());
 }
 
 guchar ctrlm_obj_network_rf4ce_t::property_write_target_irdb_status(guchar *data, guchar length) {
@@ -4373,15 +4327,38 @@ void ctrlm_obj_network_rf4ce_t::req_process_ir_set_code(void *data, int size) {
    g_assert(size == sizeof(ctrlm_main_queue_msg_ir_set_code_t));
 
    if(controller_exists(dqm->controller_id)) {
+      ctrlm_rf4ce_ir_rf_db_dev_type_t dev_type = CTRLM_RF4CE_IR_RF_DB_DEV_TV;
+      switch(dqm->ir_codes->get_type()) {
+         case CTRLM_IRDB_DEV_TYPE_TV: {
+            dev_type = CTRLM_RF4CE_IR_RF_DB_DEV_TV;
+            this->ir_rf_database_.clear_tv_ir_codes();
+            break;
+         }
+         case CTRLM_IRDB_DEV_TYPE_AVR: {
+            dev_type = CTRLM_RF4CE_IR_RF_DB_DEV_AVR;
+            this->ir_rf_database_.clear_avr_ir_codes();
+            break;
+         }
+         default: {
+            LOG_ERROR("%s: Unexpected dev_type %d\n", __FUNCTION__, dqm->ir_codes->get_type());
+            return;
+         }
+      }
       if(dqm->ir_codes->get_key_map()) {
          LOG_INFO("%s: Setting IR Codes on Controller %u\n", __FUNCTION__, dqm->controller_id);
          unsigned char status[1] = {IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES};
          for(const auto &itr : *dqm->ir_codes->get_key_map()) {
-            std::string raw_code(itr.second.begin(), itr.second.end());
-            controllers_[dqm->controller_id]->rf4ce_rib_set_target(CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE, itr.first, raw_code.length(), (uint8_t *)raw_code.c_str());
+            ctrlm_rf4ce_ir_rf_db_entry_t *entry = ctrlm_rf4ce_ir_rf_db_entry_t::from_raw_ir_code(dev_type, itr.first, (uint8_t *)itr.second.data(), (uint16_t)itr.second.size());
+            if(entry) {
+               this->ir_rf_database_.add_ir_code_entry(entry);
+            } else {
+               LOG_WARN("%s: failed to create entry\n", __FUNCTION__);
+            }
          }
+         LOG_INFO("%s:\n%s\n", __FUNCTION__, this->ir_rf_database_.to_string(true).c_str());
          controllers_[dqm->controller_id]->rf4ce_rib_set_target(CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS, status);
          controllers_[dqm->controller_id]->irdb_entry_id_name_set(dqm->ir_codes->get_type(), dqm->ir_codes->get_id());
+         this->ir_rf_database_.store_db();
          if(dqm->success) *dqm->success = true;
       } else {
          LOG_ERROR("%s: Invalid IR Codes\n", __FUNCTION__);
@@ -4405,10 +4382,13 @@ void ctrlm_obj_network_rf4ce_t::req_process_ir_clear_codes(void *data, int size)
 
    if(controller_exists(dqm->controller_id)) {
       LOG_INFO("%s: Clearing IR Codes on Controller %u\n", __FUNCTION__, dqm->controller_id);
-      unsigned char status[1] = {IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES};
-      controllers_[dqm->controller_id]->rf4ce_rib_set_target(CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS, status);
+      unsigned char status[1] = {IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES};
+      this->ir_rf_database_.clear_ir_codes();
+      this->ir_rf_database_.store_db();
+      LOG_INFO("%s:\n%s\n", __FUNCTION__, this->ir_rf_database_.to_string(true).c_str());
       controllers_[dqm->controller_id]->irdb_entry_id_name_set(CTRLM_IRDB_DEV_TYPE_TV, "0");
       controllers_[dqm->controller_id]->irdb_entry_id_name_set(CTRLM_IRDB_DEV_TYPE_AVR, "0");
+      controllers_[dqm->controller_id]->rf4ce_rib_set_target(CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS, status);
       if(dqm->success) *dqm->success = true;
    } else {
       LOG_ERROR("%s: Controller %u doesn't exist\n", __FUNCTION__, dqm->controller_id);

@@ -566,8 +566,12 @@ int main(int argc, char *argv[]) {
 #else
    g_ctrlm.authservice = new ctrlm_auth_legacy_t(g_ctrlm.server_url_authservice);
 #endif
-
-   ctrlm_load_authservice_data();
+   if(!ctrlm_has_authservice_data() && g_ctrlm.authservice->is_ready()) {
+       LOG_INFO("%s: Starting polling authservice for device data\n", __FUNCTION__);
+       g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+   } else {
+      LOG_WARN("%s: Authservice not ready, no reason to poll\n", __FUNCTION__);
+   }
 #endif // AUTH_ENABLED
 
 #ifdef USE_VOICE_SDK
@@ -700,16 +704,6 @@ int main(int argc, char *argv[]) {
    ctrlm_thread_monitor_init();
 
    g_ctrlm.successful_init = TRUE;
-
-#ifdef AUTH_ENABLED
-   // Authservice check
-   if(!ctrlm_has_authservice_data() && g_ctrlm.authservice->is_ready()) {
-       LOG_INFO("%s: Starting polling authservice for device data\n", __FUNCTION__);
-       g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
-   } else {
-      LOG_WARN("%s: Authservice not ready, no reason to poll\n", __FUNCTION__);
-   }
-#endif
 
    //Get the keycode logging preference
    IARM_BUS_SYSMGR_KEYCodeLoggingInfo_Param_t param;
@@ -1419,6 +1413,7 @@ gboolean ctrlm_has_authservice_data(void) {
 gboolean ctrlm_load_authservice_data(void) {
    gboolean ret = TRUE;
 #ifdef AUTH_ENABLED
+   if(g_ctrlm.authservice->is_ready()) {
 #ifdef AUTH_RECEIVER_ID
    if(!ctrlm_main_has_receiver_id_get()) {
       LOG_INFO("%s: load receiver id\n", __FUNCTION__);
@@ -1492,6 +1487,9 @@ gboolean ctrlm_load_authservice_data(void) {
       }
    }
 #endif
+   } else {
+      LOG_WARN("%s: Authservice is not ready...\n", __FUNCTION__);
+   }
 #endif
 
    return(ret);
