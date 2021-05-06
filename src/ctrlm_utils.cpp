@@ -1324,7 +1324,8 @@ bool ctrlm_dsmgr_deinit() {
 
 bool ctrlm_dsmgr_mute_audio(bool mute) {
   try {
-     device::Host::getInstance().getAudioOutputPort("HDMI0").setMuted(mute);
+     dsAudioDuckingAction_t action = mute ? dsAUDIO_DUCKINGACTION_START : dsAUDIO_DUCKINGACTION_STOP;
+     device::Host::getInstance().getAudioOutputPort("SPEAKER0").setAudioDucking(action, dsAUDIO_DUCKINGTYPE_ABSOLUTE, mute ? 0 : 100);
      LOG_INFO("%s: Audio is %smuted\n", __FUNCTION__, mute?"":"un-");
   }
   catch(std::exception& error) {
@@ -1334,17 +1335,27 @@ bool ctrlm_dsmgr_mute_audio(bool mute) {
   return true;
 }
 
-bool ctrlm_dsmgr_duck_audio(double vol) {
+bool ctrlm_dsmgr_duck_audio(bool enable, bool relative, double vol) {
   if(vol < 0 || vol > 1) {
       LOG_ERROR("%s: Invalid volume\n", __FUNCTION__);
       return false;
   }
   try {
-     device::Host::getInstance().getAudioOutputPort("HDMI0").setAudioDuckingLevel(vol);
-     LOG_INFO("%s: Audio is %.01f%%\n", __FUNCTION__, vol * 100);
+     unsigned char level = (unsigned char)((vol * 100) + 0.5);
+
+     dsAudioDuckingAction_t action = enable   ? dsAUDIO_DUCKINGACTION_START  : dsAUDIO_DUCKINGACTION_STOP;
+     dsAudioDuckingType_t   type   = relative ? dsAUDIO_DUCKINGTYPE_RELATIVE : dsAUDIO_DUCKINGTYPE_ABSOLUTE;
+
+     device::Host::getInstance().getAudioOutputPort("SPEAKER0").setAudioDucking(action, type, level);
+
+     if(enable) {
+        LOG_INFO("%s: Audio ducking enabled - type <%s> level <%u%%>\n", __FUNCTION__, relative ? "RELATIVE" : "ABSOLUTE", level);
+     } else {
+        LOG_INFO("%s: Audio ducking disabled\n", __FUNCTION__);
+     }
   }
   catch(std::exception& error) {
-    LOG_WARN("%s: Muting sound error : %s\n", __FUNCTION__, error.what());
+    LOG_WARN("%s: Ducking sound error : %s\n", __FUNCTION__, error.what());
     return false;
   }
   return true;

@@ -46,6 +46,7 @@
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_MODE                  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioMode"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_TIMING                "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioTiming"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_CONFIDENCE_THRESHOLD  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioConfidenceThreshold"
+#define CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_TYPE          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioDuckingType"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_LEVEL         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioDuckingLevel"
 #define CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.VSDKConfiguration"
 #define CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.KeywordSensitivity"

@@ -91,6 +91,24 @@ bool json_config::config_value_get(const char* key, int& val, int min_val, int m
    return true;
 }
 
+bool json_config::config_value_get(const char* key, double& val, double min_val, double max_val) const {
+
+   json_t *json_obj = json_object_get(json_section_obj, key);
+   if(json_obj == 0 || !json_is_real(json_obj) ) {
+      LOG_INFO("%s: %-25s - ABSENT\n", __FUNCTION__, key);
+      return false;
+   }
+   // handle real number types
+   double value = json_real_value(json_obj);
+   LOG_INFO("%s: %-25s - PRESENT <%f>\n", __FUNCTION__, key, value);
+   if(value < min_val || value > max_val) {
+      LOG_INFO("%s: %-25s - OUT OF RANGE %f\n", __FUNCTION__, key, value);
+      return false;
+   }
+   val = value;
+   return true;
+}
+
 bool json_config::config_value_get(const char* key, std::string& val) const{
 
    json_t *json_obj = json_object_get(json_section_obj, key);

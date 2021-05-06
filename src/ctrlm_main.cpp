@@ -687,9 +687,6 @@ int main(int argc, char *argv[]) {
       return(-1);
    }
 
-   //umute audio in case we muted it and we crashed
-   ctrlm_dsmgr_mute_audio(false);
-
    LOG_INFO("ctrlm_main: init voice\n");
 #ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_configure_config_file_json(json_obj_voice, json_obj_vsdk);

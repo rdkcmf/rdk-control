@@ -230,6 +230,7 @@
       "audio_mode"                       :         1,
       "audio_timing"                     :         0,
       "audio_confidence_threshold"       :       0.5,
+      "audio_ducking_type"               :         0,
       "audio_ducking_level"              :       0.5
    },
    "device_update" : {

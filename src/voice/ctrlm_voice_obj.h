@@ -36,7 +36,7 @@
 
 #define VOICE_SESSION_REQ_DATA_LEN_MAX (33)
 
-#define CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER    {(ctrlm_voice_audio_mode_t)JSON_INT_VALUE_VOICE_AUDIO_MODE, (ctrlm_voice_audio_timing_t)JSON_INT_VALUE_VOICE_AUDIO_TIMING, JSON_FLOAT_VALUE_VOICE_AUDIO_CONFIDENCE_THRESHOLD, JSON_FLOAT_VALUE_VOICE_AUDIO_DUCKING_LEVEL}
+#define CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER    {(ctrlm_voice_audio_mode_t)JSON_INT_VALUE_VOICE_AUDIO_MODE, (ctrlm_voice_audio_timing_t)JSON_INT_VALUE_VOICE_AUDIO_TIMING, JSON_FLOAT_VALUE_VOICE_AUDIO_CONFIDENCE_THRESHOLD, (ctrlm_voice_audio_ducking_type_t)JSON_INT_VALUE_VOICE_AUDIO_DUCKING_TYPE, JSON_FLOAT_VALUE_VOICE_AUDIO_DUCKING_LEVEL}
 typedef enum {
    CTRLM_VOICE_AUDIO_MODE_OFF             = 0,
    CTRLM_VOICE_AUDIO_MODE_MUTING          = 1,
@@ -53,10 +53,16 @@ typedef enum {
 typedef double ctrlm_voice_audio_confidence_threshold_t;
 typedef double ctrlm_voice_audio_ducking_level_t;
 
+typedef enum {
+   CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE = 0,
+   CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE = 1,
+} ctrlm_voice_audio_ducking_type_t;
+
 typedef struct {
    ctrlm_voice_audio_mode_t                 mode;
    ctrlm_voice_audio_timing_t               timing;
    ctrlm_voice_audio_confidence_threshold_t confidence_threshold;
+   ctrlm_voice_audio_ducking_type_t         ducking_type;
    ctrlm_voice_audio_ducking_level_t        ducking_level;
 } ctrlm_voice_audio_settings_t;
 
@@ -498,6 +504,7 @@ public:
 
     ctrlm_voice_audio_mode_t                 audio_mode;
     ctrlm_voice_audio_timing_t               audio_timing;
+    ctrlm_voice_audio_ducking_type_t         audio_ducking_type;
     ctrlm_voice_audio_ducking_level_t        audio_ducking_level;
     ctrlm_voice_audio_confidence_threshold_t audio_confidence_threshold;
 

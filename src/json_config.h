@@ -35,6 +35,7 @@ class json_config {
 
       bool config_value_get(const char* key, bool& val) const;
       bool config_value_get(const char* key, int& val, int min_val=INT_MIN, int max_val=INT_MAX) const;
+      bool config_value_get(const char* key, double& val, double min_val=0.0, double max_val=1.0) const;
       template <typename T>
       bool config_value_get(const char* key, T& val, int min_val=INT_MIN, int max_val=INT_MAX) const {
          int value = 0;

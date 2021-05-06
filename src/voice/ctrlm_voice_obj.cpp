@@ -206,7 +206,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
     LOG_INFO("%s: Configuring voice\n", __FUNCTION__);
     if (conf.config_object_set(obj_voice)){
         bool enabled = true;
-        ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_level};
+        ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level};
 
         conf.config_value_get(JSON_BOOL_NAME_VOICE_ENABLE,                      enabled);
         conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_vrex_src_ptt);
@@ -234,8 +234,9 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_STR_NAME_VOICE_OPUS_ENCODER_PARAMS,          this->prefs.opus_encoder_params_str);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_MODE,                   audio_settings.mode);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_TIMING,                 audio_settings.timing);
-        conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, audio_settings.confidence_threshold);
-        conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_DUCKING_LEVEL,        audio_settings.ducking_level);
+        conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, audio_settings.confidence_threshold, 0.0, 1.0);
+        conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_DUCKING_TYPE,           audio_settings.ducking_type, CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE, CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE);
+        conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_DUCKING_LEVEL,        audio_settings.ducking_level, 0.0, 1.0);
         this->voice_params_opus_encoder_validate();
 
         // Check if enabled
@@ -294,6 +295,9 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
      }
 
     this->process_xconf(&json_obj_vsdk);
+
+    // Disable muting/ducking to recover in case ctrlm restarts while muted/ducked.
+    this->audio_state_set(false);
 
     this->voice_sdk_open(json_obj_vsdk);
 
@@ -605,7 +609,7 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
       LOG_INFO("%s: opus encoder params <%s>\n", __FUNCTION__, this->prefs.opus_encoder_params_str.c_str());
    }
 
-   ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_level};
+   ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level};
    bool changed = false;
 
    result = ctrlm_tr181_int_get(CTRLM_TR181_VOICE_PARAMS_AUDIO_MODE, (int*)&audio_settings.mode);
@@ -617,6 +621,10 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
        changed = true;
    }
    result = ctrlm_tr181_real_get(CTRLM_TR181_VOICE_PARAMS_AUDIO_CONFIDENCE_THRESHOLD, &audio_settings.confidence_threshold);
+   if(result == CTRLM_TR181_RESULT_SUCCESS) {
+       changed = true;
+   }
+   result = ctrlm_tr181_int_get(CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_TYPE, (int *)&audio_settings.ducking_type);
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
        changed = true;
    }
@@ -2034,6 +2042,14 @@ const char *ctrlm_voice_audio_timing_str(ctrlm_voice_audio_timing_t timing) {
     return("UNKNOWN");
 }
 
+const char *ctrlm_voice_audio_ducking_type_str(ctrlm_voice_audio_ducking_type_t ducking_type) {
+    switch(ducking_type) {
+        case CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE: return("ABSOLUTE");
+        case CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE: return("RELATIVE");
+    }
+    return("UNKNOWN");
+}
+
 ctrlm_hal_input_device_t voice_device_to_hal(ctrlm_voice_device_t device) {
     ctrlm_hal_input_device_t ret = CTRLM_HAL_INPUT_INVALID;
     switch(device) {
@@ -2155,6 +2171,17 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
             break;
         }
     }
+    switch(settings->ducking_type) {
+        case CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE:
+        case CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE: {
+            this->audio_ducking_type = settings->ducking_type;
+            break;
+        }
+        default: {
+            this->audio_ducking_type = (ctrlm_voice_audio_ducking_type_t)JSON_INT_VALUE_VOICE_AUDIO_DUCKING_TYPE;
+            break;
+        }
+    }
 
     if(settings->ducking_level >= 0 && settings->ducking_level <= 1) {
         this->audio_ducking_level = settings->ducking_level;
@@ -2173,6 +2200,7 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
 
     ss << "Audio Mode < " << ctrlm_voice_audio_mode_str(this->audio_mode) << " >";
     if(this->audio_mode == CTRLM_VOICE_AUDIO_MODE_DUCKING) {
+        ss << ", Ducking Type < " << ctrlm_voice_audio_ducking_type_str(this->audio_ducking_type) << " >";
         ss << ", Ducking Level < " << this->audio_ducking_level * 100 << "% >";
     }
     if(this->audio_mode != CTRLM_VOICE_AUDIO_MODE_OFF) {
@@ -2274,14 +2302,11 @@ void ctrlm_voice_t::audio_state_set(bool session) {
             break;
         }
         case CTRLM_VOICE_AUDIO_MODE_DUCKING: {
-            if(session) {
-                ctrlm_dsmgr_duck_audio(this->audio_ducking_level);
-            } else {
-                ctrlm_dsmgr_duck_audio(1);
-            }
+            ctrlm_dsmgr_duck_audio(session, (this->audio_ducking_type == CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE), this->audio_ducking_level);
             break;
         }
         default: {
+            LOG_WARN("%s: invalid audio mode\n", __FUNCTION__);
             break;
         }
     }
