@@ -356,6 +356,7 @@ typedef struct {
    ctrlm_main_queue_msg_header_t header;
    ctrlm_audio_container_t       container;
    char                          file_path[128];
+   bool                          raw_mic_enable;
 } ctrlm_main_queue_msg_audio_capture_start_t;
 
 typedef struct {

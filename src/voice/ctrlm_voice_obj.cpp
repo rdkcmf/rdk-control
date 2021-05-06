@@ -2285,9 +2285,9 @@ void ctrlm_voice_xrsr_session_capture_start(ctrlm_main_queue_msg_audio_capture_s
       return;
    }
 
-   LOG_INFO("%s: container <%s> file path <%s>\n", __FUNCTION__, xrsr_audio_container_str(xrsr_container), capture_start->file_path);
+   LOG_INFO("%s: container <%s> file path <%s> raw_mic_enable <%d>\n", __FUNCTION__, xrsr_audio_container_str(xrsr_container), capture_start->file_path, capture_start->raw_mic_enable);
 
-   xrsr_session_capture_start(xrsr_container, capture_start->file_path);
+   xrsr_session_capture_start(xrsr_container, capture_start->file_path, capture_start->raw_mic_enable);
 }
 
 void ctrlm_voice_xrsr_session_capture_stop(void) {

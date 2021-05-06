@@ -463,6 +463,7 @@ IARM_Result_t ctrlm_main_iarm_call_audio_capture_start(void *arg) {
    msg->header.network_id = CTRLM_MAIN_NETWORK_ID_INVALID;
    msg->container         = capture_start->container;
    snprintf(msg->file_path, sizeof(msg->file_path), "%s", capture_start->file_path);
+   msg->raw_mic_enable    = (capture_start->raw_mic_enable) ? true : false;
    ctrlm_main_queue_msg_push(msg);
 
    capture_start->result = CTRLM_IARM_CALL_RESULT_SUCCESS;

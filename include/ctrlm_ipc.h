@@ -810,6 +810,7 @@ typedef struct {
    ctrlm_iarm_call_result_t result;
    ctrlm_audio_container_t  container;
    char                     file_path[128];
+   unsigned char            raw_mic_enable;
 } ctrlm_main_iarm_call_audio_capture_t;
 
 typedef struct {
