@@ -623,6 +623,12 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
        changed = true;
    }
 
+   int keyword_sensitivity = 0;
+   result = ctrlm_tr181_int_get(CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY, &keyword_sensitivity);
+   if(result == CTRLM_TR181_RESULT_SUCCESS) {
+      this->prefs.keyword_sensitivity = (keyword_sensitivity > 0) ? keyword_sensitivity : JSON_INT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY;
+   }
+
    result = ctrlm_tr181_string_get(CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION, &encoded_rfc_val[0], CTRLM_RFC_MAX_PARAM_LEN);
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
       json_error_t jerror;

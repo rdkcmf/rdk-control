@@ -48,6 +48,7 @@
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_CONFIDENCE_THRESHOLD  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioConfidenceThreshold"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_LEVEL         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioDuckingLevel"
 #define CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.VSDKConfiguration"
+#define CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.KeywordSensitivity"
 
 typedef enum {
    CTRLM_TR181_RESULT_FAILURE = 0,
