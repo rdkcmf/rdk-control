@@ -26,7 +26,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/                     \
               -I$(top_srcdir)/src/voice/endpoints/ \
               -I$(top_srcdir)/src/voice/ipc/
 
-AM_LDFLAGS = -larchive
+AM_LDFLAGS = 
 
 bin_PROGRAMS       = controlMgr
 controlMgr_SOURCES = ctrlm_main.cpp                           \
@@ -100,7 +100,6 @@ endif
 
 if CPC_ENABLED
 AM_CPPFLAGS += -DCPC_ENABLED
-AM_LDFLAGS += -lsecure_wrapper
 
 controlMgr_SOURCES += ../cpc/ctrlm_rf4ce_voice_packet_analysis.cpp \
                       ../cpc/ctrlm_vendor_network_factory.cpp      \

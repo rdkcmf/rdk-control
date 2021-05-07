@@ -22,7 +22,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sstream>
-#include <archive.h>
 #include "ctrlm.h"
 #include "ctrlm_utils.h"
 // dsMgr includes
@@ -38,9 +37,6 @@
 #include "dsRpc.h"
 #include "dsDisplay.h"
 // end dsMgr includes
-
-#define BLOCK_SIZE     (1024 * 4 * 10) /* bytes */
-#define MAX_RECURSE_DEPTH 20
 
 #define CTRLM_INVALID_STR_LEN (24)
 
@@ -1439,259 +1435,19 @@ std::string ctrlm_convert_mac_long_to_string ( const unsigned long long ieee_add
    return string(ascii_mac);
 }
 
-static bool ctrlm_rm_rf(std::string path, unsigned int recursive_depth = MAX_RECURSE_DEPTH) {
-   /* This is the implementation for (rm -rf) command */
-   LOG_INFO("%s: Removing the directory <%s> \n", __FUNCTION__, path.c_str());
-   bool status = false;
-
-   if(0 > recursive_depth){
-     LOG_ERROR("%s: Invalid recursion depth\n", __FUNCTION__);
-     return false;
-   } else if(0 == recursive_depth) {
-     LOG_ERROR("%s: Maximum recursion depth reached\n", __FUNCTION__);
-     return false;
-   }
-
-   /* DIR handler */
-   errno = 0;
-   DIR *handler = opendir(path.c_str());
-   if(handler == NULL){
-     int errsv = errno;
-     LOG_ERROR("%s: Failed opendir to %s, opendir call error (%s)\n", __FUNCTION__, path.c_str(), strerror(errsv));
-     return false;
-   }
-
-   /* handler to run-through the available directoreis and files */
-   struct dirent *dir;
-
-   /* store the length of the path */
-   size_t path_len = strlen(path.c_str());
-
-   errno = 0;
-   status = true;
-   while (status && (dir = readdir(handler))) {
-     bool recurse_status = false;
-     size_t len;
-
-     /* skip recursive calls on "." and ".." */
-     if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, "..")) {
-        continue;
-     }
-
-     len = path_len + strlen(dir->d_name) + 2;
-     static char ctrlm_rm_rf_buf[PATH_MAX];
-     struct stat sbuf;
-     snprintf(ctrlm_rm_rf_buf, len, "%s/%s", path.c_str(), dir->d_name);
-     errno = 0;
-     if (0 != stat(ctrlm_rm_rf_buf, &sbuf)) {
-        int errsv = errno;
-        LOG_ERROR("%s: Failed to stat %s, stat call error (%s)\n", __FUNCTION__, ctrlm_rm_rf_buf, strerror(errsv));
-        errno = 0;
-        if( 0 != closedir(handler)) {
-          int errsv = errno;
-          LOG_ERROR("%s: Failed closedir to %s, closedir call error (%s)\n", __FUNCTION__, path.c_str(), strerror(errsv));
-        }
-        return false;
-     } else {
-       if (S_ISDIR(sbuf.st_mode)){
-         --recursive_depth;
-         recurse_status = ctrlm_rm_rf(ctrlm_rm_rf_buf, recursive_depth);
-       } else {
-         errno = 0;
-         if(0 != unlink(ctrlm_rm_rf_buf)){
-            int errsv = errno;
-            LOG_ERROR("%s: Failed unlink %s, unlink call error (%s)\n", __FUNCTION__, ctrlm_rm_rf_buf, strerror(errsv));
-            recurse_status = false;
-         } else {
-            recurse_status = true;
-         }
-       }
-     }
-     status = recurse_status;
-   }
-
-   if(dir  == NULL && errno == 0){
-     LOG_INFO("%s: End of directory stream reached\n", __FUNCTION__);
-   } else if(dir  == NULL && errno != 0){
-     int errsv = errno;
-     LOG_ERROR("%s: Failed readdir to %s, readdir call error (%s)\n", __FUNCTION__, path.c_str(), strerror(errsv));
-     status = false;
-   }
-
-   errno = 0;
-   if( 0 != closedir(handler)) {
-     int errsv = errno;
-     LOG_ERROR("%s: Failed closedir to %s, closedir call error (%s)\n", __FUNCTION__, path.c_str(), strerror(errsv));
-     return false;
-   }
-
-   if (status) {
-      errno = 0;
-      if(0 != rmdir(path.c_str())){
-        int errsv = errno;
-        LOG_ERROR("%s: Failed rmdir %s, rmdir call error (%s)\n", __FUNCTION__, path.c_str(), strerror(errsv));
-        return false;
-      }
-   }
-   return status;
-}
-
-bool ctrlm_utils_rm_rf(std::string path){
-   bool status;
-   ctrlm_utils_sem_wait();
-   status = ctrlm_rm_rf(path);
-   ctrlm_utils_sem_post();
-   return status;
-}
-
-bool ctrlm_tar_archive_extract(std::string archive_path, std::string dest_path) {
-   LOG_INFO("%s: extracting <%s> to <%s>\n", __FUNCTION__, archive_path.c_str(), dest_path.c_str());
-   bool status = false;
-   struct archive *arch = NULL;
-   struct archive_entry *entry;
-   int result=0;
-
-   /* store the current working dir to getback to the same */
-   char path[PATH_MAX];
-   errno = 0;
-   if(getcwd(path, PATH_MAX) == NULL){
-     int errsv = errno;
-     LOG_ERROR("%s: Failed to getcwd and getcwd call error (%s)\n", __FUNCTION__, strerror(errsv));
-     return false;
-   }
-
-   /* switch to destination directory to extract the tar*/
-   errno = 0;
-   if(chdir (dest_path.c_str()) != 0) {
+bool ctrlm_archive_extract(std::string file_path_archive, std::string dest_path) {
+   LOG_INFO("%s: extracting <%s> to <%s>\n", __FUNCTION__, file_path_archive.c_str(), dest_path.c_str());
+   string cmd = "mkdir -p " + dest_path;
+   if( 0 != system(cmd.c_str())) {
       int errsv = errno;
-      LOG_ERROR("%s: Failed chdir to %s and chdir call error (%s)\n", __FUNCTION__, dest_path.c_str(), strerror(errsv));
+      LOG_WARN("%s: failed to make the destination directory, system call error %d (%s)\n", __FUNCTION__, errsv, strerror(errsv));
       return false;
    }
 
-   /* we can only read tar achives */
-   arch = archive_read_new ();
-   if(arch == NULL){
-      LOG_ERROR("%s: Unable to create an archive handlers\n", __FUNCTION__);
-      errno = 0;
-      if(chdir (path) != 0) {
-        int errsv = errno;
-        LOG_ERROR("%s: Failed chdir to %s and chdir call error (%s)\n", __FUNCTION__, path, strerror(errsv));
-      }
-      return false;
-   }
-
-   if(ARCHIVE_OK != archive_read_support_format_all (arch) || ARCHIVE_OK != archive_read_support_filter_all (arch)) {
-      LOG_WARN("%s: Unable to support archive / decompression formats\n", __FUNCTION__);
-      /*free the archie*/
-      archive_read_free (arch);
-      errno = 0;
-      if(chdir (path) != 0) {
-        int errsv = errno;
-        LOG_ERROR("%s: Failed chdir to %s and chdir call error (%s)\n", __FUNCTION__, path, strerror(errsv));
-      }
-      return false;
-   }
-
-   /* open the tar file */
-   result = archive_read_open_filename (arch, archive_path.c_str(), BLOCK_SIZE);
-   if(result != ARCHIVE_OK) {
-      LOG_ERROR("%s: Cannot open %s\n", __FUNCTION__, archive_path.c_str());
-       /* free the archive */
-      archive_read_free (arch);
-      errno = 0;
-      if(chdir (path) != 0) {
-        int errsv = errno;
-        LOG_ERROR("%s: Failed chdir to %s and chdir call error (%s)\n", __FUNCTION__, path, strerror(errsv));
-      }
-      return false;
-   }
-
-   /* extract each file */
-   do {
-      result = archive_read_next_header (arch, &entry);
-      if (result == ARCHIVE_EOF) {
-         break;
-      }
-      if (result != ARCHIVE_OK) {
-         LOG_ERROR("%s: Cannot read header  %s\n", __FUNCTION__, archive_error_string (arch));
-         break;
-      }
-
-      result = archive_read_extract (arch, entry, 0);
-      if (result == ARCHIVE_OK || result == ARCHIVE_WARN) {
-         /* tar is extracted successfully*/
-         status = true;
-      } else {
-         LOG_ERROR("%s: Cannot extract %s\n", __FUNCTION__, archive_error_string (arch));
-         break;
-      }
-    } while(1);
-
-   /* close the archive */
-   archive_read_close (arch);
-   archive_read_free (arch);
-
-   errno = 0;
-   if(chdir (path) != 0) {
+   cmd = "tar -xzpf  " + file_path_archive + " -C " + dest_path;
+   if( 0 != system(cmd.c_str())) {
       int errsv = errno;
-      LOG_ERROR("%s: Failed chdir to %s and chdir call error (%s)\n", __FUNCTION__, path, strerror(errsv));
-      return false;
-   }
-
-   return status;
-}
-
-void ctrlm_archive_extract_tmp_dir_make(std::string tmp_dir_path) {
-   LOG_INFO("%s: <%s>\n", __FUNCTION__, tmp_dir_path.c_str());
-   errno = 0;
-   if(0 != mkdir(tmp_dir_path.c_str(), S_IRWXU | S_IRWXG)){
-      int errsv = errno;
-      LOG_ERROR("%s: Failed to mkdir, mkdir error (%s)\n", __FUNCTION__, strerror(errsv));
-      return;
-   }
-}
-
-void ctrlm_archive_extract_ble_tmp_dir_make(std::string tmp_dir_path) {
-   string dir = tmp_dir_path + "ctrlm/";
-   LOG_INFO("%s: <%s>\n", __FUNCTION__, dir.c_str());
-   errno = 0;
-   if(0 != mkdir(dir.c_str(), S_IRWXU | S_IRWXG)){
-      int errsv = errno;
-      LOG_ERROR("%s: Failed to mkdir, mkdir error (%s)\n", __FUNCTION__, strerror(errsv));
-      return;
-   }
-}
-
-bool ctrlm_archive_extract_ble_check_dir_exists(string path){
-   struct stat st;
-   LOG_INFO("%s: test for dir <%s>\n", __FUNCTION__, path.c_str());
-
-   if(stat(path.c_str(),&st) == 0){
-       if((st.st_mode & S_IFDIR) != 0){
-           return true;
-       }
-   }
-   LOG_INFO("%s: dir not found <%s>\n", __FUNCTION__, path.c_str());
-   return false;
-}
-
-bool ctrlm_archive_extract(std::string file_path_archive, std::string tmp_dir_path, std::string archive_file_name) {
-   string dest_path = tmp_dir_path + "ctrlm/" + archive_file_name + "/";
-
-   if(ctrlm_archive_extract_ble_check_dir_exists(tmp_dir_path + "ctrlm/")==false){
-      ctrlm_archive_extract_tmp_dir_make(tmp_dir_path);
-      ctrlm_archive_extract_ble_tmp_dir_make(tmp_dir_path);
-   }
-
-   errno = 0;
-   if(0 != mkdir(dest_path.c_str(), S_IRWXU | S_IRWXG)){
-      int errsv = errno;
-      LOG_ERROR("%s: Failed to mkdir, mkdir error (%s)\n", __FUNCTION__, strerror(errsv));
-      return false;
-   }
-
-   if( true != ctrlm_tar_archive_extract(file_path_archive, dest_path)) {
-      LOG_WARN("%s: Failed to extract the archive due to ctrlm_tar_archive_extract call error\n", __FUNCTION__);
+      LOG_WARN("%s: failed to extract the archive, system call error %d (%s)\n", __FUNCTION__, errsv, strerror(errsv));
       return false;
    }
    return true;
@@ -1699,8 +1455,10 @@ bool ctrlm_archive_extract(std::string file_path_archive, std::string tmp_dir_pa
 
 void ctrlm_archive_remove(std::string dir) {
    LOG_INFO("%s: deleting directory <%s>\n", __FUNCTION__, dir.c_str());
-   if( true != ctrlm_utils_rm_rf(dir)) {
-      LOG_WARN("%s: Failed to remove directory, ctrlm_rm_rf call error\n", __FUNCTION__);
+   string cmd = "rm -rf " + dir;
+   if( 0 != system(cmd.c_str())) {
+      int errsv = errno;
+      LOG_WARN("%s: failed to delete directory, system call error %d (%s)\n", __FUNCTION__, errsv, strerror(errsv));
    }
 }
 
