@@ -185,6 +185,7 @@ typedef struct {
    GThread *                          main_thread;
    GMainLoop *                        main_loop;
    sem_t                              semaphore;
+   sem_t                              ctrlm_utils_sem;
    GAsyncQueue *                      queue;
    string                             stb_name;
    string                             receiver_id;
@@ -441,6 +442,8 @@ int main(int argc, char *argv[]) {
    LOG_WARN("ctrlm_main: Memory debug is ENABLED.\n");
    g_mem_set_vtable(glib_mem_profiler_table);
 #endif
+
+   sem_init(&g_ctrlm.ctrlm_utils_sem, 0, 1);
 
    if(!ctrlm_iarm_init()) {
       LOG_FATAL("ctrlm_main: Unable to initialize IARM bus.\n");
@@ -777,8 +780,18 @@ int main(int argc, char *argv[]) {
    }
 #endif
 
+   sem_destroy(&g_ctrlm.ctrlm_utils_sem);
+
    LOG_INFO("ctrlm_main: exit program\n");
    return (g_ctrlm.return_code);
+}
+
+void ctrlm_utils_sem_wait(){
+   sem_wait(&g_ctrlm.ctrlm_utils_sem);
+}
+
+void ctrlm_utils_sem_post(){
+   sem_post(&g_ctrlm.ctrlm_utils_sem);
 }
 
 void ctrlm_thread_monitor_init(void) {

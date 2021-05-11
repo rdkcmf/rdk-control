@@ -1015,7 +1015,7 @@ void ctrlm_obj_network_ble_t::req_process_network_managed_upgrade(void *data, in
          LOG_INFO("%s: dest_path <%s> already exists, removing it...\n", __FUNCTION__, dest_path.c_str());
          ctrlm_archive_remove(dest_path);
       }
-      if (ctrlm_archive_extract(archive_file_path, dest_path)) {
+      if (ctrlm_archive_extract(archive_file_path, dqm->temp_dir_path, archive_file_name)) {
          //extract metadata from image.xml
          ctrlm_ble_upgrade_image_info_t image_info;
          image_info.path = dest_path;

@@ -115,8 +115,15 @@ ctrlm_remote_keypad_config ctrlm_get_remote_keypad_config(const char *remote_typ
 unsigned long long ctrlm_convert_mac_string_to_long (const char* ascii_mac);
 std::string        ctrlm_convert_mac_long_to_string (const unsigned long long ieee_address);
 
-bool        ctrlm_archive_extract(std::string file_path_archive, std::string dest_path);
+bool        ctrlm_archive_extract(std::string file_path_archive, std::string tmp_dir_path, std::string archive_file_name);
 void        ctrlm_archive_remove(std::string dir);
+bool        ctrlm_tar_archive_extract(std::string file_path_archive, std::string dest_path);
+bool        ctrlm_utils_rm_rf(std::string path);
+void        ctrlm_utils_sem_wait();
+void        ctrlm_utils_sem_post();
+void        ctrlm_archive_extract_tmp_dir_make(std::string tmp_dir_path);
+void        ctrlm_archive_extract_ble_tmp_dir_make(std::string tmp_dir_path);
+bool        ctrlm_archive_extract_ble_check_dir_exists(std::string path);
 std::string ctrlm_xml_tag_text_get(std::string xml, std::string tag);
 
 #ifdef __cplusplus
