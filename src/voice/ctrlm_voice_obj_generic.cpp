@@ -37,6 +37,10 @@
 #include "ctrlm_voice_endpoint_ws.h"
 #include "ctrlm_voice_endpoint_ws_nextgen.h"
 
+#ifdef SUPPORT_VOICE_DEST_ALSA
+#include "ctrlm_voice_endpoint_sdt.h"
+#endif
+
 //I have seen it take up 12 seconds to get network so giving 15s timeout to be safe
 #define STANDBY_PARAMS_CONNECT_CHECK_INTERVAL (200)
 #define STANDBY_PARAMS_TIMEOUT_CONNECT        (15000)
@@ -44,7 +48,6 @@
 #define STANDBY_PARAMS_TIMEOUT_SESSION        (15000)
 #define STANDBY_PARAMS_IPV4_FALLBACK          (true)
 #define STANDBY_PARAMS_BACKOFF_DELAY          (100)
-
 
 // Application Interface Implementation
 ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
@@ -55,6 +58,9 @@ ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
     this->obj_http       = NULL;
     this->obj_ws         = NULL;
     this->obj_ws_nextgen = NULL;
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    this->obj_sdt        = NULL;
+    #endif
 }
 
 ctrlm_voice_generic_t::~ctrlm_voice_generic_t() {
@@ -72,6 +78,12 @@ ctrlm_voice_generic_t::~ctrlm_voice_generic_t() {
         delete this->obj_ws_nextgen;
         this->obj_ws_nextgen = NULL;
     }
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    if(this->obj_sdt != NULL) {
+        delete this->obj_sdt;
+        this->obj_sdt = NULL;
+    }
+    #endif
 }
 
 void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
@@ -80,6 +92,9 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
     this->obj_ws         = new ctrlm_voice_endpoint_ws_t(this);
     this->obj_http       = new ctrlm_voice_endpoint_http_t(this);
     this->obj_ws_nextgen = new ctrlm_voice_endpoint_ws_nextgen_t(this);
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    this->obj_sdt        = new ctrlm_voice_endpoint_sdt_t(this);
+    #endif
     if(this->obj_ws->open() == false) {
         LOG_ERROR("%s: Failed to open speech WS\n", __FUNCTION__);
         xrsr_close();
@@ -93,9 +108,19 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
         xrsr_close();
         g_assert(0);
     }
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    else if(this->obj_sdt->open() == false) {
+        LOG_ERROR("%s: Failed to open speech sdt \n", __FUNCTION__);
+        xrsr_close();
+        g_assert(0);
+    }
+    #endif
     this->endpoints.push_back(this->obj_ws);
     this->endpoints.push_back(this->obj_http);
     this->endpoints.push_back(this->obj_ws_nextgen);
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    this->endpoints.push_back(this->obj_sdt);
+    #endif
 }
 
 void ctrlm_voice_generic_t::voice_sdk_update_routes() {
@@ -222,7 +247,31 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 i++;
                 LOG_INFO("%s: url translation from %s to %s\n", __FUNCTION__, url->c_str(), urls_translated[translated_index].c_str());
             }
-        } else {
+        }
+        #ifdef SUPPORT_VOICE_DEST_ALSA
+          else if(url->rfind("sdt", 0) == 0) {
+            xrsr_handlers_t    handlers_xrsr;
+            memset(&handlers_xrsr, 0, sizeof(handlers_xrsr));
+
+            if(!this->obj_sdt->get_handlers(&handlers_xrsr)) {
+                LOG_ERROR("%s: failed to get handlers ws\n", __FUNCTION__);
+            } else {
+
+                routes[i].src                     = src;
+                routes[i].dst_qty                 = 1;
+                routes[i].dsts[0].url             = url->c_str();
+                routes[i].dsts[0].handlers        = handlers_xrsr;
+                routes[i].dsts[0].format          = XRSR_AUDIO_FORMAT_PCM;
+                routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
+                routes[i].dsts[0].stream_from     = stream_from;
+                routes[i].dsts[0].stream_offset   = stream_offset;
+                routes[i].dsts[0].stream_until    = stream_until;
+                routes[i].dsts[0].params          = NULL;
+                i++;
+            }
+        }
+        #endif  
+        else {
             LOG_ERROR("%s: unsupported url <%s>", __FUNCTION__, url->c_str());
         }
     }

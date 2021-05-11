@@ -48,6 +48,15 @@ AC_ARG_ENABLE([rf4ce],
 esac],[rf4ce=false])
 AM_CONDITIONAL([RF4CE_ENABLED], [test x$rf4ce = xtrue])
 
+AC_ARG_ENABLE([xrsr_sdt],
+[  --enable-xrsr_sdt    Turn on Support Voice Destination ALSA],
+[case "${enableval}" in
+  yes) xrsr_sdt=true ;;
+  no)  xrsr_sdt=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-xrsr_sdt]) ;;
+esac],[xrsr_sdt=false])
+AM_CONDITIONAL([SUPPORT_VOICE_DEST_ALSA], [test x$xrsr_sdt = xtrue])
+
 AC_ARG_ENABLE([ble],
 [  --enable-ble    Turn on RDKX logger support],
 [case "${enableval}" in

@@ -68,6 +68,10 @@ controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \
                        voice/endpoints/ctrlm_voice_endpoint_ws_nextgen.cpp
 endif
 
+if SUPPORT_VOICE_DEST_ALSA
+controlMgr_SOURCES  += voice/endpoints/ctrlm_voice_endpoint_sdt.cpp
+endif
+
 if RF4CE_ENABLED
 AM_CPPFLAGS += -DCTRLM_NETWORK_RF4CE
 AM_LDFLAGS  += $(CTRLM_HAL_RF4CE_LIBRARY)
@@ -210,6 +214,11 @@ if BREAKPAD_ENABLED
 AM_CPPFLAGS += -DBREAKPAD_SUPPORT
 
 AM_LDFLAGS += -lbreakpad_client
+endif
+
+if SUPPORT_VOICE_DEST_ALSA
+AM_CPPFLAGS += -DSUPPORT_VOICE_DEST_ALSA
+AM_LDFLAGS  += -lvirtualmic
 endif
 
 CTRLM_CONFIG_JSON        =ctrlm_config.json

@@ -41,5 +41,8 @@ class ctrlm_voice_generic_t : public ctrlm_voice_t {
     ctrlm_voice_endpoint_t * obj_http;
     ctrlm_voice_endpoint_t * obj_ws;
     ctrlm_voice_endpoint_t * obj_ws_nextgen;
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    ctrlm_voice_endpoint_t * obj_sdt;
+    #endif
 };
 #endif
