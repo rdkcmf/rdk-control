@@ -2419,6 +2419,8 @@ gpointer ctrlm_main_thread(gpointer param) {
                LOG_INFO("%s: already in power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
             } else {
                dqm->old_state = g_ctrlm.power_state;
+               //Deep Sleep may set Networked Standby, maybe other adjustments later
+               ctrlm_main_iarm_update_power_state(&dqm->new_state);
                g_ctrlm.power_state = dqm->new_state;
                // Set Power change in Networks
                for(auto const &itr : g_ctrlm.networks) {
