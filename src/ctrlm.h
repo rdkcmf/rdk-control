@@ -447,6 +447,7 @@ void        ctrlm_update_last_key_info(int controller_id, guchar source_type, gu
 voice_session_t* ctrlm_main_voice_session_get();
 ctrlm_irdb_t* ctrlm_main_irdb_get();
 ctrlm_auth_t* ctrlm_main_auth_get();
+void          ctrlm_main_auth_start_poll();
 std::string ctrlm_receiver_id_get();
 std::string ctrlm_device_id_get();
 std::string ctrlm_stb_name_get();

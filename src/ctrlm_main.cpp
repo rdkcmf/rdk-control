@@ -719,9 +719,11 @@ int main(int argc, char *argv[]) {
 
 #ifdef AUTH_ENABLED
    // Authservice check
-   if(!ctrlm_has_authservice_data()) {
+   if(!ctrlm_has_authservice_data() && g_ctrlm.authservice->is_ready()) {
        LOG_INFO("%s: Starting polling authservice for device data\n", __FUNCTION__);
        g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+   } else {
+      LOG_WARN("%s: Authservice not ready, no reason to poll\n", __FUNCTION__);
    }
 #endif
 
@@ -1193,6 +1195,12 @@ gboolean ctrlm_load_device_mac(void) {
 }
 
 #ifdef AUTH_ENABLED
+void ctrlm_main_auth_start_poll() {
+   if(g_ctrlm.authservice_poll_tag == 0) {
+      g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+   }
+}
+
 #ifdef AUTH_RECEIVER_ID
 gboolean ctrlm_main_has_receiver_id_get(void) {
    return(g_ctrlm.has_receiver_id);
@@ -1493,7 +1501,9 @@ gboolean ctrlm_load_authservice_data(void) {
       LOG_INFO("%s: load sat token\n", __FUNCTION__);
       if(!ctrlm_load_service_access_token()) {
          LOG_WARN("%s: failed to load sat token\n", __FUNCTION__);
-         ret = FALSE;
+         if(!g_ctrlm.authservice->supports_sat_expiration()) { // Do not continue to poll just for SAT if authservice supports onChange event
+            ret = FALSE;
+         }
       } else {
          LOG_INFO("%s: load sat token successfully\n", __FUNCTION__);
       }
