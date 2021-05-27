@@ -98,6 +98,7 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t(ctrlm_network_type_t type, ctrl
    state_                       = CTRLM_BLE_STATE_INITIALIZING;
    ir_state_                    = CTRLM_IR_STATE_IDLE;
    upgrade_in_progress_         = false;
+   unpair_on_remote_request_    = true;
 
    hal_thread_                  = NULL;
    hal_api_main_                = NULL;
@@ -824,15 +825,21 @@ void ctrlm_obj_network_ble_t::factory_reset(void) {
 
    LOG_INFO("%s: Sending RCU action unpair to all controllers.\n", __FUNCTION__);
 
+   // Since we are factory resetting anyway, don't waste time unpairing the remote after the
+   // remote notifies us of unpair reason through RemoteControl service
+   this->unpair_on_remote_request_ = false;
+
    for (auto const &controller : controllers_) {
-      ctrlm_hal_ble_SendRcuAction_params_t params;
-      params.ieee_address = controller.second->getMacAddress();
-      params.action = CTRLM_BLE_RCU_ACTION_FACTORY_RESET;
-      params.wait_for_reply = true;
-      if (hal_api_send_rcu_action_) { 
-         hal_api_send_rcu_action_(params); 
-      } else {
-         LOG_FATAL("%s: hal_api_send_rcu_action_ is NULL!\n", __PRETTY_FUNCTION__);
+      if (BLE_CONTROLLER_TYPE_IR != controller.second->getControllerType()) {
+         ctrlm_hal_ble_SendRcuAction_params_t params;
+         params.ieee_address = controller.second->getMacAddress();
+         params.action = CTRLM_BLE_RCU_ACTION_FACTORY_RESET;
+         params.wait_for_reply = true;
+         if (hal_api_send_rcu_action_) { 
+            hal_api_send_rcu_action_(params); 
+         } else {
+            LOG_FATAL("%s: hal_api_send_rcu_action_ is NULL!\n", __PRETTY_FUNCTION__);
+         }
       }
    }
 }
@@ -1229,9 +1236,10 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   LOG_INFO("%s: Controller (0x%llX) notified reason for unpairing = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, ctrlm_ble_unpair_reason_str(dqm->rcu_data.unpair_reason));
                   report_status = false;
                   print_status = false;
-                  if (dqm->rcu_data.unpair_reason == CTRLM_BLE_RCU_UNPAIR_REASON_SFM ||
+                  if (this->unpair_on_remote_request_ && 
+                     (dqm->rcu_data.unpair_reason == CTRLM_BLE_RCU_UNPAIR_REASON_SFM ||
                       dqm->rcu_data.unpair_reason == CTRLM_BLE_RCU_UNPAIR_REASON_FACTORY_RESET ||
-                      dqm->rcu_data.unpair_reason == CTRLM_BLE_RCU_UNPAIR_REASON_RCU_ACTION) {
+                      dqm->rcu_data.unpair_reason == CTRLM_BLE_RCU_UNPAIR_REASON_RCU_ACTION) ) {
                      if (hal_api_unpair_) {
                         // Unpair it on the client side as well
                         LOG_INFO("%s: Unpairing remote on client side to keep in sync...\n", __FUNCTION__);

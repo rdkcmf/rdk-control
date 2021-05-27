@@ -174,6 +174,8 @@ private:
    bool                                   upgrade_in_progress_;
    guint                                  upgrade_timer_tag_;
 
+   bool                                   unpair_on_remote_request_;
+
    std::map <ctrlm_controller_id_t, ctrlm_obj_controller_ble_t *> controllers_;
 
    std::map <ctrlm_ble_controller_type_t, ctrlm_ble_upgrade_image_info_t> upgrade_images_;
