@@ -71,7 +71,7 @@ using namespace std;
 #define CTRLM_DB_TABLE_VOICE                      "ctrlm_voice"
 
 #define CONTROLLER_TABLE_NAME_MAX_LEN        (32)
-#define CONTROLLER_KEY_NAME_MAX_LEN          (32)
+#define CONTROLLER_KEY_NAME_MAX_LEN          (40)
 
 #define CTRLM_DB_VERSION                           "1"
 #define CTRLM_DB_DEVICE_UPDATE_SESSION_ID_DEFAULT  (0)
@@ -1852,6 +1852,234 @@ void ctrlm_db_rf4ce_write_battery_milestones(ctrlm_network_id_t network_id, ctrl
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
 
    ctrlm_db_write_blob(table, "battery_milestones", data, length);
+}
+
+void ctrlm_db_rf4ce_read_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &battery_last_good_timestamp) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_timestamp", &data)) {
+      LOG_WARN("%s: Failed to load battery_last_good_timestamp from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_last_good_timestamp = (time_t)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t battery_last_good_timestamp) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_last_good_timestamp", battery_last_good_timestamp);
+}
+
+void ctrlm_db_rf4ce_read_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_percent) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_percent", &data)) {
+      LOG_WARN("%s: Failed to load battery_last_good_percent from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_last_good_percent = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_percent) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_last_good_percent", battery_last_good_percent);
+}
+
+void ctrlm_db_rf4ce_read_battery_last_good_loaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_loaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_loaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_last_good_loaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_last_good_loaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_last_good_loaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_loaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_last_good_loaded_voltage", battery_last_good_loaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_last_good_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_last_good_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_last_good_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_last_good_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_last_good_unloaded_voltage", battery_last_good_unloaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_voltage_large_jump_counter(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_voltage_large_jump_counter) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_voltage_large_jump_counter", &data)) {
+      LOG_WARN("%s: Failed to load battery_voltage_large_jump_counter from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_voltage_large_jump_counter = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_voltage_large_jump_counter) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_voltage_large_jump_counter", battery_voltage_large_jump_counter);
+}
+
+void ctrlm_db_rf4ce_read_battery_voltage_large_decline_detected(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, gboolean &battery_voltage_large_decline_detected) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_voltage_large_decline_detected", &data)) {
+      LOG_WARN("%s: Failed to load battery_voltage_large_decline_detected from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_voltage_large_decline_detected = (data ? true : false);
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_voltage_large_decline_detected(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, gboolean battery_voltage_large_decline_detected) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_voltage_large_decline_detected", (guint64) (battery_voltage_large_decline_detected ? 1 : 0));
+}
+
+void ctrlm_db_rf4ce_read_battery_changed_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_changed_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_changed_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_changed_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_changed_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_changed_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_changed_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_changed_unloaded_voltage", battery_changed_unloaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_75_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_75_percent_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_75_percent_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_75_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_75_percent_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_75_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_75_percent_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_75_percent_unloaded_voltage", battery_75_percent_unloaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_50_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_50_percent_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_50_percent_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_50_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_50_percent_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_50_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_50_percent_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_50_percent_unloaded_voltage", battery_50_percent_unloaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_25_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_25_percent_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_25_percent_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_25_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_25_percent_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_25_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_25_percent_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_25_percent_unloaded_voltage", battery_25_percent_unloaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_5_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_5_percent_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_5_percent_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_5_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_5_percent_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_5_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_5_percent_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_5_percent_unloaded_voltage", battery_5_percent_unloaded_voltage);
+}
+
+void ctrlm_db_rf4ce_read_battery_0_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_0_percent_unloaded_voltage) {
+   sqlite_uint64 data;
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   if (0 > ctrlm_db_read_uint64(table, "battery_0_percent_unloaded_voltage", &data)) {
+      LOG_WARN("%s: Failed to load battery_0_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
+   } else {
+      battery_0_percent_unloaded_voltage = (guchar)data;
+   }
+}
+
+void ctrlm_db_rf4ce_write_battery_0_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_0_percent_unloaded_voltage) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "battery_0_percent_unloaded_voltage", battery_0_percent_unloaded_voltage);
 }
 
 void ctrlm_db_rf4ce_read_audio_profiles(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {

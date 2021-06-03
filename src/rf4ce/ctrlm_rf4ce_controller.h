@@ -90,8 +90,9 @@ class ctrlm_obj_network_rf4ce_t;
 #define TARGET_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR         (0x10)
 #define TARGET_IRDB_STATUS_DEFAULT                      (CONTROLLER_IRDB_STATUS_FLAGS_NO_IR_PROGRAMMED)
 
-#define BATTERY_STATUS_FLAGS_REPLACEMENT (0x01)
-#define BATTERY_STATUS_FLAGS_CHARGING    (0x02)
+#define BATTERY_STATUS_FLAGS_REPLACEMENT    (0x01)
+#define BATTERY_STATUS_FLAGS_CHARGING       (0x02)
+#define BATTERY_STATUS_FLAGS_IMPENDING_DOOM (0x04)
 
 #define FAR_FIELD_CONFIGURATION_FLAGS_OPENING_CHIME      (0x01)
 #define FAR_FIELD_CONFIGURATION_FLAGS_CLOSING_CHIME      (0x02)
@@ -541,18 +542,18 @@ typedef struct {
 // End Polling Structs
 
 typedef struct {
-   time_t battery_changed_timestamp;
-   time_t battery_75_percent_timestamp;
-   time_t battery_50_percent_timestamp;
-   time_t battery_25_percent_timestamp;
-   time_t battery_5_percent_timestamp;
-   time_t battery_0_percent_timestamp;
-   guchar battery_changed_actual_percent;
-   guchar battery_75_percent_actual_percent;
-   guchar battery_50_percent_actual_percent;
-   guchar battery_25_percent_actual_percent;
-   guchar battery_5_percent_actual_percent;
-   guchar battery_0_percent_actual_percent;
+   time_t   battery_changed_timestamp;
+   time_t   battery_75_percent_timestamp;
+   time_t   battery_50_percent_timestamp;
+   time_t   battery_25_percent_timestamp;
+   time_t   battery_5_percent_timestamp;
+   time_t   battery_0_percent_timestamp;
+   guchar   battery_changed_actual_percent;
+   guchar   battery_75_percent_actual_percent;
+   guchar   battery_50_percent_actual_percent;
+   guchar   battery_25_percent_actual_percent;
+   guchar   battery_5_percent_actual_percent;
+   guchar   battery_0_percent_actual_percent;
 } battery_voltage_milestones_t;
 
 typedef struct {
@@ -680,7 +681,7 @@ public:
    void time_last_checkin_for_device_update_set();
    void time_last_checkin_for_device_update_get(time_t *time);
    bool handle_day_change();
-   ctrlm_rcu_battery_event_t get_last_battery_event();
+   void get_last_battery_event(ctrlm_rcu_battery_event_t &battery_event, unsigned long &battery_event_timestamp);
 
    bool import_check_validation();
    void time_last_key_update(void);
@@ -830,6 +831,20 @@ private:
    gboolean                                has_battery_;
    gboolean                                has_dsp_;
    battery_voltage_milestones_t            battery_milestones_;
+   time_t                                  battery_last_good_timestamp_;
+   guchar                                  battery_last_good_percent_;
+   guchar                                  battery_last_good_loaded_voltage_;
+   guchar                                  battery_last_good_unloaded_voltage_;
+   guchar                                  battery_changed_unloaded_voltage_;
+   guchar                                  battery_75_percent_unloaded_voltage_;
+   guchar                                  battery_50_percent_unloaded_voltage_;
+   guchar                                  battery_25_percent_unloaded_voltage_;
+   guchar                                  battery_5_percent_unloaded_voltage_;
+   guchar                                  battery_0_percent_unloaded_voltage_;
+   guchar                                  battery_voltage_large_jump_counter_;
+   gboolean                                battery_voltage_large_decline_detected_;
+   gboolean                                battery_first_write_;
+
    gboolean                                configuration_complete_failure_;
 
    // Far Field
@@ -901,9 +916,11 @@ private:
    ctrlm_hal_result_t network_property_set(ctrlm_hal_network_property_t property, void *value);
 
    guchar battery_level_percent(void);
-   void property_write_battery_milestones(guchar flags, guchar percent, time_t timestamp);
+   void property_write_battery_milestones(bool batteries_changed, guchar voltage_loaded, guchar voltage_unloaded, guchar percent, time_t timestamp);
    gboolean send_battery_milestone_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_battery_event_t battery_event, guchar percent);
    gboolean send_remote_reboot_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar voltage, controller_reboot_reason_t reason, guint32 assert_number);
+   gboolean is_batteries_changed(guchar new_voltage);
+   gboolean is_batteries_large_voltage_jump(guchar new_voltage);
 
    guchar property_read_peripheral_id(guchar *data, guchar length);
    guchar property_read_rf_statistics(guchar *data, guchar length);

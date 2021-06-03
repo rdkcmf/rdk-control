@@ -53,6 +53,12 @@ static char samsung_0x34[] = {0x88, 0x00, 0x29, 0x04, 0x11, 0x04, 0x00, 0x22, 0x
 
 #endif
 
+#define CTRLM_BATTERY_75_PERCENT_THRESHOLD 75
+#define CTRLM_BATTERY_50_PERCENT_THRESHOLD 50
+#define CTRLM_BATTERY_25_PERCENT_THRESHOLD 25
+#define CTRLM_BATTERY_5_PERCENT_THRESHOLD  5
+#define CTRLM_BATTERY_0_PERCENT_THRESHOLD  0
+
 #define NUM_XR11V2_HARDWARE_VERSIONS       1
 #define NUM_XR15V1_HARDWARE_VERSIONS       1
 #define NUM_XR15V2_HARDWARE_VERSIONS       2
@@ -223,20 +229,33 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
 
    print_firmware_on_button_press = true;
 
-   has_battery_                                          = false;
-   has_dsp_                                              = false;
-   battery_milestones_.battery_changed_timestamp         = 0;
-   battery_milestones_.battery_changed_actual_percent    = 0;
-   battery_milestones_.battery_75_percent_timestamp      = 0;
-   battery_milestones_.battery_75_percent_actual_percent = 0;
-   battery_milestones_.battery_50_percent_timestamp      = 0;
-   battery_milestones_.battery_50_percent_actual_percent = 0;
-   battery_milestones_.battery_25_percent_timestamp      = 0;
-   battery_milestones_.battery_25_percent_actual_percent = 0;
-   battery_milestones_.battery_5_percent_timestamp       = 0;
-   battery_milestones_.battery_5_percent_actual_percent  = 0;
-   battery_milestones_.battery_0_percent_timestamp       = 0;
-   battery_milestones_.battery_0_percent_actual_percent  = 0;
+   has_battery_                                               = false;
+   has_dsp_                                                   = false;
+   battery_milestones_.battery_changed_timestamp              = 0;
+   battery_milestones_.battery_changed_actual_percent         = 0;
+   battery_milestones_.battery_75_percent_timestamp           = 0;
+   battery_milestones_.battery_75_percent_actual_percent      = 0;
+   battery_milestones_.battery_50_percent_timestamp           = 0;
+   battery_milestones_.battery_50_percent_actual_percent      = 0;
+   battery_milestones_.battery_25_percent_timestamp           = 0;
+   battery_milestones_.battery_25_percent_actual_percent      = 0;
+   battery_milestones_.battery_5_percent_timestamp            = 0;
+   battery_milestones_.battery_5_percent_actual_percent       = 0;
+   battery_milestones_.battery_0_percent_timestamp            = 0;
+   battery_milestones_.battery_0_percent_actual_percent       = 0;
+   battery_last_good_timestamp_                               = 0;
+   battery_last_good_percent_                                 = 0;
+   battery_last_good_loaded_voltage_                          = 0;
+   battery_last_good_unloaded_voltage_                        = 0;
+   battery_changed_unloaded_voltage_                          = 0;
+   battery_75_percent_unloaded_voltage_                       = 0;
+   battery_50_percent_unloaded_voltage_                       = 0;
+   battery_25_percent_unloaded_voltage_                       = 0;
+   battery_5_percent_unloaded_voltage_                        = 0;
+   battery_0_percent_unloaded_voltage_                        = 0;
+   battery_voltage_large_jump_counter_                        = 0;
+   battery_voltage_large_decline_detected_                    = false;
+   battery_first_write_                                       = true;
 
    // Far Field
    safec_rc = memset_s(&ff_metrics_, sizeof(ff_metrics_), 0, sizeof(ff_metrics_));
@@ -678,25 +697,33 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
    status->time_last_heartbeat = time_last_heartbeat_;
 
    //Battery members
-   status->has_battery                          = has_battery_;
-   status->time_battery_update                  = battery_status_.update_time;
-   status->battery_voltage_loaded               = (battery_status_.voltage_loaded   * 4.0) / 255;
-   status->battery_voltage_unloaded             = (battery_status_.voltage_unloaded * 4.0) / 255;
-   status->battery_level_percent                = battery_status_.percent;
-   status->battery_event                        = get_last_battery_event();
+   status->has_battery                            = has_battery_;
+   status->battery_voltage_loaded                 = (battery_last_good_loaded_voltage_   * 4.0) / 255;
+   status->battery_voltage_unloaded               = (battery_last_good_unloaded_voltage_ * 4.0) / 255;
+   status->battery_level_percent                  = battery_last_good_percent_;
+   get_last_battery_event(status->battery_event, status->time_battery_update);
 
-   status->time_battery_changed                 = battery_milestones_.battery_changed_timestamp;
-   status->battery_changed_actual_percentage    = battery_milestones_.battery_changed_actual_percent;
-   status->time_battery_75_percent              = battery_milestones_.battery_75_percent_timestamp;
-   status->battery_75_percent_actual_percentage = battery_milestones_.battery_75_percent_actual_percent;
-   status->time_battery_50_percent              = battery_milestones_.battery_50_percent_timestamp;
-   status->battery_50_percent_actual_percentage = battery_milestones_.battery_50_percent_actual_percent;
-   status->time_battery_25_percent              = battery_milestones_.battery_25_percent_timestamp;
-   status->battery_25_percent_actual_percentage = battery_milestones_.battery_25_percent_actual_percent;
-   status->time_battery_5_percent               = battery_milestones_.battery_5_percent_timestamp;
-   status->battery_5_percent_actual_percentage  = battery_milestones_.battery_5_percent_actual_percent;
-   status->time_battery_0_percent               = battery_milestones_.battery_0_percent_timestamp;
-   status->battery_0_percent_actual_percentage  = battery_milestones_.battery_0_percent_actual_percent;
+   status->time_battery_changed                   = battery_milestones_.battery_changed_timestamp;
+   status->battery_changed_actual_percentage      = battery_milestones_.battery_changed_actual_percent;
+   status->battery_changed_unloaded_voltage       = (battery_changed_unloaded_voltage_   * 4.0) / 255;
+   status->time_battery_75_percent                = battery_milestones_.battery_75_percent_timestamp;
+   status->battery_75_percent_actual_percentage   = battery_milestones_.battery_75_percent_actual_percent;
+   status->battery_75_percent_unloaded_voltage    = (battery_75_percent_unloaded_voltage_   * 4.0) / 255;
+   status->time_battery_50_percent                = battery_milestones_.battery_50_percent_timestamp;
+   status->battery_50_percent_actual_percentage   = battery_milestones_.battery_50_percent_actual_percent;
+   status->battery_50_percent_unloaded_voltage    = (battery_50_percent_unloaded_voltage_   * 4.0) / 255;
+   status->time_battery_25_percent                = battery_milestones_.battery_25_percent_timestamp;
+   status->battery_25_percent_actual_percentage   = battery_milestones_.battery_25_percent_actual_percent;
+   status->battery_25_percent_unloaded_voltage    = (battery_25_percent_unloaded_voltage_   * 4.0) / 255;
+   status->time_battery_5_percent                 = battery_milestones_.battery_5_percent_timestamp;
+   status->battery_5_percent_actual_percentage    = battery_milestones_.battery_5_percent_actual_percent;
+   status->battery_5_percent_unloaded_voltage     = (battery_5_percent_unloaded_voltage_   * 4.0) / 255;
+   status->time_battery_0_percent                 = battery_milestones_.battery_0_percent_timestamp;
+   status->battery_0_percent_actual_percentage    = battery_milestones_.battery_0_percent_actual_percent;
+   status->battery_0_percent_unloaded_voltage     = (battery_0_percent_unloaded_voltage_   * 4.0) / 255;
+
+   status->battery_voltage_large_jump_counter     = battery_voltage_large_jump_counter_;
+   status->battery_voltage_large_decline_detected = battery_voltage_large_decline_detected_;
 
    //DSP members
    status->has_dsp                              = has_dsp_;
@@ -925,6 +952,27 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
       ctrlm_db_free(data);
       data = NULL;
    }
+   //battery_last_good... must be set to the last battery_status_... in case they are not currently in the database.
+   battery_last_good_timestamp_         = battery_status_.update_time;
+   battery_last_good_percent_           = battery_status_.percent;
+   battery_last_good_loaded_voltage_    = battery_status_.voltage_loaded;
+   battery_last_good_unloaded_voltage_  = battery_status_.voltage_unloaded;
+   //If the battery_last_good_timestamp_ is 0 then we have not written battery info yet
+   if(battery_last_good_timestamp_ != 0) {
+      battery_first_write_ = false;
+   }
+   ctrlm_db_rf4ce_read_battery_last_good_timestamp(network_id, controller_id, battery_last_good_timestamp_);
+   ctrlm_db_rf4ce_read_battery_last_good_percent(network_id, controller_id, battery_last_good_percent_);
+   ctrlm_db_rf4ce_read_battery_last_good_loaded_voltage(network_id, controller_id, battery_last_good_loaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_last_good_unloaded_voltage(network_id, controller_id, battery_last_good_unloaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_voltage_large_jump_counter(network_id, controller_id, battery_voltage_large_jump_counter_);
+   ctrlm_db_rf4ce_read_battery_voltage_large_decline_detected(network_id, controller_id, battery_voltage_large_decline_detected_);
+   ctrlm_db_rf4ce_read_battery_changed_unloaded_voltage(network_id, controller_id, battery_changed_unloaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_75_percent_unloaded_voltage(network_id, controller_id, battery_75_percent_unloaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_50_percent_unloaded_voltage(network_id, controller_id, battery_50_percent_unloaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_25_percent_unloaded_voltage(network_id, controller_id, battery_25_percent_unloaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_5_percent_unloaded_voltage(network_id, controller_id, battery_5_percent_unloaded_voltage_);
+   ctrlm_db_rf4ce_read_battery_0_percent_unloaded_voltage(network_id, controller_id, battery_0_percent_unloaded_voltage_);
 
    ctrlm_db_rf4ce_read_audio_profiles(network_id, controller_id, &data, &length);
    if(data == NULL) {
@@ -1840,27 +1888,44 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_status(guchar *data,
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   guchar  flags            = data[0];
-   guchar  voltage_loaded   = data[1];
-   guint32 codes_txd_rf     = ((data[5] << 24) | (data[4] << 16) | (data[3] << 8) | data[2]);
-   guint32 codes_txd_ir     = ((data[9] << 24) | (data[8] << 16) | (data[7] << 8) | data[6]);
-   guchar  voltage_unloaded = data[10];
+   bool    update_milestones = true;
+   bool    batteries_changed = false;
+   guchar  flags             = data[0];
+   guchar  voltage_loaded    = data[1];
+   guint32 codes_txd_rf      = ((data[5] << 24) | (data[4] << 16) | (data[3] << 8) | data[2]);
+   guint32 codes_txd_ir      = ((data[9] << 24) | (data[8] << 16) | (data[7] << 8) | data[6]);
+   guchar  voltage_unloaded  = data[10];
 
-   //If the batteries replaced flag is set and this is not from the db loading...
-   if(!loading_db_ && (flags & BATTERY_STATUS_FLAGS_REPLACEMENT)) {
-      //If the new voltage equals the old voltage, this was from a reboot and should be ignored.
-      if(voltage_loaded == battery_status_.voltage_loaded) {
-         LOG_WARN("%s: This battery event is probably from a remote reboot, not a batteries replaced event.  Ignoring...  Flags 0x%02X Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, flags, battery_status_.voltage_loaded * 4.0 / 255, voltage_loaded * 4.0 / 255);
-         return(0);
-      //If the new voltage is less than the old voltage+12 (or 0.2v * 255 / 4), this was from a reboot and should be treated as a voltage change.
-      } else if(voltage_loaded < (battery_status_.voltage_loaded+12)) {
-         LOG_WARN("%s: This battery event is probably from a remote reboot. Clearing batteries replaced flag.  Flags 0x%02X Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, flags, battery_status_.voltage_loaded * 4.0 / 255, voltage_loaded * 4.0 / 255);
-         flags = data[0] &= ~BATTERY_STATUS_FLAGS_REPLACEMENT;
+   if(flags) {
+      //We ignore the flags but log them if any are set
+      LOG_WARN("%s: Flags 0x%02X Voltage (old:%4.2fv, new:%4.2fv) Battery Replacement <%u>, Battery Charging <%u>, Impending Doom <%u>\n", 
+	  __FUNCTION__, flags, battery_status_.voltage_unloaded * 4.0 / 255, voltage_unloaded * 4.0 / 255, 
+	  (flags & BATTERY_STATUS_FLAGS_REPLACEMENT), (flags & BATTERY_STATUS_FLAGS_CHARGING), (flags & BATTERY_STATUS_FLAGS_IMPENDING_DOOM));
+   }
+
+   if(!loading_db_) {
+      //If this is the first battery status write, this could be a newly paired remote so treat this as batteries changed
+      if(battery_first_write_) {
+         LOG_WARN("%s: This is the first battery status write so this could be a newly paired remote.  Voltage (%4.2fv)\n", __FUNCTION__, voltage_unloaded * 4.0 / 255);
+         batteries_changed = true;
+         battery_first_write_ = false;
+      } else if((voltage_unloaded > battery_last_good_unloaded_voltage_) || (voltage_loaded > battery_last_good_loaded_voltage_)) {
+         if(is_batteries_changed(voltage_unloaded)) {
+            LOG_WARN("%s: It appears the batteries have been changed. Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, battery_status_.voltage_unloaded * 4.0 / 255, voltage_unloaded * 4.0 / 255);
+            batteries_changed = true;
+         } else if(is_batteries_large_voltage_jump(voltage_unloaded)) {
+            LOG_WARN("%s: The battery voltage haa a large increase but we don't consider the batteries to have changed.  Milestones not updated.  Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, battery_status_.voltage_unloaded * 4.0 / 255, voltage_unloaded * 4.0 / 255);
+            update_milestones = false;
+            battery_voltage_large_jump_counter_++;
+            ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(network_id_get(), controller_id_get(), battery_voltage_large_jump_counter_);
+         } else if((battery_status_.voltage_unloaded > battery_last_good_unloaded_voltage_) || (battery_status_.voltage_loaded > battery_last_good_loaded_voltage_)) {
+            LOG_WARN("%s: The battery voltage went up previously, has now gone down, but not to it's lowest point.  Milestones not updated.\n", __FUNCTION__);
+            update_milestones = false;
+         } else {
+            LOG_WARN("%s: The battery voltage has gone up but we don't consider the batteries to have changed.  Milestones not updated.  Unloaded Voltage (old:%4.2fv, new:%4.2fv)  Loaded Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, battery_last_good_unloaded_voltage_ * 4.0 / 255, voltage_unloaded * 4.0 / 255, battery_last_good_loaded_voltage_ * 4.0 / 255, voltage_loaded * 4.0 / 255);
+            update_milestones = false;
+         }
       }
-   //Else if the batteries charging flag is set...
-   } else if(flags & BATTERY_STATUS_FLAGS_CHARGING) {
-      LOG_WARN("%s: This battery event is not valid. Clearing batteries charging flag.  Flags 0x%02X Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, flags, battery_status_.voltage_loaded * 4.0 / 255, voltage_loaded * 4.0 / 255);
-      flags = data[0] &= ~BATTERY_STATUS_FLAGS_CHARGING;
    }
    
    if(battery_status_.flags            != flags          ||
@@ -1875,11 +1940,13 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_status(guchar *data,
       battery_status_.codes_txd_rf     = codes_txd_rf;
       battery_status_.codes_txd_ir     = codes_txd_ir;
       battery_status_.voltage_unloaded = voltage_unloaded;
-      battery_status_.percent          = battery_level_percent(battery_status_.voltage_loaded);
+      battery_status_.percent          = battery_level_percent(battery_status_.voltage_unloaded);
       if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
          ctrlm_db_rf4ce_write_battery_status(network_id_get(), controller_id_get(), data, length);
          ctrlm_db_rf4ce_write_time_battery_status(network_id_get(), controller_id_get(), battery_status_.update_time);
-         property_write_battery_milestones(flags, battery_status_.percent, battery_status_.update_time);
+         if(update_milestones) {
+            property_write_battery_milestones(batteries_changed, voltage_loaded, voltage_unloaded, battery_status_.percent, battery_status_.update_time);
+         }
          obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_BATTERY_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS, data);
       }
    }
@@ -1900,62 +1967,126 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar *d
    battery_milestones_.battery_25_percent_timestamp, battery_milestones_.battery_25_percent_actual_percent, battery_milestones_.battery_5_percent_timestamp, battery_milestones_.battery_5_percent_actual_percent, battery_milestones_.battery_0_percent_timestamp, battery_milestones_.battery_0_percent_actual_percent);
    return(length);
 }
-void ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar flags, guchar percent, time_t timestamp) {
+void ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(bool batteries_changed, guchar voltage_loaded, guchar voltage_unloaded, guchar percent, time_t timestamp) {
    guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES];
    ctrlm_rcu_battery_event_t battery_event = CTRLM_RCU_BATTERY_EVENT_NONE;
-   errno_t safec_rc = -1;
+   ctrlm_network_id_t network_id           = network_id_get();
+   ctrlm_controller_id_t controller_id     = controller_id_get();
+   guchar threshold_counter                = 0;
+   errno_t safec_rc                        = -1;
 
    if(!loading_db_) { // send the event
-      gboolean send_event = true;
-      if(flags & BATTERY_STATUS_FLAGS_REPLACEMENT) {
-         battery_milestones_.battery_changed_actual_percent    = percent;
-         battery_milestones_.battery_changed_timestamp         = timestamp;
-         battery_milestones_.battery_75_percent_actual_percent = 0;
-         battery_milestones_.battery_75_percent_timestamp      = 0;
-         battery_milestones_.battery_50_percent_actual_percent = 0;
-         battery_milestones_.battery_50_percent_timestamp      = 0;
-         battery_milestones_.battery_25_percent_actual_percent = 0;
-         battery_milestones_.battery_25_percent_timestamp      = 0;
-         battery_milestones_.battery_5_percent_actual_percent  = 0;
-         battery_milestones_.battery_5_percent_timestamp       = 0;
-         battery_milestones_.battery_0_percent_actual_percent  = 0;
-         battery_milestones_.battery_0_percent_timestamp       = 0;
-         battery_event                  = CTRLM_RCU_BATTERY_EVENT_REPLACED;
-      } else if((percent <= 75) && (percent > 50)  && (battery_milestones_.battery_75_percent_timestamp == 0)) {
+      gboolean send_event = false;
+      if(batteries_changed) {
+         battery_milestones_.battery_changed_actual_percent       = percent;
+         battery_milestones_.battery_changed_timestamp            = timestamp;
+         battery_milestones_.battery_75_percent_actual_percent    = 0;
+         battery_milestones_.battery_75_percent_timestamp         = 0;
+         battery_milestones_.battery_50_percent_actual_percent    = 0;
+         battery_milestones_.battery_50_percent_timestamp         = 0;
+         battery_milestones_.battery_25_percent_actual_percent    = 0;
+         battery_milestones_.battery_25_percent_timestamp         = 0;
+         battery_milestones_.battery_5_percent_actual_percent     = 0;
+         battery_milestones_.battery_5_percent_timestamp          = 0;
+         battery_milestones_.battery_0_percent_actual_percent     = 0;
+         battery_milestones_.battery_0_percent_timestamp          = 0;
+         battery_changed_unloaded_voltage_                        = voltage_unloaded;
+         battery_75_percent_unloaded_voltage_                     = 0;
+         battery_50_percent_unloaded_voltage_                     = 0;
+         battery_25_percent_unloaded_voltage_                     = 0;
+         battery_5_percent_unloaded_voltage_                      = 0;
+         battery_0_percent_unloaded_voltage_                      = 0;
+         battery_voltage_large_jump_counter_                      = 0;
+         battery_voltage_large_decline_detected_                  = false;
+         threshold_counter                                        = 0;
+         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_REPLACED;
+         send_event                                               = true;
+         //Need to clear battery_voltage_large_jump_counter_ in the database
+         ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(network_id_get(), controller_id_get(), battery_voltage_large_jump_counter_);
+      }
+      //These check variables are to help us transition from images prior to RDK-32347
+      unsigned long battery_75_percent_old_image_check = battery_milestones_.battery_50_percent_timestamp + battery_milestones_.battery_25_percent_timestamp + battery_milestones_.battery_5_percent_timestamp + battery_milestones_.battery_0_percent_timestamp;
+      unsigned long battery_50_percent_old_image_check = battery_milestones_.battery_25_percent_timestamp + battery_milestones_.battery_5_percent_timestamp + battery_milestones_.battery_0_percent_timestamp;
+      unsigned long battery_25_percent_old_image_check = battery_milestones_.battery_5_percent_timestamp + battery_milestones_.battery_0_percent_timestamp;
+      unsigned long battery_5_percent_old_image_check  = battery_milestones_.battery_0_percent_timestamp;
+      if((percent <= CTRLM_BATTERY_75_PERCENT_THRESHOLD) && (battery_milestones_.battery_75_percent_timestamp == 0) && (battery_75_percent_old_image_check == 0)) {
          battery_milestones_.battery_75_percent_actual_percent    = percent;
          battery_milestones_.battery_75_percent_timestamp         = timestamp;
+         battery_75_percent_unloaded_voltage_                     = voltage_unloaded;
+         threshold_counter++;
          battery_event                                            = CTRLM_RCU_BATTERY_EVENT_75_PERCENT;
-      } else if((percent <= 50) && (percent > 25)  && (battery_milestones_.battery_50_percent_timestamp == 0)) {
+         send_event                                               = true;
+      }
+      if((percent <= CTRLM_BATTERY_50_PERCENT_THRESHOLD) && (battery_milestones_.battery_50_percent_timestamp == 0) && (battery_50_percent_old_image_check == 0)) {
          battery_milestones_.battery_50_percent_actual_percent    = percent;
          battery_milestones_.battery_50_percent_timestamp         = timestamp;
+         battery_50_percent_unloaded_voltage_                     = voltage_unloaded;
+         threshold_counter++;
          battery_event                                            = CTRLM_RCU_BATTERY_EVENT_50_PERCENT;
-      } else if((percent <= 25) && (percent > 5)  && (battery_milestones_.battery_25_percent_timestamp == 0)) {
+         send_event                                               = true;
+      }
+      if((percent <= CTRLM_BATTERY_25_PERCENT_THRESHOLD) && (battery_milestones_.battery_25_percent_timestamp == 0) && (battery_25_percent_old_image_check == 0)) {
          battery_milestones_.battery_25_percent_actual_percent    = percent;
          battery_milestones_.battery_25_percent_timestamp         = timestamp;
+         battery_25_percent_unloaded_voltage_                     = voltage_unloaded;
+         threshold_counter++;
          battery_event                                            = CTRLM_RCU_BATTERY_EVENT_25_PERCENT;
-      } else if((percent <= 5) && (percent > 0)  && (battery_milestones_.battery_5_percent_timestamp == 0)) {
-         battery_milestones_.battery_5_percent_actual_percent    = percent;
-         battery_milestones_.battery_5_percent_timestamp         = timestamp;
-         battery_event                                           = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
-      } else if((percent == 0) && (battery_milestones_.battery_0_percent_timestamp == 0)) {
-         battery_milestones_.battery_0_percent_actual_percent    = percent;
-         battery_milestones_.battery_0_percent_timestamp         = timestamp;
-         battery_event                                           = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
-      } else {
-         send_event = false;
+         send_event                                               = true;
       }
+      if((percent <= CTRLM_BATTERY_5_PERCENT_THRESHOLD) && (battery_milestones_.battery_5_percent_timestamp == 0) && (battery_5_percent_old_image_check == 0)) {
+         battery_milestones_.battery_5_percent_actual_percent     = percent;
+         battery_milestones_.battery_5_percent_timestamp          = timestamp;
+         battery_5_percent_unloaded_voltage_                      = voltage_unloaded;
+         threshold_counter++;
+         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
+         send_event                                               = true;
+      }
+      if((percent == CTRLM_BATTERY_0_PERCENT_THRESHOLD)           && (battery_milestones_.battery_0_percent_timestamp == 0)) {
+         battery_milestones_.battery_0_percent_actual_percent     = percent;
+         battery_milestones_.battery_0_percent_timestamp          = timestamp;
+         battery_0_percent_unloaded_voltage_                      = voltage_unloaded;
+         threshold_counter++;
+         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
+         send_event                                               = true;
+      }
+      battery_last_good_loaded_voltage_                           = voltage_loaded;
+      battery_last_good_unloaded_voltage_                         = voltage_unloaded;
+      battery_last_good_percent_                                  = percent;
+      battery_last_good_timestamp_                                = timestamp;
+      if(!batteries_changed && (threshold_counter>1)) {
+         battery_voltage_large_decline_detected_ = true;
+      }
+
+      ctrlm_db_rf4ce_write_battery_last_good_timestamp(network_id, controller_id, battery_last_good_timestamp_);
+      ctrlm_db_rf4ce_write_battery_last_good_percent(network_id, controller_id, battery_last_good_percent_);
+      ctrlm_db_rf4ce_write_battery_last_good_loaded_voltage(network_id, controller_id, battery_last_good_loaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_last_good_unloaded_voltage(network_id, controller_id, battery_last_good_unloaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_voltage_large_decline_detected(network_id, controller_id, battery_voltage_large_decline_detected_);
+      ctrlm_db_rf4ce_write_battery_changed_unloaded_voltage(network_id, controller_id, battery_changed_unloaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_75_percent_unloaded_voltage(network_id, controller_id, battery_75_percent_unloaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_50_percent_unloaded_voltage(network_id, controller_id, battery_50_percent_unloaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_25_percent_unloaded_voltage(network_id, controller_id, battery_25_percent_unloaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_5_percent_unloaded_voltage(network_id, controller_id, battery_5_percent_unloaded_voltage_);
+      ctrlm_db_rf4ce_write_battery_0_percent_unloaded_voltage(network_id, controller_id, battery_0_percent_unloaded_voltage_);
 
       if(send_event) {
          safec_rc = memcpy_s(data, sizeof(data), &battery_milestones_, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
          ERR_CHK(safec_rc);
-         ctrlm_db_rf4ce_write_battery_milestones(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
+         ctrlm_db_rf4ce_write_battery_milestones(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
          send_battery_milestone_event(network_id_get(), controller_id_get(), battery_event, percent);
       }
    }
 
-   LOG_INFO("%s: battery_changed <%ld>, <%d%%> battery_75_percent_ <%ld>, <%d%%> battery_50_percent_ <%ld>, <%d%%> battery_25_percent_ <%ld>, <%d%%> battery_5_percent_ <%ld>, <%d%%> battery_0_percent_ <%ld>, <%d%%> \n",
-   __FUNCTION__, battery_milestones_.battery_changed_timestamp, battery_milestones_.battery_changed_actual_percent, battery_milestones_.battery_75_percent_timestamp, battery_milestones_.battery_75_percent_actual_percent, battery_milestones_.battery_50_percent_timestamp, battery_milestones_.battery_50_percent_actual_percent,
-   battery_milestones_.battery_25_percent_timestamp, battery_milestones_.battery_25_percent_actual_percent, battery_milestones_.battery_5_percent_timestamp, battery_milestones_.battery_5_percent_actual_percent, battery_milestones_.battery_0_percent_timestamp, battery_milestones_.battery_0_percent_actual_percent);
+   LOG_INFO("%s: battery_changed <%ld>, <%d%%>, <%4.2fv> battery_75_percent_ <%ld>, <%d%%>, <%4.2fv> battery_50_percent_ <%ld>, <%d%%>, <%4.2fv> battery_25_percent_ <%ld>, <%d%%>, <%4.2fv> battery_5_percent_ <%ld>, <%d%%>, <%4.2fv> battery_0_percent_ <%ld>, <%d%%>, <%4.2fv> \n",
+      __FUNCTION__, battery_milestones_.battery_changed_timestamp, battery_milestones_.battery_changed_actual_percent, battery_changed_unloaded_voltage_ * 4.0 / 255, 
+      battery_milestones_.battery_75_percent_timestamp, battery_milestones_.battery_75_percent_actual_percent, battery_75_percent_unloaded_voltage_ * 4.0 / 255, 
+      battery_milestones_.battery_50_percent_timestamp, battery_milestones_.battery_50_percent_actual_percent, battery_50_percent_unloaded_voltage_ * 4.0 / 255,
+      battery_milestones_.battery_25_percent_timestamp, battery_milestones_.battery_25_percent_actual_percent, battery_25_percent_unloaded_voltage_ * 4.0 / 255, 
+      battery_milestones_.battery_5_percent_timestamp, battery_milestones_.battery_5_percent_actual_percent, battery_5_percent_unloaded_voltage_ * 4.0 / 255, 
+      battery_milestones_.battery_0_percent_timestamp, battery_milestones_.battery_0_percent_actual_percent, battery_0_percent_unloaded_voltage_ * 4.0 / 255);
+   LOG_INFO("%s: battery_last_good_timestamp <%ld> battery_last_good_percent_<%d%%> battery_last_good_loaded_voltage <%4.2fv> battery_last_good_unloaded_voltage <%4.2fv> battery_voltage_large_jump_counter <%d> battery_voltage_large_decline_detected_<%d> battery_first_write_ <%d>\n",
+      __FUNCTION__, battery_last_good_timestamp_, battery_last_good_percent_, battery_last_good_loaded_voltage_ * 4.0 / 255, battery_last_good_unloaded_voltage_ * 4.0 / 255,
+      battery_voltage_large_jump_counter_, battery_voltage_large_decline_detected_, battery_first_write_);
 }
 
 gboolean ctrlm_obj_controller_rf4ce_t::send_battery_milestone_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_battery_event_t battery_event, guchar percent) {
@@ -4665,24 +4796,26 @@ bool ctrlm_obj_controller_rf4ce_t::handle_day_change() {
    return(false);
 }
 
-ctrlm_rcu_battery_event_t ctrlm_obj_controller_rf4ce_t::get_last_battery_event() {
-   ctrlm_rcu_battery_event_t battery_event = CTRLM_RCU_BATTERY_EVENT_NONE;
-
+void ctrlm_obj_controller_rf4ce_t::get_last_battery_event(ctrlm_rcu_battery_event_t &battery_event, unsigned long &battery_event_timestamp) {
    if (battery_milestones_.battery_0_percent_timestamp != 0) {
-      battery_event = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
+      battery_event_timestamp = battery_milestones_.battery_0_percent_timestamp;
    } else if (battery_milestones_.battery_5_percent_timestamp != 0) {
-       battery_event = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
+      battery_event          = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
+      battery_event_timestamp = battery_milestones_.battery_5_percent_timestamp;
    } else if (battery_milestones_.battery_25_percent_timestamp != 0) {
-      battery_event = CTRLM_RCU_BATTERY_EVENT_25_PERCENT;
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_25_PERCENT;
+      battery_event_timestamp = battery_milestones_.battery_25_percent_timestamp;
    } else if (battery_milestones_.battery_50_percent_timestamp != 0) {
-      battery_event = CTRLM_RCU_BATTERY_EVENT_50_PERCENT;
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_50_PERCENT;
+      battery_event_timestamp = battery_milestones_.battery_50_percent_timestamp;
    } else if (battery_milestones_.battery_75_percent_timestamp != 0) {
-      battery_event = CTRLM_RCU_BATTERY_EVENT_75_PERCENT;
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_75_PERCENT;
+      battery_event_timestamp = battery_milestones_.battery_75_percent_timestamp;
    } else if (battery_milestones_.battery_changed_timestamp != 0) {
-       battery_event = CTRLM_RCU_BATTERY_EVENT_REPLACED;
+      battery_event          = CTRLM_RCU_BATTERY_EVENT_REPLACED;
+      battery_event_timestamp = battery_milestones_.battery_changed_timestamp;
    }
-
-   return battery_event;
 }
 
 bool ctrlm_obj_controller_rf4ce_t::import_check_validation() {
@@ -5244,5 +5377,17 @@ guint8 ctrlm_obj_controller_rf4ce_t::polling_methods_get() const {
 
 bool ctrlm_obj_controller_rf4ce_t::is_fmr_supported() const {
    return fmr_supported_;
+}
+
+gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_changed(guchar new_voltage) {
+   guchar battery_increase = (0.3 * 255 / 4);
+   //If the new voltage goes up by 0.3v or more, consider this a batteries changed situation
+   return(new_voltage >= (battery_status_.voltage_unloaded + battery_increase));
+}
+
+gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar new_voltage) {
+   guchar battery_increase = (0.2 * 255 / 4);
+   //If the new voltage goes up by 0.2v or more but less than 0.3v, don't set the new voltage but report as a large jump.
+   return(new_voltage >= (battery_status_.voltage_unloaded + battery_increase));
 }
 

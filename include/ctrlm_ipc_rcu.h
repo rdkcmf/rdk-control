@@ -46,7 +46,7 @@
 #define CTRLM_RCU_IARM_CALL_REVERSE_CMD                  "Rcu_ReverseCmd"           ///< IARM Call to Trigger Remote Controller Action
 #define CTRLM_RCU_IARM_CALL_RF4CE_POLLING_ACTION         "Rcu_Rf4cePollingAction"   ///< IARM Call to Send Remote Heartbeat Response Polling Action
 
-#define CTRLM_RCU_IARM_BUS_API_REVISION                  (12)    ///< Revision of the RCU IARM API
+#define CTRLM_RCU_IARM_BUS_API_REVISION                  (13)    ///< Revision of the RCU IARM API
 #define CTRLM_RCU_VALIDATION_KEY_QTY                      (3)    ///< Number of validation keys used in internal validation
 #define CTRLM_RCU_MAX_SETUP_COMMAND_SIZE                  (5)    ///< Maximum setup command size (numbers entered after setup key)
 #define CTRLM_RCU_VERSION_LENGTH                         (18)    ///< Maximum length of the version string
@@ -425,16 +425,22 @@ typedef struct {
    unsigned long                     time_battery_update;                                   ///< Time of battery update (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned long                     time_battery_changed;                                  ///< Time of battery changed (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned char                     battery_changed_actual_percentage;                     ///< Actual percentage of the batteries when the were "changed"
+   float                             battery_changed_unloaded_voltage;                      ///< Actual voltage of the batteries when the were "changed"
    unsigned long                     time_battery_75_percent;                               ///< Time of battery at 75% (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned char                     battery_75_percent_actual_percentage;                  ///< Actual percentage of the batteries when they hit 75% or below
+   float                             battery_75_percent_unloaded_voltage;                   ///< Actual voltage of the batteries when they hit 75% or below
    unsigned long                     time_battery_50_percent;                               ///< Time of battery at 50% (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned char                     battery_50_percent_actual_percentage;                  ///< Actual percentage of the batteries when they hit 50% or below
+   float                             battery_50_percent_unloaded_voltage;                   ///< Actual voltage of the batteries when they hit 50% or below
    unsigned long                     time_battery_25_percent;                               ///< Time of battery at 25% (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned char                     battery_25_percent_actual_percentage;                  ///< Actual percentage of the batteries when they hit 25% or below
+   float                             battery_25_percent_unloaded_voltage;                   ///< Actual voltage of the batteries when they hit 25% or below
    unsigned long                     time_battery_5_percent;                                ///< Time of battery at 5% (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned char                     battery_5_percent_actual_percentage;                   ///< Actual percentage of the batteries when they hit 5% or below
+   float                             battery_5_percent_unloaded_voltage;                    ///< Actual voltage of the batteries when they hit 5% or below
    unsigned long                     time_battery_0_percent;                                ///< Time of battery at 0% (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    unsigned char                     battery_0_percent_actual_percentage;                   ///< Actual percentage of the batteries when they hit 0% or below
+   float                             battery_0_percent_unloaded_voltage;                    ///< Actual voltage of the batteries when they hit 0% or below
    ctrlm_rcu_battery_event_t         battery_event;                                         ///< Last battery event
    unsigned long                     time_battery_event;                                    ///< Time of the last battery event (number of seconds since the Epoch, 1970-01-01 00:00:00 +0000 (UTC))
    char                              type[CTRLM_RCU_MAX_USER_STRING_LENGTH];                ///< Remote control's type string
@@ -475,6 +481,8 @@ typedef struct {
    unsigned long                     time_last_heartbeat;                                   ///< The time of the last heartbeat
    char                              irdb_entry_id_name_tv[CTRLM_MAX_PARAM_STR_LEN];        ///< The TV irdb code name
    char                              irdb_entry_id_name_avr[CTRLM_MAX_PARAM_STR_LEN];       ///< The AVR irdb code name
+   unsigned char                     battery_voltage_large_jump_counter;                    ///< The large jump counter for battery voltage
+   unsigned char                     battery_voltage_large_decline_detected;                ///< The large decline detected flag for battery voltage
 } ctrlm_controller_status_t;
 
 /// @brief Structure of Remote Controls's Controller Status IARM call
