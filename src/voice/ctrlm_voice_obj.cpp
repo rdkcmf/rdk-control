@@ -147,9 +147,15 @@ ctrlm_voice_t::~ctrlm_voice_t() {
     /* Close Voice SDK */
 }
 
-//TODO this needs to query the hardware, have requested info from Sky. Will be fixed by LLAMA-1478
 bool ctrlm_voice_t::privacy_mode(void) {
-   return (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
+   bool privacy;
+
+   if(!xrsr_privacy_mode_get(&privacy)) {
+      LOG_ERROR("%s: error getting privcay mode, defaulting to ON\n", __FUNCTION__);
+      privacy = true;
+   }
+
+   return privacy;
 }
 
 void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
@@ -185,9 +191,9 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
        LOG_ERROR("%s: Failed to get host name <%s>\n", __FUNCTION__, strerror(errsv));
    }
 
-
-
-   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, XRSR_POWER_MODE_FULL, privacy_mode(), json_obj_vsdk)) {
+   //HAL is not available because xrsr is not open so use stored status. Init means full power
+   bool privacy = (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
+   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, XRSR_POWER_MODE_FULL, privacy, json_obj_vsdk)) {
       LOG_ERROR("%s: Failed to open speech router\n", __FUNCTION__);
       g_assert(0);
    }
