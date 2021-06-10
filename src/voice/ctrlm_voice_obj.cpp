@@ -2232,10 +2232,12 @@ void ctrlm_voice_t::keyword_power_state_change(bool success) {
    if(CTRLM_POWER_STATE_STANDBY == ctrlm_main_get_power_state()) {
       if(success) {
          LOG_INFO("%s: Standby, keyword verified, go full power\n", __FUNCTION__);
-         ctrlm_voice_iarm_set_power_state_on();
-         ctrlm_power_state_change(CTRLM_POWER_STATE_ON); //In ctrlmTestApp test case system state is already on and PwrMgr will ignore the call, so make this one as well
+         ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false); //In ctrlmTestApp test case system state is already on and PwrMgr will ignore the call, so make this one as well
+         ctrlm_voice_iarm_set_power_state(CTRLM_POWER_STATE_ON);
       } else {
-         LOG_INFO("%s: Standby, keyword not verified, remain in standby\n", __FUNCTION__);
+         LOG_INFO("%s: Standby, keyword not verified, go back to standby\n", __FUNCTION__);
+         ctrlm_power_state_change(CTRLM_POWER_STATE_STANDBY, false);
+         ctrlm_voice_iarm_set_power_state(CTRLM_POWER_STATE_DEEP_SLEEP);
       }
    }
 }
@@ -2353,15 +2355,8 @@ void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
    bool success = true;
    switch(power_state) {
       case CTRLM_POWER_STATE_STANDBY:
-         if(privacy_mode()) {
-            LOG_INFO("%s: privacy mode, skip standby, go to deep sleep\n", __FUNCTION__);
-            if(!xrsr_power_mode_set(XRSR_POWER_MODE_SLEEP)) {
-               success = false;
-            }
-         } else {
-            if(!xrsr_power_mode_set(XRSR_POWER_MODE_LOW)) {
-               success = false;
-            }
+         if(!xrsr_power_mode_set(XRSR_POWER_MODE_LOW)) {
+            success = false;
          }
          break;
       case CTRLM_POWER_STATE_DEEP_SLEEP:
@@ -2393,6 +2388,8 @@ void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
    }
    if(!success) {
       LOG_ERROR("%s: failed to set xrsr to power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+   } else { 
+      this->voice_sdk_update_routes();
    }
 }
 

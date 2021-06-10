@@ -25,6 +25,9 @@
 #include "irMgr.h"
 #include "pwrMgr.h"
 #include "sysMgr.h"
+#ifdef ENABLE_DEEP_SLEEP
+#include "deepSleepMgr.h"
+#endif
 #include "comcastIrKeyCodes.h"
 #include "ctrlm.h"
 #include "ctrlm_ipc.h"
@@ -522,7 +525,7 @@ IARM_Result_t ctrlm_main_iarm_call_power_state_change(void *arg) {
    }
 
    LOG_INFO("%s: new state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state->new_state));
-   if(!ctrlm_power_state_change(power_state->new_state)) {
+   if(!ctrlm_power_state_change(power_state->new_state, true)) {
       return(IARM_RESULT_OOM);
    }
 
@@ -727,6 +730,7 @@ IARM_Result_t ctrlm_event_handler_power_pre_change(void* pArgs)
     }
     //ctrlm is on, sleep, or standby. For Llama standby == networked standby power manager transitions from nsm to light sleep to on but ctrlm needs to be "on" during light sleep to process audio
     msg->header.type = CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
+    msg->system = true;
     switch(pParams->newState) {
        case IARM_BUS_PWRMGR_POWERSTATE_ON:
        case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
@@ -996,6 +1000,28 @@ void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state) {
          LOG_ERROR("%s: IARM query for network standby mode failed, defaulting to deep sleep!\n", __FUNCTION__);
       }
    }
+
+   #ifdef ENABLE_DEEP_SLEEP
+   if(CTRLM_POWER_STATE_ON == *power_state) {
+      DeepSleep_WakeupReason_t wakeup_reason;
+      IARM_Result_t res = IARM_Bus_Call(IARM_BUS_DEEPSLEEPMGR_NAME, IARM_BUS_DEEPSLEEPMGR_API_GetLastWakeupReason, (void*)&wakeup_reason, sizeof(wakeup_reason));
+
+      if(res == IARM_RESULT_SUCCESS) {
+         LOG_INFO("%s wakeup_reason %d\n", __FUNCTION__, wakeup_reason);
+         if(wakeup_reason == DEEPSLEEP_WAKEUPREASON_VOICE) {
+            XLOGD_INFO("%s: wake from voice, Voice will handle power state\n", __FUNCTION__);
+            *power_state = CTRLM_POWER_STATE_STANDBY;
+         } else {
+            XLOGD_INFO("%s: not wake from voice, transition to on\n", __FUNCTION__);
+            *power_state = CTRLM_POWER_STATE_ON;
+         }
+      } else {
+         *power_state = CTRLM_POWER_STATE_ON;
+         LOG_ERROR("%s: IARM query for wakeup reason failed, defaulting to ON!", __FUNCTION__);
+      }
+   }
+   #endif
+
 }
 
 IARM_Result_t ctrlm_main_iarm_call_last_keypress_get(void *arg) {

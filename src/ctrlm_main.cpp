@@ -2424,9 +2424,20 @@ gpointer ctrlm_main_thread(gpointer param) {
             if(g_ctrlm.power_state == dqm->new_state ) {
                LOG_INFO("%s: already in power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
             } else {
+               /* If this message came from Power Manager, then Deep Sleep may set Networked Standby, and
+                * waking from deep sleep might be from voice or from button press
+                * If this message came from ctrlm_voice then simply proceed
+                */
+               LOG_INFO("%s: power state message came from %s\n", __FUNCTION__, dqm->system?"system":"internal");
+               if(dqm->system) {
+                  ctrlm_main_iarm_update_power_state(&dqm->new_state);
+                  if(g_ctrlm.power_state == dqm->new_state) {
+                     LOG_INFO("%s: already in updated power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
+                     break;
+                  }
+               }
+
                dqm->old_state = g_ctrlm.power_state;
-               //Deep Sleep may set Networked Standby, maybe other adjustments later
-               ctrlm_main_iarm_update_power_state(&dqm->new_state);
                g_ctrlm.power_state = dqm->new_state;
                // Set Power change in Networks
                for(auto const &itr : g_ctrlm.networks) {
@@ -5404,7 +5415,7 @@ gboolean ctrlm_ntp_check(gpointer user_data) {
    return(false);
 }
 
-gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state) {
+gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state, bool system) {
    //Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_power_state_change_t *msg = (ctrlm_main_queue_power_state_change_t *)g_malloc(sizeof(ctrlm_main_queue_power_state_change_t));
    if(NULL == msg) {
@@ -5416,6 +5427,7 @@ gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state) {
    msg->header.type = CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
    msg->header.network_id = CTRLM_MAIN_NETWORK_ID_ALL;
    msg->new_state = power_state;
+   msg->system = system;
    ctrlm_main_queue_msg_push(msg);
    return(true);
 }
