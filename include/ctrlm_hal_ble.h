@@ -215,6 +215,11 @@ typedef struct {
    bool                    wait_for_reply;
 } ctrlm_hal_ble_SendRcuAction_params_t;
 
+typedef struct {
+   bool                    waking_up;
+} ctrlm_hal_ble_HandleDeepsleep_params_t;
+
+
 /// @}
 
 /// @addtogroup HAL_BLE_Function_Typedefs   Request Function Prototypes
@@ -316,6 +321,10 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_GetRcuRebootReason_t)(ctrlm_hal_b
 /// @brief Send an action for the RCU to perform
 /// @param[in] ieee_address - MAC address of the controller
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_SendRcuAction_t)(ctrlm_hal_ble_SendRcuAction_params_t params);
+
+/// @brief notify the HAL of a deepsleep transition
+/// @param[in] waking_up - true if waking from deepsleep, false if going into deepsleep
+typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_HandleDeepsleep_t)(ctrlm_hal_ble_HandleDeepsleep_params_t params);
 /// @}
 
 /// @addtogroup HAL_BLE_Callback_Functions - Callback Function Prototypes
@@ -349,6 +358,7 @@ typedef struct {
    ctrlm_hal_ble_req_GetRcuUnpairReason_t get_rcu_unpair_reason;
    ctrlm_hal_ble_req_GetRcuRebootReason_t get_rcu_reboot_reason;
    ctrlm_hal_ble_req_SendRcuAction_t      send_rcu_action;
+   ctrlm_hal_ble_req_HandleDeepsleep_t    handle_deepsleep;
 } ctrlm_hal_ble_cfm_init_params_t;
 
 /// @brief Network Init Confirmation Function

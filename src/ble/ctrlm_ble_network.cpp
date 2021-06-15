@@ -249,6 +249,7 @@ void ctrlm_obj_network_ble_t::hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t p
    hal_api_get_rcu_unpair_reason_ = params.get_rcu_unpair_reason;
    hal_api_get_rcu_reboot_reason_ = params.get_rcu_reboot_reason;
    hal_api_send_rcu_action_       = params.send_rcu_action;
+   hal_api_handle_deepsleep_      = params.handle_deepsleep;
 
    // Unblock the caller of hal_init
    g_mutex_lock(&mutex_);
@@ -1836,4 +1837,18 @@ json_t *ctrlm_obj_network_ble_t::xconf_export_controllers() {
       json_array_append(ret, temp);
    }
    return ret;
+}
+
+void ctrlm_obj_network_ble_t::power_state_change(ctrlm_main_queue_power_state_change_t *dqm) {
+   g_assert(dqm);
+
+   if ((dqm->old_state != CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) ||
+       (dqm->old_state == CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP))
+   {
+      ctrlm_hal_ble_HandleDeepsleep_params_t params;
+      params.waking_up = dqm->old_state == CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP;
+      if (hal_api_handle_deepsleep_) {
+         hal_api_handle_deepsleep_(params);
+      }
+   }
 }

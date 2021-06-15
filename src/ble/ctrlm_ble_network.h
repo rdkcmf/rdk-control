@@ -143,6 +143,8 @@ public:
    void                          printStatus();
    virtual void                  factory_reset();
 
+   void                          power_state_change(ctrlm_main_queue_power_state_change_t *dqm);
+
 private:
    ctrlm_obj_network_ble_t();
    ctrlm_hal_ble_network_main_t           hal_api_main_;
@@ -166,6 +168,7 @@ private:
    ctrlm_hal_ble_req_GetRcuUnpairReason_t hal_api_get_rcu_unpair_reason_;
    ctrlm_hal_ble_req_GetRcuRebootReason_t hal_api_get_rcu_reboot_reason_;
    ctrlm_hal_ble_req_SendRcuAction_t      hal_api_send_rcu_action_;
+   ctrlm_hal_ble_req_HandleDeepsleep_t    hal_api_handle_deepsleep_;
 
    ctrlm_ble_state_t                      state_;
    ctrlm_ir_state_t                       ir_state_;

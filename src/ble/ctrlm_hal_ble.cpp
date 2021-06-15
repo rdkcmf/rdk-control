@@ -124,6 +124,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_Get
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_GetRcuRebootReason_params_t *params);
 static void ctrlm_hal_ble_RcuAction_ResultCB(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_SendRcuAction(ctrlm_hal_ble_SendRcuAction_params_t params);
+static ctrlm_hal_result_t ctrlm_hal_ble_req_HandleDeepsleep(ctrlm_hal_ble_HandleDeepsleep_params_t params);
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_Terminate(void);
 
@@ -437,10 +438,31 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
         params.get_rcu_unpair_reason = ctrlm_hal_ble_req_GetRcuUnpairReason;
         params.get_rcu_reboot_reason = ctrlm_hal_ble_req_GetRcuRebootReason;
         params.send_rcu_action = ctrlm_hal_ble_req_SendRcuAction;
+        params.handle_deepsleep = ctrlm_hal_ble_req_HandleDeepsleep;
 
         g_ctrlm_hal_ble->main_init.cfm_init(g_ctrlm_hal_ble->main_init.network_id, params);
     }
     return NULL;
+}
+
+
+static ctrlm_hal_result_t ctrlm_hal_ble_req_HandleDeepsleep(ctrlm_hal_ble_HandleDeepsleep_params_t params)
+{
+    LOG_INFO("%s: Enter... waking_up = <%s>\n", __FUNCTION__, params.waking_up ? "TRUE" : "FALSE");
+    ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
+
+    if (params.waking_up) {
+        g_mutex_lock(&g_ctrlm_hal_ble->mutex_metadata);
+        for (auto it = g_ctrlm_hal_ble->rcu_metadata.begin(); it != g_ctrlm_hal_ble->rcu_metadata.end(); it++) {
+            if (it->second.input_device_fd >= 0) {
+                LOG_INFO ("%s: Closing key input device for RCU <0x%llX> so key monitor thread can reopen...\n", __FUNCTION__, it->first);
+                close(it->second.input_device_fd);
+                it->second.input_device_fd = -1;
+            }
+        }
+        g_mutex_unlock(&g_ctrlm_hal_ble->mutex_metadata);
+    }
+    return ret;
 }
 
 
