@@ -1311,8 +1311,9 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_CONNECTED;
     } else if (0 == prop.compare("AudioGainLevel")) {
         g_variant_get (value, "i", &int_variant);
-        LOG_INFO("%s: Item '%s' = <%d>\n", __FUNCTION__, prop.c_str(), int_variant);
-        rcu_status.rcu_data.audio_gain_level = int_variant;
+        // This value is actually an 8 bit unsigned, but the dbus function sends us an int
+        rcu_status.rcu_data.audio_gain_level = (uint8_t) int_variant;
+        LOG_INFO("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), rcu_status.rcu_data.audio_gain_level);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_AUDIO_GAIN_LEVEL;
     } else if (0 == prop.compare("AudioStreaming")) {
         g_variant_get (value, "b", &bool_variant);

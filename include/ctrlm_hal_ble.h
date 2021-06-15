@@ -111,7 +111,7 @@ typedef struct {
    char                          name[CTRLM_MAX_PARAM_STR_LEN];
    char                          serial_number[CTRLM_MAX_PARAM_STR_LEN];
    int                           ir_code;
-   int                           audio_gain_level;
+   uint8_t                       audio_gain_level;
    bool                          audio_streaming;
    unsigned int                  touch_mode;
    bool                          touch_mode_settable;
