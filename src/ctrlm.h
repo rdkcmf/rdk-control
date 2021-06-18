@@ -433,7 +433,7 @@ gboolean ctrlm_main_iarm_call_chip_status_get(ctrlm_main_iarm_call_chip_status_t
 
 ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void);
 ctrlm_power_state_t ctrlm_main_get_power_state(void);
-void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state);
+void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state, bool system);
 
 
 void        ctrlm_main_iarm_event_binding_line_of_sight(gboolean active);

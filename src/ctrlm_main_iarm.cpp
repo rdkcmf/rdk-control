@@ -986,7 +986,7 @@ ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void) {
    return power_state;
 }
 
-void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state) {
+void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state, bool system) {
    if(CTRLM_POWER_STATE_DEEP_SLEEP == *power_state) {
       IARM_Bus_PWRMgr_NetworkStandbyMode_Param_t param = {0};
       IARM_Result_t res = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetNetworkStandbyMode, (void *)&param, sizeof(param));
@@ -1008,11 +1008,11 @@ void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state) {
 
       if(res == IARM_RESULT_SUCCESS) {
          LOG_INFO("%s wakeup_reason %d\n", __FUNCTION__, wakeup_reason);
-         if(wakeup_reason == DEEPSLEEP_WAKEUPREASON_VOICE) {
-            XLOGD_INFO("%s: wake from voice, Voice will handle power state\n", __FUNCTION__);
+         if(system && (wakeup_reason == DEEPSLEEP_WAKEUPREASON_VOICE)) { //system sends ON while processing in standby, so wait
+            XLOGD_INFO("%s: system wake from voice, remain in standby\n", __FUNCTION__);
             *power_state = CTRLM_POWER_STATE_STANDBY;
          } else {
-            XLOGD_INFO("%s: not wake from voice, transition to on\n", __FUNCTION__);
+            XLOGD_INFO("%s: not system wake from voice, transition to on\n", __FUNCTION__);
             *power_state = CTRLM_POWER_STATE_ON;
          }
       } else {

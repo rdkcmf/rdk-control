@@ -875,11 +875,10 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
    for(vector<ctrlm_thread_monitor_t>::iterator it = g_ctrlm.monitor_threads.begin(); it != g_ctrlm.monitor_threads.end(); it++) {
       LOG_DEBUG("%s: Checking %s\n", __FUNCTION__, it->name);
 
-      //This only happens when low power mode was entered from ctrlmTestApp, normally ctrlm thread monitor will not run
+      //ctrlm thread may run while db thread is stopped
       if((ctrlm_db_queue_msg_push == it->queue_push) &&
         ((CTRLM_POWER_STATE_STANDBY      == g_ctrlm.power_state) ||
         (CTRLM_POWER_STATE_DEEP_SLEEP    == g_ctrlm.power_state))) {
-            LOG_INFO("%s: skip checking %s in faux standby\n", __FUNCTION__, it->name);
             continue;
       }
 
@@ -887,7 +886,7 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
          LOG_FATAL("%s: Thread %s is unresponsive\n", __FUNCTION__, it->name);
          ctrlm_quit_main_loop();
          return (FALSE);
-         }
+      }
    }
 
    // Send a message to each thread to respond
@@ -2436,15 +2435,11 @@ gpointer ctrlm_main_thread(gpointer param) {
             } else {
                /* If this message came from Power Manager, then Deep Sleep may set Networked Standby, and
                 * waking from deep sleep might be from voice or from button press
-                * If this message came from ctrlm_voice then simply proceed
                 */
-               LOG_INFO("%s: power state message came from %s\n", __FUNCTION__, dqm->system?"system":"internal");
-               if(dqm->system) {
-                  ctrlm_main_iarm_update_power_state(&dqm->new_state);
-                  if(g_ctrlm.power_state == dqm->new_state) {
-                     LOG_INFO("%s: already in updated power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
-                     break;
-                  }
+               ctrlm_main_iarm_update_power_state(&dqm->new_state, dqm->system);
+               if(g_ctrlm.power_state == dqm->new_state) {
+                  LOG_INFO("%s: already in updated power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
+                  break;
                }
 
                dqm->old_state = g_ctrlm.power_state;
@@ -5436,8 +5431,8 @@ gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state, bool system) 
 
    msg->header.type = CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
    msg->header.network_id = CTRLM_MAIN_NETWORK_ID_ALL;
-   msg->new_state = power_state;
    msg->system = system;
+   msg->new_state = power_state;
    ctrlm_main_queue_msg_push(msg);
    return(true);
 }

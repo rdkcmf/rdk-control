@@ -1793,8 +1793,9 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
     }
 
-    if(this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) {
-       keyword_power_state_change(this->keyword_verified);
+    if( (this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY) ) {
+       //In this state, the system is ON while ctrlm is in STANDBY, bring ctrlm into alignment with system
+       ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false);
     }
 
     if(this->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
@@ -2232,20 +2233,6 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
 
     LOG_INFO("%s: %s\n", __FUNCTION__, ss.str().c_str());
     // End print configuration
-}
-
-void ctrlm_voice_t::keyword_power_state_change(bool success) {
-   if(CTRLM_POWER_STATE_STANDBY == ctrlm_main_get_power_state()) {
-      if(success) {
-         LOG_INFO("%s: Standby, keyword verified, go full power\n", __FUNCTION__);
-         ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false); //In ctrlmTestApp test case system state is already on and PwrMgr will ignore the call, so make this one as well
-         ctrlm_voice_iarm_set_power_state(CTRLM_POWER_STATE_ON);
-      } else {
-         LOG_INFO("%s: Standby, keyword not verified, go back to standby\n", __FUNCTION__);
-         ctrlm_power_state_change(CTRLM_POWER_STATE_STANDBY, false);
-         ctrlm_voice_iarm_set_power_state(CTRLM_POWER_STATE_DEEP_SLEEP);
-      }
-   }
 }
 
 // Helper Functions end

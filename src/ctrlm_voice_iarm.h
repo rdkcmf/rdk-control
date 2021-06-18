@@ -37,7 +37,6 @@ void     ctrlm_voice_iarm_event_session_stats(ctrlm_voice_iarm_event_session_sta
 void     ctrlm_voice_iarm_event_session_abort(ctrlm_voice_iarm_event_session_abort_t *event);
 void     ctrlm_voice_iarm_event_session_short(ctrlm_voice_iarm_event_session_short_t *event);
 void     ctrlm_voice_iarm_event_media_service(ctrlm_voice_iarm_event_media_service_t *event);
-void     ctrlm_voice_iarm_set_power_state(ctrlm_power_state_t power_state);
 void     ctrlm_voice_iarm_terminate(void);
 
 #ifdef __cplusplus

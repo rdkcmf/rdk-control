@@ -523,7 +523,6 @@ public:
    void                 set_audio_mode(ctrlm_voice_audio_settings_t *settings);
    void                 audio_state_set(bool session);
    bool                 privacy_mode(void);
-   void                 keyword_power_state_change(bool success);
 
 };
 

@@ -168,18 +168,6 @@ IARM_Result_t ctrlm_voice_handle_settings_from_server(void *arg) {
 
    return(IARM_RESULT_SUCCESS);
 }
-
-void ctrlm_voice_iarm_set_power_state(ctrlm_power_state_t power_state) {
-   IARM_Bus_PWRMgr_SetPowerState_Param_t param;
-   param.newState = (power_state == CTRLM_POWER_STATE_ON) ? IARM_BUS_PWRMGR_POWERSTATE_ON : IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP;
-   param.keyCode = KED_FP_POWER;
-
-   IARM_Result_t result = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_SetPowerState,
-           (void *)&param, sizeof(param));
-   if(IARM_RESULT_SUCCESS != result) {
-      LOG_ERROR("%s: IARM Bus Error!\n", __FUNCTION__);
-   }
-}
 #endif
 
 void ctrlm_voice_iarm_terminate(void) {
