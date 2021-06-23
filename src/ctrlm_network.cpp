@@ -71,10 +71,23 @@ ctrlm_obj_network_t::ctrlm_obj_network_t(ctrlm_network_type_t type, ctrlm_networ
    hal_thread_      = NULL;
    failed_state_    = false;
    original_thread_ = original_thread;
+   ctrlm_main_thread_ = NULL;
+   g_cond_clear(&condition_);  //CID:82418 - Uninit_ctor
 }
 
 ctrlm_obj_network_t::ctrlm_obj_network_t() {
    LOG_INFO("ctrlm_obj_network_t constructor - default\n");
+   init_result_     = CTRLM_HAL_RESULT_ERROR;
+   ready_           = false;
+   hal_thread_      = NULL;
+   failed_state_    = false;
+   ctrlm_main_thread_ = NULL;
+   g_cond_clear(&condition_);  //CID:89792 - Uninit_ctor
+   hal_api_main_ = NULL;
+   hal_api_property_get_ = NULL;
+   hal_api_property_set_ = NULL;
+   hal_api_term_ = NULL;
+   mutex_cond_init_ = FALSE;
 }
 
 ctrlm_obj_network_t::~ctrlm_obj_network_t() {

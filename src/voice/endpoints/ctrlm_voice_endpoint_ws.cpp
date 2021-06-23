@@ -223,7 +223,8 @@ void ctrlm_voice_endpoint_ws_t::voice_session_begin_callback_ws(void *data, int 
         * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
         * And here, we have destination buffer size more than 4K i.e 5120.
         */
-        strncpy(ws->sat_token, sat.c_str(), sizeof(ws->sat_token));
+        strncpy(ws->sat_token, sat.c_str(), sizeof(ws->sat_token)-1);
+	ws->sat_token[sizeof(ws->sat_token)-1] = '\0';  //CID:157395 - Buffer size warning
     } else {
         ws->sat_token[0] = '\0';
     }

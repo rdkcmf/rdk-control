@@ -64,6 +64,7 @@ public:
         sub_type             = "";
         language             = "";
         keyword_verification = false;
+	keyword_verification_required = false;  //CID:160949
     }
 };
 

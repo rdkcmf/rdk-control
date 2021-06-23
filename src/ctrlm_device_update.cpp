@@ -802,17 +802,19 @@ void ctrlm_device_update_process_device_file(string file_path_archive, string de
                LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
                g_assert(0);
             }
-            msg->header.type       = CTRLM_MAIN_QUEUE_MSG_TYPE_NOTIFY_FIRMWARE;
-            msg->image_type        = image_info.image_type;
-            msg->controller_type   = controller_type;
-            msg->force_update      = image_info.force_update;
-            safec_rc = memcpy_s(&msg->version_software, sizeof(msg->version_software), &image_info.version_software, sizeof(version_software_t));
-            ERR_CHK(safec_rc);
-            safec_rc = memcpy_s(&msg->version_bootloader_min, sizeof(msg->version_bootloader_min), &image_info.version_bootloader_min, sizeof(version_software_t));
-            ERR_CHK(safec_rc);
-            safec_rc = memcpy_s(&msg->version_hardware_min, sizeof(msg->version_hardware_min), &image_info.version_hardware_min, sizeof(version_hardware_t));
-            ERR_CHK(safec_rc);
-            ctrlm_main_queue_msg_push(msg);
+	    else {
+               msg->header.type       = CTRLM_MAIN_QUEUE_MSG_TYPE_NOTIFY_FIRMWARE;
+               msg->image_type        = image_info.image_type;
+               msg->controller_type   = controller_type;
+               msg->force_update      = image_info.force_update;
+               safec_rc = memcpy_s(&msg->version_software, sizeof(msg->version_software), &image_info.version_software, sizeof(version_software_t));
+               ERR_CHK(safec_rc);
+               safec_rc = memcpy_s(&msg->version_bootloader_min, sizeof(msg->version_bootloader_min), &image_info.version_bootloader_min, sizeof(version_software_t));
+               ERR_CHK(safec_rc);
+               safec_rc = memcpy_s(&msg->version_hardware_min, sizeof(msg->version_hardware_min), &image_info.version_hardware_min, sizeof(version_hardware_t));
+               ERR_CHK(safec_rc);
+               ctrlm_main_queue_msg_push(msg);
+            }  //CID:113223 - Forward null
 #endif
          }
       }
@@ -1984,11 +1986,8 @@ void ctrlm_device_update_rf4ce_load_info(ctrlm_network_id_t network_id, ctrlm_co
 gboolean ctrlm_device_update_timeout_session(gpointer user_data) {
    LOG_INFO("%s: Session timed out.\n", __FUNCTION__);
    device_update_timeout_session_params_t *params = (device_update_timeout_session_params_t *)user_data;
-   if(NULL == params) {
+   if((NULL == params)) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
-      DEVICE_UPDATE_MUTEX_LOCK();
-      g_ctrlm_device_update.rf4ce_sessions[params->controller_id].timeout_source_id = 0;
-      DEVICE_UPDATE_MUTEX_UNLOCK();
       return(false);
    }
 

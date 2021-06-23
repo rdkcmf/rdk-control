@@ -66,6 +66,7 @@ static const char *controller_name_to_audio_model(const char *controller);
 ctrlm_voice_endpoint_ws_nextgen_t::ctrlm_voice_endpoint_ws_nextgen_t(ctrlm_voice_t *voice_obj) : ctrlm_voice_endpoint_t(voice_obj) {
     this->xrsv_obj_ws_nextgen     = NULL;
     this->voice_message_available = false;
+    server_ret_code = 0;  //CID:157976 - Uninit-ctor
 }
 
 ctrlm_voice_endpoint_ws_nextgen_t::~ctrlm_voice_endpoint_ws_nextgen_t() {
@@ -257,7 +258,8 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
          * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
          * And here, we have destination buffer size more than 4K i.e 5120.
          */
-        strncpy(ws->sat_token, sat.c_str(), sizeof(ws->sat_token));
+        strncpy(ws->sat_token, sat.c_str(), sizeof(ws->sat_token) -1);
+	ws->sat_token[sizeof(ws->sat_token) -1] = '\0';   //CID:158167 - Buffer size warning
     } else {
         ws->sat_token[0] = '\0';
     }

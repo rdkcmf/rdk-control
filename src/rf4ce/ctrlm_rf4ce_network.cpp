@@ -1855,11 +1855,11 @@ bool ctrlm_obj_network_rf4ce_t::backup_hal_nvm() {
    if(nvm_backup_data_) {
    // Compare current NVM data with backup
       if(FALSE == g_file_load_contents(g_file, NULL, &contents, &length, NULL, &error)) {
-         if(G_FILE_ERROR_NOENT == error->code) {
+         if( (error != NULL) && (G_FILE_ERROR_NOENT == error->code)) {
             LOG_INFO("%s: HAL NVM backup not found for comparison\n", __FUNCTION__);
          } else {
             LOG_ERROR("%s: HAL NVM exists but failed to get contents\n", __FUNCTION__);
-         }
+         }   //CID:85557 - Reverse_inull
          if(error) {
             g_error_free(error);
             error = NULL;
@@ -2000,8 +2000,10 @@ gboolean ctrlm_obj_network_rf4ce_t::blackout_settings_get_rfc() {
    int ind = -1;
 
    if(FALSE == g_file_get_contents(CTRLM_RF4CE_BLACKOUT_RFC_FILE, &contents, &len, &err)) {
-      LOG_INFO("%s: Failed to open RFC file <%s>\n", __FUNCTION__, err->message);
-      g_error_free(err);
+      if(err != NULL) { 
+         LOG_INFO("%s: Failed to open RFC file <%s>\n", __FUNCTION__, err->message);
+         g_error_free(err);
+      }   //CID:127763 - Forward null
       return FALSE;
    }
 
@@ -2317,7 +2319,9 @@ void ctrlm_obj_network_rf4ce_t::check_if_update_file_still_needed(ctrlm_main_que
    }
    if(file_is_needed==false){
       LOG_INFO("%s: update file not needed so deleting %s\n", __FUNCTION__,msg->file_path_archive);
-      remove((const char *)msg->file_path_archive);
+      if(!remove((const char *)msg->file_path_archive)) {
+          LOG_INFO("%s: file path archieve not removed \n", __FUNCTION__);
+      }  //CID:84920 - Checked return
    }else{
       LOG_INFO("%s: update file needed keeping %s\n", __FUNCTION__,msg->file_path_archive);
    }
@@ -4524,7 +4528,9 @@ ctrlm_hal_result_t ctrlm_obj_network_rf4ce_t::hal_rf4ce_decrypt(ctrlm_hal_rf4ce_
       return CTRLM_HAL_RESULT_ERROR;
    }
 
-   EVP_DecryptFinal_ex(ctx_, &param->cipher_text[outl], &outl);
+   if(!EVP_DecryptFinal_ex(ctx_, &param->cipher_text[outl], &outl)) {
+       LOG_ERROR("%s: EVP_DecryptFinal_ex() : decrypt failed\n", __FUNCTION__);
+   }  //cID:160255 - checked return
 
    return CTRLM_HAL_RESULT_SUCCESS;
 }

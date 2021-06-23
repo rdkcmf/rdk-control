@@ -572,6 +572,7 @@ bool ctrlm_obj_controller_rf4ce_t::device_update_session_resume_available(void) 
 void ctrlm_obj_controller_rf4ce_t::device_update_session_resume_store(rf4ce_device_update_session_resume_state_t *state) {
    if(state == NULL) {
       LOG_ERROR("%s: <%s> (%u) NULL param\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get());
+      return;  //CID:110370 - Forward null
    }
    if(!this->device_update_session_resume_support()) {
       LOG_ERROR("%s: <%s> (%u) device does not support session resume\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get());

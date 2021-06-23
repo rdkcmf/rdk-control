@@ -1284,8 +1284,10 @@ char *ctrlm_get_file_contents(const char *path) {
    GError     *err       = NULL;
 
    if(FALSE == g_file_get_contents(path, &contents, &len, &err)) {
-      LOG_INFO("%s: Failed to open RFC file <%s>\n", __FUNCTION__, err->message);
-      g_error_free(err);
+      if(err != NULL) {
+         LOG_INFO("%s: Failed to open RFC file <%s>\n", __FUNCTION__, err->message);
+         g_error_free(err);
+      }  //CID:127825 - forward null
       return NULL;
    }
    return contents;

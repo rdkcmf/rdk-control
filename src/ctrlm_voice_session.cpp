@@ -62,6 +62,11 @@
 #define STATS_VER_PATCH    (  8)
 #define STATS_VERSION      ((STATS_VER_MAJOR << 24) | (STATS_VER_MINOR << 16) | (STATS_VER_REVISION << 8) | STATS_VER_PATCH)
 
+#define CURL_EASY_SETOPT(curl, CURLoption, option)\
+	if (curl_easy_setopt(curl, CURLoption, option) != 0) {\
+            LOG_ERROR("%s: Failed at curl_easy_setopt \n", __FUNCTION__);\
+	}  //CID:128065 - checked return
+
 typedef enum {
    // Client error codes
    VREX_SVR_RET_CODE_OK                      =    0, // No Error
@@ -695,22 +700,22 @@ void voice_session_t::start_transfer_server() {
       if(NULL == url_escape) {
          LOG_INFO("%s: Unable to escape URL!\n", __FUNCTION__);
       }
-      curl_easy_setopt(curl, CURLOPT_URL, url_escape);
+      CURL_EASY_SETOPT(curl, CURLOPT_URL, url_escape);
       #else
-      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+      CURL_EASY_SETOPT(curl, CURLOPT_URL, url.c_str());
       #endif
       //curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-      curl_easy_setopt(curl, CURLOPT_POST, 1L);
-      curl_easy_setopt(curl, CURLOPT_READFUNCTION, vrex_server_voice_data_read);
-      curl_easy_setopt(curl, CURLOPT_READDATA, this);  // pointer to pass to our read function
-      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, vrex_server_voice_response);
-      curl_easy_setopt(curl, CURLOPT_WRITEDATA, this); // pointer to pass to our write function
-      curl_easy_setopt(curl, CURLOPT_TIMEOUT, m_timeout_vrex_request);
-      curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-      curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, vrex_request_progress);
-      curl_easy_setopt(curl, CURLOPT_XFERINFODATA, this);
-      curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
-      curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+      CURL_EASY_SETOPT(curl, CURLOPT_POST, 1L);
+      CURL_EASY_SETOPT(curl, CURLOPT_READFUNCTION, vrex_server_voice_data_read);
+      CURL_EASY_SETOPT(curl, CURLOPT_READDATA, this);  // pointer to pass to our read function
+      CURL_EASY_SETOPT(curl, CURLOPT_WRITEFUNCTION, vrex_server_voice_response);
+      CURL_EASY_SETOPT(curl, CURLOPT_WRITEDATA, this); // pointer to pass to our write function
+      CURL_EASY_SETOPT(curl, CURLOPT_TIMEOUT, m_timeout_vrex_request);
+      CURL_EASY_SETOPT(curl, CURLOPT_NOSIGNAL, 1L);
+      CURL_EASY_SETOPT(curl, CURLOPT_XFERINFOFUNCTION, vrex_request_progress);
+      CURL_EASY_SETOPT(curl, CURLOPT_XFERINFODATA, this);
+      CURL_EASY_SETOPT(curl, CURLOPT_NOPROGRESS, 0);
+      CURL_EASY_SETOPT(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
       //#ifdef CURL_INSECURE_MODE
       //#error Curl is set to insecure mode.  Never set this in production code.
@@ -726,11 +731,11 @@ void voice_session_t::start_transfer_server() {
          chunk = curl_slist_append(chunk, m_service_access_token.c_str());
       }
       chunk = curl_slist_append(chunk, "Expect:");
-      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+      CURL_EASY_SETOPT(curl, CURLOPT_HTTPHEADER, chunk);
 
       //Add the user agent field
       LOG_INFO("Speech USERAGENT: %s\n", m_user_agent.c_str());
-      curl_easy_setopt(curl, CURLOPT_USERAGENT, m_user_agent.c_str());
+      CURL_EASY_SETOPT(curl, CURLOPT_USERAGENT, m_user_agent.c_str());
 
       #ifdef CURL_LONG_DELAY_TEST
       #warning CURL LONG DELAY TEST CODE IS ENABLED!

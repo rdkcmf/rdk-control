@@ -53,6 +53,7 @@ typedef struct {
 
 // Function Implementations
 ctrlm_voice_endpoint_http_t::ctrlm_voice_endpoint_http_t(ctrlm_voice_t *voice_obj) : ctrlm_voice_endpoint_t(voice_obj) {
+    server_ret_code = 0;  //CID:155208 - Uninit_ctor
     this->xrsv_obj_http = NULL;
 }
 
@@ -188,10 +189,11 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
      * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
      * And here, we have destination buffer size more than 4K i.e 5120.
      */
-    strncpy(http->sat_token, sat.c_str(), sizeof(http->sat_token));
+    strncpy(http->sat_token, sat.c_str(), sizeof(http->sat_token)-1);
+    http->sat_token[sizeof(http->sat_token)-1] = '\0';  //CID:157393 - Buffer size warning
     safec_rc = strncpy_s(http->user_agent, sizeof(http->user_agent), user_agent.str().c_str(), sizeof(http->user_agent)-1);
     ERR_CHK(safec_rc);
-    http->user_agent[XRSR_USER_AGENT_LEN_MAX - 1] = '\0';
+    http->user_agent[sizeof(http->user_agent)-1] = '\0';
     if(dqm->src == XRSR_SRC_RCU_PTT && this->query_str_qty > 0) { // Add the application defined query string parameters
        http->query_strs = this->query_strs;
     }

@@ -117,8 +117,12 @@ void ctrlm_recovery_property_get(ctrlm_recovery_property_t property, void *value
 }
 
 void ctrlm_recovery_factory_reset() {
-   remove(CTRLM_NVM_BACKUP);
-   remove(HAL_NVM_BACKUP);
+   if (remove(CTRLM_NVM_BACKUP) != 0) {
+        LOG_ERROR("%s: CTRLM_NVM_BACKUP failed \n", __FUNCTION__);  //CID:87883 - checked return
+   }
+   if (remove(HAL_NVM_BACKUP) != 0) {
+        LOG_ERROR("%s: HAL_NVM_BACKUP failed \n", __FUNCTION__);  //CID:87883 - checked return
+   }
 }
 
 void ctrlm_recovery_terminate(gboolean unlink) {

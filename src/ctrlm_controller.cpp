@@ -35,6 +35,8 @@ ctrlm_obj_controller_t::ctrlm_obj_controller_t(ctrlm_controller_id_t controller_
 }
 
 ctrlm_obj_controller_t::ctrlm_obj_controller_t() {
+   controller_id_ = CTRLM_MAIN_CONTROLLER_ID_INVALID;
+   obj_network_ = NULL;  //CID:82352 - Uninit_ctor
    LOG_INFO("ctrlm_obj_controller_t constructor - default\n");
 }
 

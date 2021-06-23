@@ -448,14 +448,14 @@ void ctrlm_obj_network_rf4ce_t::ind_process_data_rcu(ctrlm_main_queue_msg_rf4ce_
                guint32 combo_keys_index = 0;
 
                for(guint32 index = 0; index < length; index++) {
-                  if(combo_keys_index > 0) {
+                  if((combo_keys_index > 0) && (combo_keys_index < (COMBO_KEYS_BUF_SIZE))) {
                     if (combo_keys_index == COMBO_KEYS_BUF_SIZE) {
                        LOG_INFO("%s: Combo Keys index exceeded buffer size <%d>\n", __FUNCTION__, COMBO_KEYS_BUF_SIZE);
                        break;
                     }
-                     combo_keys[combo_keys_index++] = ',';
+                    combo_keys[combo_keys_index++] = ',';
                   }
-                  if(combo_keys_index < COMBO_KEYS_BUF_SIZE) {
+                  if(combo_keys_index < COMBO_KEYS_BUF_SIZE) {  //CID:81797 - Overrun
                      int size = sprintf_s(&combo_keys[combo_keys_index], COMBO_KEYS_BUF_SIZE - combo_keys_index, "%s", ctrlm_key_code_str((ctrlm_key_code_t)((guchar)cmd_data[index + 2])));
                      if(size > 0) {
                         combo_keys_index += size;

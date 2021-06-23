@@ -849,9 +849,11 @@ int ctrlm_db_insert_or_update(const char *table, const char *key, const int *val
    sqlite3_stmt *p_stmt = NULL;
    int rc;
    stringstream sql;
-   sql << "INSERT OR REPLACE INTO " << table << "(key,value) VALUES (?,?);";
 
-   if(table == NULL || key == NULL) {
+   if(table != NULL && key != NULL) {
+      sql << "INSERT OR REPLACE INTO " << table << "(key,value) VALUES (?,?);";   //CID:80608 - Reverse_inull
+   }
+   else {
       LOG_ERROR("%s: Invalid table or key\n", __FUNCTION__);
       return(-1);
    }
@@ -1230,11 +1232,14 @@ void ctrlm_db_voice_create() {
       // Create the voice table
       int rc = sqlite3_exec(g_ctrlm_db.handle, "CREATE TABLE " CTRLM_DB_TABLE_VOICE "(key TEXT PRIMARY KEY, value TEXT);", NULL, NULL, &err_msg);
       if(rc != SQLITE_OK) {
-         LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-         sqlite3_free(err_msg);
-         return;
+         LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+         if(err_msg) {
+            sqlite3_free(err_msg);
+         }
       }
-      LOG_INFO("%s: voice DB created\n", __FUNCTION__);
+      else {
+         LOG_INFO("%s: voice DB created\n", __FUNCTION__);
+      }
    }
 }
 
@@ -1411,7 +1416,7 @@ void ctrlm_db_print() {
 
          const tm* loc_time = localtime(&time_binding);
          if (loc_time != 0) {
-            strftime(time_str, 40, "%x - %I:%M:%S %p", localtime(&time_binding));
+            strftime(time_str, 40, "%x - %I:%M:%S %p", loc_time);
          }
 
          LOG_INFO("%s:       Controller Id %u IEEE 0x%016llX Binding <%s> Validation <%s> Bound <%s>\n", __FUNCTION__, *it_controller, ieee_address, ctrlm_rcu_binding_type_str(binding_type), ctrlm_rcu_validation_type_str(validation_type), time_str);
