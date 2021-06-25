@@ -34,6 +34,21 @@
 
 #define Q_NOTATION_TO_DOUBLE(input, bits) ((double)((double)input) / (double)(1 << bits))
 
+typedef enum
+{
+   CTRLM_IR_REMOTE_TYPE_XR11V2,
+   CTRLM_IR_REMOTE_TYPE_XR15V1,
+   CTRLM_IR_REMOTE_TYPE_NA,
+   CTRLM_IR_REMOTE_TYPE_UNKNOWN,
+   CTRLM_IR_REMOTE_TYPE_COMCAST,
+   CTRLM_IR_REMOTE_TYPE_PLATCO,
+   CTRLM_IR_REMOTE_TYPE_XR15V2,
+   CTRLM_IR_REMOTE_TYPE_XR16V1,
+   CTRLM_IR_REMOTE_TYPE_XRAV1,
+   CTRLM_IR_REMOTE_TYPE_XR20V1,
+   CTRLM_IR_REMOTE_TYPE_UNDEFINED
+} ctrlm_ir_remote_type;
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -53,8 +68,8 @@ void ctrlm_print_data_hex(const char *prefix, guchar *data, unsigned int length,
 void ctrlm_print_controller_status(const char *prefix, ctrlm_controller_status_t *status);
 
 const char *ctrlm_main_queue_msg_type_str(ctrlm_main_queue_msg_type_t type);
-
 const char *ctrlm_controller_status_cmd_result_str(ctrlm_controller_status_cmd_result_t result);
+
 
 const char *ctrlm_key_status_str(ctrlm_key_status_t key_status);
 const char *ctrlm_key_code_str(ctrlm_key_code_t key_code);
@@ -75,6 +90,7 @@ const char *ctrlm_rcu_ghost_code_str(ctrlm_rcu_ghost_code_t ghost_code);
 const char *ctrlm_rcu_function_str(ctrlm_rcu_function_t function);
 const char *ctrlm_rcu_controller_type_str(ctrlm_rcu_controller_type_t controller_type);
 const char *ctrlm_rcu_reverse_cmd_result_str(ctrlm_rcu_reverse_cmd_result_t result);
+const char *ctrlm_rcu_ir_remote_types_str(ctrlm_ir_remote_type controller_type);
 
 const char *ctrlm_voice_session_result_str(ctrlm_voice_session_result_t result);
 const char *ctrlm_voice_session_end_reason_str(ctrlm_voice_session_end_reason_t reason);

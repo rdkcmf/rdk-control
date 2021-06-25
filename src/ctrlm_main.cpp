@@ -32,6 +32,7 @@
 #include "jansson.h"
 #include "libIBus.h"
 #include "irMgr.h"
+#include "plat_ir.h"
 #include "sysMgr.h"
 #include "comcastIrKeyCodes.h"
 #include "ctrlm_version.h"
@@ -126,21 +127,12 @@ typedef struct
    bool has_ir_remote;
 } ctrlm_ir_remote_usage;
 
-typedef enum
-{
-   CTRLM_REMOTE_TYPE_XR11,
-   CTRLM_REMOTE_TYPE_XR15,
-   CTRLM_REMOTE_TYPE_NA,
-   CTRLM_REMOTE_TYPE_UNKNOWN,
-   CTRLM_REMOTE_TYPE_MAX_REMOTE_TYPES,
-} ctrlm_remote_type;
-
 typedef struct {
    int                         controller_id;
    guchar                      source_type;
    guint32                     source_key_code;
    long long                   timestamp;
-   ctrlm_remote_type           last_ir_remote_type;
+   ctrlm_ir_remote_type        last_ir_remote_type;
    bool                        is_screen_bind_mode;
    ctrlm_remote_keypad_config  remote_keypad_config;
    char                        source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME];
@@ -164,14 +156,6 @@ typedef struct {
    unsigned char            last_non_screenbind_error_binding_type;
    char                     last_non_screenbind_remote_type[CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH];
 } ctrlm_pairing_metrics_t;
-
-static const char *ctrlm_remote_types[CTRLM_REMOTE_TYPE_MAX_REMOTE_TYPES] = 
-{
-    "XR11-20",
-    "XR15-10",
-    "N/A",
-    "unknown"
-};
 
 static const char *key_source_names[sizeof(IARM_Bus_IRMgr_KeySrc_t)] = 
 {
@@ -368,6 +352,7 @@ static void     ctrlm_property_write_shutdown_time(void);
 static guchar   ctrlm_property_write_shutdown_time(guchar *data, guchar length);
 static void     ctrlm_property_read_shutdown_time(void);
 static void     control_service_values_read_from_db();
+static void     ctrlm_check_for_key_tag(int key_tag);
 
 #if CTRLM_HAL_RF4CE_API_VERSION >= 9
 static void ctrlm_crash_recovery_check();
@@ -533,10 +518,10 @@ int main(int argc, char *argv[]) {
    g_ctrlm.has_service_access_token       = false;
    sem_init(&g_ctrlm.service_access_token_semaphore, 0, 1);
 
-   g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_UNKNOWN;
+   g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_UNKNOWN;
    g_ctrlm.last_key_info.is_screen_bind_mode  = false;
    g_ctrlm.last_key_info.remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_INVALID;
-   strncpy(g_ctrlm.last_key_info.source_name, ctrlm_remote_types[g_ctrlm.last_key_info.last_ir_remote_type], CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+   strncpy(g_ctrlm.last_key_info.source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
    g_ctrlm.last_key_info.source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME-1] = '\0';
 
    g_ctrlm.discovery_remote_type[0] = '\0';
@@ -3905,11 +3890,12 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
       IARM_Bus_IRMgr_EventData_t *ir_event_data           = (IARM_Bus_IRMgr_EventData_t*)data;
       int key_code                                        = ir_event_data->data.irkey.keyCode;
       int key_src                                         = ir_event_data->data.irkey.keySrc;
+      int key_tag                                         = ir_event_data->data.irkey.keyTag;
       int controller_id                                   = ir_event_data->data.irkey.keySourceId;
       bool need_to_update_db                              = false;
       bool need_to_update_last_key_info                   = false;
       bool send_on_control_event                          = false;
-      ctrlm_remote_type old_remote_type                   = g_ctrlm.last_key_info.last_ir_remote_type;
+      ctrlm_ir_remote_type old_remote_type                = g_ctrlm.last_key_info.last_ir_remote_type;
       ctrlm_remote_keypad_config old_remote_keypad_config = g_ctrlm.last_key_info.remote_keypad_config;
       guchar last_source_type                             = g_ctrlm.last_key_info.source_type;
       gboolean  write_last_key_info                       = false;
@@ -3927,16 +3913,6 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          return;
       }
 
-      if(key_src == IARM_BUS_IRMGR_KEYSRC_RF) {
-         ctrlm_controller_product_name_get(controller_id, source_name);
-         remote_keypad_config = ctrlm_get_remote_keypad_config(source_name);
-      } else {
-         remote_keypad_config = g_ctrlm.last_key_info.remote_keypad_config;
-         controller_id = -1;
-         strncpy(source_name, ctrlm_remote_types[g_ctrlm.last_key_info.last_ir_remote_type], CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
-         source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
-      }
-
       //Check for day change
       need_to_update_db = ctrlm_main_handle_day_change_ir_remote_usage();
 
@@ -3946,15 +3922,12 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          return;
       }
 
-      LOG_INFO("%s: Got IARM_BUS_IRMGR_EVENT_CONTROL event, controller_id <%d>, controlCode <0x%02X>, src <%d>.\n",
-                  __FUNCTION__, controller_id, (unsigned int)key_code, key_src);
-
       switch(key_code) {
          case KED_XR2V3:
          case KED_XR5V2:
          case KED_XR11V1:
          case KED_XR11V2: {
-            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_XR11;
+            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR11V2;
             g_ctrlm.last_key_info.remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_SETUP_KEY_WITH_NUMBER_KEYS;
             g_ctrlm.last_key_info.source_type          = IARM_BUS_IRMGR_KEYSRC_IR;
             g_ctrlm.last_key_info.is_screen_bind_mode  = false;
@@ -3962,7 +3935,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
             data                                       = std::to_string(g_ctrlm.last_key_info.remote_keypad_config);
             send_on_control_event                      = true;
             need_to_update_last_key_info               = true;
-            strncpy(source_name, ctrlm_remote_types[g_ctrlm.last_key_info.last_ir_remote_type], CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+            strncpy(source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
             source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
             switch(key_code) {
                case KED_XR2V3:
@@ -3989,7 +3962,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          }
 
          case KED_XR11_NOTIFY:
-            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_XR11;
+            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR11V2;
             g_ctrlm.last_key_info.remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_SETUP_KEY_WITH_NUMBER_KEYS;
             g_ctrlm.last_key_info.source_type          = IARM_BUS_IRMGR_KEYSRC_IR;
             g_ctrlm.last_key_info.is_screen_bind_mode  = false;
@@ -4001,7 +3974,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
             }
             break;
          case KED_XR15V1_NOTIFY:
-            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_XR15;
+            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR15V1;
             g_ctrlm.last_key_info.remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_NO_SETUP_KEY_WITH_NUMBER_KEYS;
             g_ctrlm.last_key_info.source_type          = IARM_BUS_IRMGR_KEYSRC_IR;
             LOG_INFO("%s: Received KED_XR15V1_NOTIFY\n", __FUNCTION__);
@@ -4011,7 +3984,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
             }
             break;
          case KED_XR16V1_NOTIFY:
-            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_REMOTE_TYPE_NA;
+            g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_NA;
             g_ctrlm.last_key_info.remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_HAS_NO_SETUP_KEY_WITH_NO_NUMBER_KEYS;
             g_ctrlm.last_key_info.source_type          = IARM_BUS_IRMGR_KEYSRC_IR;
             LOG_INFO("%s: Received KED_XR16V1_NOTIFY\n", __FUNCTION__);
@@ -4036,18 +4009,31 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
             send_on_control_event        = true;
             need_to_update_last_key_info = true;
             type                         = "TV";
-            data                         = std::to_string(remote_keypad_config);
             break;
          }
          case KED_PUSH_TO_TALK:
             send_on_control_event        = true;
             need_to_update_last_key_info = true;
             type                         = "mic";
-            data                         = std::to_string(remote_keypad_config);
             break;
          default:
             break;
       }
+	  
+      if(key_src == IARM_BUS_IRMGR_KEYSRC_RF) {
+         ctrlm_controller_product_name_get(controller_id, source_name);
+         remote_keypad_config = ctrlm_get_remote_keypad_config(source_name);
+      } else {
+         remote_keypad_config = g_ctrlm.last_key_info.remote_keypad_config;
+         controller_id = -1;
+         //Check to see if the tag was included.  If so, use it.
+         ctrlm_check_for_key_tag(key_tag);
+         strncpy(source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+         source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+      }
+
+      LOG_INFO("%s: Got IARM_BUS_IRMGR_EVENT_CONTROL event, controller_id <%d>, controlCode <0x%02X>, src <%d>.\n",
+                  __FUNCTION__, controller_id, (unsigned int)key_code, key_src);
 
       //Only save the last key info to the db if the source type (IR or RF) or the source name (XR11, XR15) have changed
       //It's not worth the writes to the db for every key.  It is important to know if we are IR/RF and XR11/XR15
@@ -4056,7 +4042,8 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
       }
 
       if(send_on_control_event) {
-            ctrlm_rcu_iarm_event_control(controller_id, key_source_names[key_src], type.c_str(), data.c_str(), key_code, 0);
+         data = std::to_string(remote_keypad_config);
+         ctrlm_rcu_iarm_event_control(controller_id, key_source_names[key_src], type.c_str(), data.c_str(), key_code, 0);
       }
 
       if(need_to_update_last_key_info) {
@@ -4073,6 +4060,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
       IARM_Bus_IRMgr_EventData_t *ir_event_data = (IARM_Bus_IRMgr_EventData_t*)data;
       int      key_code                              = ir_event_data->data.irkey.keyCode;
       int      key_src                               = ir_event_data->data.irkey.keySrc;
+      int      key_tag                               = ir_event_data->data.irkey.keyTag;
       int      controller_id                         = ir_event_data->data.irkey.keySourceId;
       guchar   last_source_type                      = g_ctrlm.last_key_info.source_type;
       gboolean  write_last_key_info                  = false;
@@ -4100,7 +4088,9 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          ctrlm_controller_product_name_get(controller_id, source_name);
       } else {
          controller_id = -1;
-         strncpy(source_name, ctrlm_remote_types[g_ctrlm.last_key_info.last_ir_remote_type], CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+         //Check to see if the tag was included.  If so, use it.
+         ctrlm_check_for_key_tag(key_tag);
+         strncpy(source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
          source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
       }
 
@@ -4117,6 +4107,47 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
       }
 
       ctrlm_update_last_key_info(controller_id, key_src, key_code, source_name, g_ctrlm.last_key_info.is_screen_bind_mode, write_last_key_info);
+   }
+}
+
+void ctrlm_check_for_key_tag(int key_tag) {
+   switch(key_tag) {
+      case XMP_TAG_PLATCO: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_PLATCO;
+         break;
+      }
+      case XMP_TAG_XR11V2: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR11V2;
+         break;
+      }
+      case XMP_TAG_XR15V1: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR15V1;
+         break;
+      }
+      case XMP_TAG_XR15V2: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR15V2;
+         break;
+      }
+      case XMP_TAG_XR16V1: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR16V1;
+         break;
+      }
+      case XMP_TAG_XRAV1: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XRAV1;
+         break;
+      }
+      case XMP_TAG_XR20V1: {
+         g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_XR20V1;
+         break;
+      }
+      case XMP_TAG_COMCAST:
+      case XMP_TAG_UNDEFINED:
+      default: {
+         break;
+      }
+   }
+   if(key_tag != XMP_TAG_COMCAST) {
+      LOG_INFO("%s: key_tag <%s>\n", __FUNCTION__, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type));
    }
 }
 

@@ -582,6 +582,23 @@ const char *ctrlm_rcu_controller_type_str(ctrlm_rcu_controller_type_t controller
    return(ctrlm_invalid_return(controller_type));
 }
 
+const char *ctrlm_rcu_ir_remote_types_str(ctrlm_ir_remote_type controller_type) {
+   switch(controller_type) {
+      case CTRLM_IR_REMOTE_TYPE_XR11V2:    return("XR11-20");
+      case CTRLM_IR_REMOTE_TYPE_XR15V1:    return("XR15-10");
+      case CTRLM_IR_REMOTE_TYPE_NA:        return("N/A");
+      case CTRLM_IR_REMOTE_TYPE_UNKNOWN:   return("unknown");
+      case CTRLM_IR_REMOTE_TYPE_COMCAST:   return("COMCAST");
+      case CTRLM_IR_REMOTE_TYPE_PLATCO:    return("PLATCO");
+      case CTRLM_IR_REMOTE_TYPE_XR15V2:    return("XR15-20");
+      case CTRLM_IR_REMOTE_TYPE_XR16V1:    return("XR16-10");
+      case CTRLM_IR_REMOTE_TYPE_XRAV1:     return("XRAV-10");
+      case CTRLM_IR_REMOTE_TYPE_XR20V1:    return("XR20-10");
+      case CTRLM_IR_REMOTE_TYPE_UNDEFINED: return("UNDEFINED");
+   }
+   return(ctrlm_invalid_return(controller_type));
+}
+
 const char *ctrlm_rcu_reverse_cmd_result_str(ctrlm_rcu_reverse_cmd_result_t result) {
    switch(result) {
       case CTRLM_RCU_REVERSE_CMD_SUCCESS:                return("SUCCESS");
