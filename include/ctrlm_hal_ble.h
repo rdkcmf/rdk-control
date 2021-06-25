@@ -89,6 +89,7 @@ typedef enum {
    CTRLM_HAL_BLE_PROPERTY_UPGRADE_PROGRESS,
    CTRLM_HAL_BLE_PROPERTY_UNPAIR_REASON,
    CTRLM_HAL_BLE_PROPERTY_REBOOT_REASON,
+   CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY,
    CTRLM_HAL_BLE_PROPERTY_UNKNOWN
 } ctrlm_hal_ble_RcuProperty_t;
 /// @}
@@ -119,7 +120,7 @@ typedef struct {
    int                           upgrade_progress;
    ctrlm_ble_RcuUnpairReason_t   unpair_reason;
    ctrlm_ble_RcuRebootReason_t   reboot_reason;
-
+   uint8_t                       last_wakeup_key;
 } ctrlm_hal_ble_rcu_data_t;
 
 typedef struct {
@@ -209,6 +210,10 @@ typedef struct {
    unsigned long long            ieee_address;
    ctrlm_ble_RcuRebootReason_t   reason;
 } ctrlm_hal_ble_GetRcuRebootReason_params_t;
+typedef struct {
+   unsigned long long            ieee_address;
+   uint8_t                       key;
+} ctrlm_hal_ble_GetRcuLastWakeupKey_params_t;
 typedef struct {
    unsigned long long      ieee_address;
    ctrlm_ble_RcuAction_t   action;
@@ -318,6 +323,10 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_GetRcuUnpairReason_t)(ctrlm_hal_b
 /// @param[in] ieee_address - MAC address of the controller
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_GetRcuRebootReason_t)(ctrlm_hal_ble_GetRcuRebootReason_params_t *params);
 
+/// @brief Read the last key press characteristic from the RCU
+/// @param[in] ieee_address - MAC address of the controller
+typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_GetRcuLastWakeupKey_t)(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params);
+
 /// @brief Send an action for the RCU to perform
 /// @param[in] ieee_address - MAC address of the controller
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_SendRcuAction_t)(ctrlm_hal_ble_SendRcuAction_params_t params);
@@ -335,30 +344,31 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_HandleDeepsleep_t)(ctrlm_hal_ble_
 /// @brief BLE Confirm Init Parameters Structure
 /// @details The structure which is passed from the HAL Network device in the BLE initialization confirmation.
 typedef struct {
-   ctrlm_hal_result_t                     result;
-   char                                   version[CTRLM_HAL_NETWORK_VERSION_STRING_SIZE];
-   ctrlm_hal_req_term_t                   term;
-   ctrlm_hal_req_property_get_t           property_get;                                   ///< Network Property Get Request
-   ctrlm_hal_req_property_set_t           property_set;                                   ///< Network Property Set Request
-   ctrlm_hal_ble_req_StartThreads_t       start_threads;
-   ctrlm_hal_ble_req_GetDevices_t         get_devices;
-   ctrlm_hal_ble_req_GetAllRcuProps_t     get_all_rcu_props;
-   ctrlm_hal_ble_req_StartDiscovery_t     start_discovery;
-   ctrlm_hal_ble_req_PairWithCode_t       pair_with_code;
-   ctrlm_hal_ble_req_Unpair_t             unpair;
-   ctrlm_hal_ble_req_StartAudioStream_t   start_audio_stream;
-   ctrlm_hal_ble_req_StopAudioStream_t    stop_audio_stream;
-   ctrlm_hal_ble_req_GetAudioStats_t      get_audio_stats;
-   ctrlm_hal_ble_req_IRSetCode_t          set_ir_codes;
-   ctrlm_hal_ble_req_IRClear_t            clear_ir_codes;
-   ctrlm_hal_ble_req_FindMe_t             find_me;
-   ctrlm_hal_ble_req_GetDaemonLogLevels_t get_daemon_log_levels;
-   ctrlm_hal_ble_req_SetDaemonLogLevels_t set_daemon_log_levels;
-   ctrlm_hal_ble_req_FwUpgrade_t          fw_upgrade;
-   ctrlm_hal_ble_req_GetRcuUnpairReason_t get_rcu_unpair_reason;
-   ctrlm_hal_ble_req_GetRcuRebootReason_t get_rcu_reboot_reason;
-   ctrlm_hal_ble_req_SendRcuAction_t      send_rcu_action;
-   ctrlm_hal_ble_req_HandleDeepsleep_t    handle_deepsleep;
+   ctrlm_hal_result_t                      result;
+   char                                    version[CTRLM_HAL_NETWORK_VERSION_STRING_SIZE];
+   ctrlm_hal_req_term_t                    term;
+   ctrlm_hal_req_property_get_t            property_get;                                   ///< Network Property Get Request
+   ctrlm_hal_req_property_set_t            property_set;                                   ///< Network Property Set Request
+   ctrlm_hal_ble_req_StartThreads_t        start_threads;
+   ctrlm_hal_ble_req_GetDevices_t          get_devices;
+   ctrlm_hal_ble_req_GetAllRcuProps_t      get_all_rcu_props;
+   ctrlm_hal_ble_req_StartDiscovery_t      start_discovery;
+   ctrlm_hal_ble_req_PairWithCode_t        pair_with_code;
+   ctrlm_hal_ble_req_Unpair_t              unpair;
+   ctrlm_hal_ble_req_StartAudioStream_t    start_audio_stream;
+   ctrlm_hal_ble_req_StopAudioStream_t     stop_audio_stream;
+   ctrlm_hal_ble_req_GetAudioStats_t       get_audio_stats;
+   ctrlm_hal_ble_req_IRSetCode_t           set_ir_codes;
+   ctrlm_hal_ble_req_IRClear_t             clear_ir_codes;
+   ctrlm_hal_ble_req_FindMe_t              find_me;
+   ctrlm_hal_ble_req_GetDaemonLogLevels_t  get_daemon_log_levels;
+   ctrlm_hal_ble_req_SetDaemonLogLevels_t  set_daemon_log_levels;
+   ctrlm_hal_ble_req_FwUpgrade_t           fw_upgrade;
+   ctrlm_hal_ble_req_GetRcuUnpairReason_t  get_rcu_unpair_reason;
+   ctrlm_hal_ble_req_GetRcuRebootReason_t  get_rcu_reboot_reason;
+   ctrlm_hal_ble_req_GetRcuLastWakeupKey_t get_rcu_last_wakeup_key;
+   ctrlm_hal_ble_req_SendRcuAction_t       send_rcu_action;
+   ctrlm_hal_ble_req_HandleDeepsleep_t     handle_deepsleep;
 } ctrlm_hal_ble_cfm_init_params_t;
 
 /// @brief Network Init Confirmation Function

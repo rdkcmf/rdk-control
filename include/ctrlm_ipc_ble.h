@@ -93,6 +93,14 @@ typedef struct {
 } ctrlm_iarm_call_GetRcuRebootReason_params_t;
 
 typedef struct {
+   unsigned char                 api_revision;
+   ctrlm_network_id_t            network_id;
+   ctrlm_controller_id_t         controller_id;
+   uint8_t                       key;
+   ctrlm_iarm_call_result_t      result;
+} ctrlm_iarm_call_GetRcuLastWakeupKey_params_t;
+
+typedef struct {
    unsigned char              api_revision;
    ctrlm_network_id_t         network_id;
    ctrlm_controller_id_t      controller_id;
@@ -111,6 +119,7 @@ typedef struct {
 
 #define CTRLM_BLE_IARM_CALL_GET_RCU_UNPAIR_REASON  "Ble_GetRcuUnpairReason"
 #define CTRLM_BLE_IARM_CALL_GET_RCU_REBOOT_REASON  "Ble_GetRcuRebootReason"
+#define CTRLM_BLE_IARM_CALL_GET_LAST_WAKEUP_KEY    "Ble_GetRcuLastWakeupKey"
 #define CTRLM_BLE_IARM_CALL_SEND_RCU_ACTION        "Ble_SendRcuAction"
 
 #endif   //_CTRLM_IPC_BTREMOTE_H_

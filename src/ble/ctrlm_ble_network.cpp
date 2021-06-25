@@ -232,25 +232,26 @@ void ctrlm_obj_network_ble_t::hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t p
    version_               = params.version;
    state_                 = CTRLM_BLE_STATE_IDLE;
 
-   hal_api_start_threads_         = params.start_threads;
-   hal_api_get_devices_           = params.get_devices;
-   hal_api_get_all_rcu_props_     = params.get_all_rcu_props;
-   hal_api_discovery_start_       = params.start_discovery;
-   hal_api_pair_with_code_        = params.pair_with_code;
-   hal_api_unpair_                = params.unpair;
-   hal_api_start_audio_stream_    = params.start_audio_stream;
-   hal_api_stop_audio_stream_     = params.stop_audio_stream;
-   hal_api_get_audio_stats_       = params.get_audio_stats;
-   hal_api_set_ir_codes_          = params.set_ir_codes;
-   hal_api_clear_ir_codes_        = params.clear_ir_codes;
-   hal_api_find_me_               = params.find_me;
-   hal_api_get_daemon_log_levels_ = params.get_daemon_log_levels;
-   hal_api_set_daemon_log_levels_ = params.set_daemon_log_levels;
-   hal_api_fw_upgrade_            = params.fw_upgrade;
-   hal_api_get_rcu_unpair_reason_ = params.get_rcu_unpair_reason;
-   hal_api_get_rcu_reboot_reason_ = params.get_rcu_reboot_reason;
-   hal_api_send_rcu_action_       = params.send_rcu_action;
-   hal_api_handle_deepsleep_      = params.handle_deepsleep;
+   hal_api_start_threads_           = params.start_threads;
+   hal_api_get_devices_             = params.get_devices;
+   hal_api_get_all_rcu_props_       = params.get_all_rcu_props;
+   hal_api_discovery_start_         = params.start_discovery;
+   hal_api_pair_with_code_          = params.pair_with_code;
+   hal_api_unpair_                  = params.unpair;
+   hal_api_start_audio_stream_      = params.start_audio_stream;
+   hal_api_stop_audio_stream_       = params.stop_audio_stream;
+   hal_api_get_audio_stats_         = params.get_audio_stats;
+   hal_api_set_ir_codes_            = params.set_ir_codes;
+   hal_api_clear_ir_codes_          = params.clear_ir_codes;
+   hal_api_find_me_                 = params.find_me;
+   hal_api_get_daemon_log_levels_   = params.get_daemon_log_levels;
+   hal_api_set_daemon_log_levels_   = params.set_daemon_log_levels;
+   hal_api_fw_upgrade_              = params.fw_upgrade;
+   hal_api_get_rcu_unpair_reason_   = params.get_rcu_unpair_reason;
+   hal_api_get_rcu_reboot_reason_   = params.get_rcu_reboot_reason;
+   hal_api_get_rcu_last_wakeup_key_ = params.get_rcu_last_wakeup_key;
+   hal_api_send_rcu_action_         = params.send_rcu_action;
+   hal_api_handle_deepsleep_        = params.handle_deepsleep;
 
    // Unblock the caller of hal_init
    g_mutex_lock(&mutex_);
@@ -789,6 +790,42 @@ void ctrlm_obj_network_ble_t::req_process_get_rcu_reboot_reason(void *data, int 
    }
 }
 
+void ctrlm_obj_network_ble_t::req_process_get_rcu_last_wakeup_key(void *data, int size) {
+   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   THREAD_ID_VALIDATE();
+   ctrlm_main_queue_msg_get_last_wakeup_key_t *dqm = (ctrlm_main_queue_msg_get_last_wakeup_key_t *)data;
+
+   g_assert(dqm);
+   g_assert(size == sizeof(ctrlm_main_queue_msg_get_last_wakeup_key_t));
+
+   dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR;
+
+   if (!ready_) {
+      LOG_FATAL("%s: Network is not ready!\n", __PRETTY_FUNCTION__);
+   } else {
+      ctrlm_controller_id_t controller_id = dqm->params->controller_id;
+
+      if (!controller_exists(controller_id)) {
+         LOG_ERROR("%s: Controller doesn't exist!\n", __PRETTY_FUNCTION__);
+         dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR_INVALID_PARAMETER;
+      } else {
+         ctrlm_hal_ble_GetRcuLastWakeupKey_params_t params;
+         params.ieee_address = controllers_[controller_id]->getMacAddress();
+         if (hal_api_get_rcu_last_wakeup_key_) {
+            if (CTRLM_HAL_RESULT_SUCCESS == hal_api_get_rcu_last_wakeup_key_(&params)) {
+               dqm->params->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+               dqm->params->key = params.key;
+            }
+         } else {
+            LOG_FATAL("%s: hal_api_get_rcu_last_wakeup_key_ is NULL!\n", __PRETTY_FUNCTION__);
+         }
+      }
+   }
+   if(dqm->semaphore) {
+      sem_post(dqm->semaphore);
+   }
+}
+
 void ctrlm_obj_network_ble_t::req_process_send_rcu_action(void *data, int size) {
    LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
@@ -1255,6 +1292,11 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   break;
                case CTRLM_HAL_BLE_PROPERTY_REBOOT_REASON:
                   LOG_INFO("%s: Controller (0x%llX) notified reason for rebooting = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, ctrlm_ble_reboot_reason_str(dqm->rcu_data.reboot_reason));
+                  report_status = false;
+                  print_status = false;
+                  break;
+               case CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY:
+                  LOG_INFO("%s: Controller (0x%llX) notified last wakeup key = <0x%X>\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.last_wakeup_key);
                   report_status = false;
                   print_status = false;
                   break;

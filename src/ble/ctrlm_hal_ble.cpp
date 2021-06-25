@@ -122,6 +122,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_pa
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_GetRcuUnpairReason_params_t *params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_GetRcuRebootReason_params_t *params);
+static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params);
 static void ctrlm_hal_ble_RcuAction_ResultCB(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_SendRcuAction(ctrlm_hal_ble_SendRcuAction_params_t params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_HandleDeepsleep(ctrlm_hal_ble_HandleDeepsleep_params_t params);
@@ -441,6 +442,7 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
         params.fw_upgrade = ctrlm_hal_ble_req_FwUpgrade;
         params.get_rcu_unpair_reason = ctrlm_hal_ble_req_GetRcuUnpairReason;
         params.get_rcu_reboot_reason = ctrlm_hal_ble_req_GetRcuRebootReason;
+        params.get_rcu_last_wakeup_key = ctrlm_hal_ble_req_GetRcuLastWakeupKey;
         params.send_rcu_action = ctrlm_hal_ble_req_SendRcuAction;
         params.handle_deepsleep = ctrlm_hal_ble_req_HandleDeepsleep;
 
@@ -1177,6 +1179,45 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_Get
 
     return ret;
 }
+static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params)
+{
+    LOG_INFO("%s: Enter...\n", __FUNCTION__);
+    ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
+
+    GVariant  *reply = NULL;
+    GError *error = NULL;
+    GDBusProxy *gdbus_proxy = NULL;
+
+    gdbus_proxy = g_dbus_proxy_new_for_bus_sync (   G_BUS_TYPE_SYSTEM,
+                                                    G_DBUS_PROXY_FLAGS_NONE,
+                                                    NULL,
+                                                    CTRLM_HAL_BLE_SKY_RCU_DBUS_NAME,
+                                                    ctrlm_ble_utils_BuildDBusDeviceObjectPath(CTRLM_HAL_BLE_SKY_RCU_DBUS_OBJECT_PATH_BASE, params->ieee_address).c_str(),
+                                                    CTRLM_HAL_BLE_SKY_RCU_DBUS_INTERFACE_PROPERTIES,
+                                                    NULL,
+                                                    &error );
+    if (NULL == gdbus_proxy) {
+        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
+        if (NULL != error) {
+            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
+        }
+        g_clear_error (&error);
+        return CTRLM_HAL_RESULT_ERROR;
+    } else {
+        if (CTRLM_HAL_RESULT_SUCCESS == (ret = ctrlm_hal_ble_GetDbusProperty(gdbus_proxy, CTRLM_HAL_BLE_SKY_RCU_DBUS_INTERFACE_DEVICE, "LastKeypress", &reply))) {
+            guint8 key_ = 0;
+            GVariant  *v = NULL;
+            g_variant_get (reply, "(v)", &v);
+            g_variant_get (v, "y", &key_);
+            params->key = key_;
+            if (NULL != v) { g_variant_unref(v); }
+        }
+    }
+    if (NULL != reply) { g_variant_unref(reply); }
+    g_object_unref(gdbus_proxy);
+
+    return ret;
+}
 
 static void ctrlm_hal_ble_RcuAction_ResultCB(GDBusProxy   *proxy,
                                              GAsyncResult *res,
@@ -1410,6 +1451,11 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         LOG_DEBUG("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
         rcu_status.rcu_data.reboot_reason = (ctrlm_ble_RcuRebootReason_t)char_variant;
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_REBOOT_REASON;
+    } else if (0 == prop.compare("LastKeypress")) {
+        g_variant_get (value, "y", &char_variant);
+        LOG_DEBUG("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
+        rcu_status.rcu_data.last_wakeup_key = (uint8_t)char_variant;
+        rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY;
     } else {
         LOG_WARN("%s: Item '%s' with type '%s' is unhandled signal!!!!!!!\n", __FUNCTION__, prop.c_str(), g_variant_get_type_string (value));
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_UNKNOWN;
