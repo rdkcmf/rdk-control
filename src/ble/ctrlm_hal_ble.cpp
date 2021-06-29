@@ -844,6 +844,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_IRSetCode(ctrlm_hal_ble_IRSetCode_pa
                 key_code = CTRLM_HAL_BLE_IR_KEY_INPUT;
                 break;
             case CTRLM_KEY_CODE_TV_POWER:
+            case CTRLM_KEY_CODE_POWER_TOGGLE:
             case CTRLM_KEY_CODE_AVR_POWER_TOGGLE:
                 key_code = CTRLM_HAL_BLE_IR_KEY_POWER;
                 break;
