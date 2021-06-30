@@ -429,7 +429,12 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::configure_voice(void *data) {
     } else {
         json_t *obj = json_loads(call_data->payload, JSON_DECODE_FLAGS, NULL);
         if(obj) {
-            result = ctrlm_get_voice_obj()->voice_configure(obj, true);
+            ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+            if(voice_obj) {
+                result = voice_obj->voice_configure(obj, true);
+            } else {
+                LOG_ERROR("%s: Voice Object is NULL!\n", __FUNCTION__);
+            }
             json_decref(obj);
         } else {
             LOG_ERROR("%s: Invalid JSON\n", __FUNCTION__);
@@ -448,7 +453,12 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::set_voice_init(void *data) {
         result = false;
         ret = IARM_RESULT_INVALID_PARAM;
     } else {
-        result = ctrlm_get_voice_obj()->voice_init_set(call_data->payload);
+        ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+        if(voice_obj) {
+            result = voice_obj->voice_init_set(call_data->payload);
+        } else {
+            LOG_ERROR("%s: Voice Object is NULL!\n", __FUNCTION__);
+        }
         json_result_bool(result, call_data->result, sizeof(call_data->result));
     }
 
@@ -464,7 +474,12 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::send_voice_message(void *data) {
         result = false;
         ret = IARM_RESULT_INVALID_PARAM;
     } else {
-        result = ctrlm_get_voice_obj()->voice_message(call_data->payload);
+        ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+        if(voice_obj) {
+            result = voice_obj->voice_message(call_data->payload);
+        } else {
+            LOG_ERROR("%s: Voice Object is NULL!\n", __FUNCTION__);
+        }
         json_result_bool(result, call_data->result, sizeof(call_data->result));
     }
 
