@@ -1029,8 +1029,7 @@ void ctrlm_obj_network_ble_t::req_process_network_continue_upgrade(void *data, i
       for (auto const &upgrade_image : upgrade_images_) {
          for (auto &controller : controllers_) {
             if (controller.second->getControllerType() == upgrade_image.first) {
-               if (controller.second->swUpgradeRequired(upgrade_image.second.version_software) ||
-                   upgrade_image.second.force_update) {
+               if (controller.second->swUpgradeRequired(upgrade_image.second.version_software, upgrade_image.second.force_update)) {
                   additional_upgrades_required = true;
                   ctrlm_hal_ble_FwUpgrade_params_t params;
                   params.file_path = upgrade_image.second.path + "/" + upgrade_image.second.image_filename;

@@ -115,7 +115,7 @@ public:
    guchar                        property_read_irdb_entry_id_name_tv(guchar *data, guchar length);
    guchar                        property_read_irdb_entry_id_name_avr(guchar *data, guchar length);
 
-   bool                          swUpgradeRequired(ctrlm_version_t newVersion);
+   bool                          swUpgradeRequired(ctrlm_version_t newVersion, bool force);
 
    void                          setUpgradeAttempted(bool upgrade_attempted);
    bool                          getUpgradeAttempted(void);

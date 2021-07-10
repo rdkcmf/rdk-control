@@ -368,9 +368,12 @@ guchar ctrlm_obj_controller_ble_t::property_read_irdb_entry_id_name_avr(guchar *
    return(length);
 }
 
-bool ctrlm_obj_controller_ble_t::swUpgradeRequired(ctrlm_version_t newVersion) {
-   LOG_DEBUG("%s: Controller %u: current rev = <%s>, new rev = <%s>\n", __FUNCTION__, controller_id_get(), sw_revision_.toString().c_str(),newVersion.toString().c_str());
-   return ((sw_revision_.compare(newVersion) < 0) && !upgrade_attempted_);
+bool ctrlm_obj_controller_ble_t::swUpgradeRequired(ctrlm_version_t newVersion, bool force) {
+   LOG_DEBUG("%s: Controller %u: current rev = <%s>, new rev = <%s>, force = <%s>\n", __FUNCTION__, 
+         controller_id_get(), sw_revision_.toString().c_str(),newVersion.toString().c_str(), force ? "TRUE" : "FALSE");
+   int rev_compare = sw_revision_.compare(newVersion);
+   // Need a sw upgrade if the current version is older than the new version, or force flag is true and versions aren't equal
+   return ((rev_compare < 0) && !upgrade_attempted_) || (force && (rev_compare != 0));
 }
 
 void ctrlm_obj_controller_ble_t::setUpgradeAttempted(bool upgrade_attempted) {
