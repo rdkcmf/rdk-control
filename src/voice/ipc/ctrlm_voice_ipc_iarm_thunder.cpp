@@ -538,8 +538,9 @@ bool broadcast_event(const char *bus_name, int event, const char *str) {
     if(data) {
         IARM_Result_t result;
 
-        errno_t safec_rc = memset_s(data, size, 0, size);
-        ERR_CHK(safec_rc);
+        //Can't be replaced with safeC version of this
+        memset(data, 0, size);
+
         data->api_revision = CTRLM_VOICE_IARM_BUS_API_REVISION;
         //Can't be replaced with safeC version of this, as safeC string functions doesn't allow string size more than 4K
         sprintf(data->payload, "%s", str);
