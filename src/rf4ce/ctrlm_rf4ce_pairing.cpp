@@ -168,6 +168,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_stb(ctrlm_main_queue_msg_rf4ce_
    THREAD_ID_VALIDATE();
    ctrlm_hal_rf4ce_rsp_pair_params_t params;
    ctrlm_controller_id_t controller_id;
+   errno_t safec_rc = -1;
 #ifdef ASB
    bool asb = false;
    asb_key_derivation_method_t key_derivation_method = ASB_KEY_DERIVATION_NONE;
@@ -197,8 +198,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_stb(ctrlm_main_queue_msg_rf4ce_
    params.dst_ieee_addr          = dqm->params.src_ieee_addr;
    params.rec_app_capabilities   = 0x15;
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 12)
-   memset(params.rec_user_string, 0, 16);
-   strncpy((char *)params.rec_user_string, user_string_.c_str(), 9);
+   safec_rc = strncpy_s((char *)params.rec_user_string, sizeof(params.rec_user_string), user_string_.c_str(), 9);
+   ERR_CHK(safec_rc);
 #ifdef ASB
    if(asb) {
       params.rec_user_string[10] = key_derivation_method_get(dqm->params.org_user_string[10]);
@@ -230,11 +231,13 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_stb(ctrlm_main_queue_msg_rf4ce_
       // get user string from discovery request
       discovered_user_strings_t::const_iterator it = discovered_user_strings_.find(dqm->params.src_ieee_addr);
       if(it != discovered_user_strings_.cend()) {
-         strncpy(user_string, it->second.user_string, sizeof(user_string));
+         safec_rc = strncpy_s(user_string, sizeof(user_string), it->second.user_string, sizeof(user_string)-1);
+         ERR_CHK(safec_rc);
          discovered_user_strings_.erase(dqm->params.src_ieee_addr);
       } else if(dqm->params.org_user_string[0] != 0) {
          // if not available, grt user string from pairing request
-         strncpy(user_string, (const char*)dqm->params.org_user_string, sizeof(user_string));
+         safec_rc = strncpy_s(user_string, sizeof(user_string), (const char*)dqm->params.org_user_string, sizeof(user_string)-1);
+         ERR_CHK(safec_rc);
          user_string[CTRLM_HAL_RF4CE_USER_STRING_SIZE - 1] = '\0';
       }
       controller_user_string_set(params.controller_id, (guchar*)user_string);
@@ -291,8 +294,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_autobind(ctrlm_main_queue_msg_r
    params.dst_ieee_addr          = dqm->params.src_ieee_addr;
    params.rec_app_capabilities   = 0x15;
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 12)
-   memset(params.rec_user_string, 0, 16);
-   strncpy((char *)params.rec_user_string, user_string_.c_str(), 9);
+   errno_t safec_rc = strncpy_s((char *)params.rec_user_string, sizeof(params.rec_user_string), user_string_.c_str(), 9);
+   ERR_CHK(safec_rc);
 #ifdef ASB
    if(asb) {
       params.rec_user_string[10] = key_derivation_method_get(dqm->params.org_user_string[10]);
@@ -346,6 +349,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_binding_button(ctrlm_main_queue
    THREAD_ID_VALIDATE();
    ctrlm_hal_rf4ce_rsp_pair_params_t params;
    ctrlm_controller_id_t controller_id;
+   errno_t safec_rc = -1;
 #ifdef ASB
    bool asb = false;
    asb_key_derivation_method_t key_derivation_method = ASB_KEY_DERIVATION_NONE;
@@ -374,8 +378,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_binding_button(ctrlm_main_queue
    params.dst_ieee_addr          = dqm->params.src_ieee_addr;
    params.rec_app_capabilities   = 0x15;
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 12)
-   memset(params.rec_user_string, 0, 16);
-   strncpy((char *)params.rec_user_string, user_string_.c_str(), 9);
+   safec_rc = strncpy_s((char *)params.rec_user_string, sizeof(params.rec_user_string), user_string_.c_str(), 9);
+   ERR_CHK(safec_rc);
 #ifdef ASB
    if(asb) {
       params.rec_user_string[10] = key_derivation_method_get(dqm->params.org_user_string[10]);
@@ -407,11 +411,13 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_binding_button(ctrlm_main_queue
       // get user string from discovery request
       discovered_user_strings_t::const_iterator it = discovered_user_strings_.find(dqm->params.src_ieee_addr);
       if(it != discovered_user_strings_.cend()) {
-         strncpy(user_string, it->second.user_string, sizeof(user_string));
+         safec_rc = strncpy_s(user_string, sizeof(user_string), it->second.user_string, sizeof(user_string)-1);
+         ERR_CHK(safec_rc);
          discovered_user_strings_.erase(dqm->params.src_ieee_addr);
       } else if(dqm->params.org_user_string[0] != 0) {
          // if not available, grt user string from pairing request
-         strncpy(user_string, (const char*)dqm->params.org_user_string, sizeof(user_string));
+         safec_rc = strncpy_s(user_string, sizeof(user_string), (const char*)dqm->params.org_user_string, sizeof(user_string)-1);
+         ERR_CHK(safec_rc);
          user_string[CTRLM_HAL_RF4CE_USER_STRING_SIZE - 1] = '\0';
       }
       controller_user_string_set(params.controller_id, (guchar*)user_string);
@@ -469,8 +475,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair_screen_bind(ctrlm_main_queue_ms
    params.dst_ieee_addr          = dqm->params.src_ieee_addr;
    params.rec_app_capabilities   = 0x15;
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 12)
-   memset(params.rec_user_string, 0, 16);
-   strncpy((char *)params.rec_user_string, user_string_.c_str(), 9);
+   errno_t safec_rc = strncpy_s((char *)params.rec_user_string, sizeof(params.rec_user_string), user_string_.c_str(), 9);
+   ERR_CHK(safec_rc);
 #ifdef ASB
    if(asb) {
       params.rec_user_string[10] = key_derivation_method_get(dqm->params.org_user_string[10]);

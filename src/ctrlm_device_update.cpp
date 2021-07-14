@@ -796,6 +796,7 @@ void ctrlm_device_update_process_device_file(string file_path_archive, string de
             // HACK FOR XR15-704
 #ifdef CTRLM_NETWORK_RF4CE
             // Firmware Notify message
+	    errno_t safec_rc = -1;
             ctrlm_main_queue_msg_notify_firmware_t *msg = (ctrlm_main_queue_msg_notify_firmware_t *)g_malloc(sizeof(ctrlm_main_queue_msg_notify_firmware_t));
             if(NULL == msg) {
                LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
@@ -805,11 +806,14 @@ void ctrlm_device_update_process_device_file(string file_path_archive, string de
             msg->image_type        = image_info.image_type;
             msg->controller_type   = controller_type;
             msg->force_update      = image_info.force_update;
-            memcpy(&msg->version_software,       &image_info.version_software,       sizeof(version_software_t));
-            memcpy(&msg->version_bootloader_min, &image_info.version_bootloader_min, sizeof(version_software_t));
-            memcpy(&msg->version_hardware_min,   &image_info.version_hardware_min,   sizeof(version_hardware_t));
+            safec_rc = memcpy_s(&msg->version_software, sizeof(msg->version_software), &image_info.version_software, sizeof(version_software_t));
+            ERR_CHK(safec_rc);
+            safec_rc = memcpy_s(&msg->version_bootloader_min, sizeof(msg->version_bootloader_min), &image_info.version_bootloader_min, sizeof(version_software_t));
+            ERR_CHK(safec_rc);
+            safec_rc = memcpy_s(&msg->version_hardware_min, sizeof(msg->version_hardware_min), &image_info.version_hardware_min, sizeof(version_hardware_t));
+            ERR_CHK(safec_rc);
             ctrlm_main_queue_msg_push(msg);
-#endif        
+#endif
          }
       }
    }
@@ -1064,7 +1068,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
    gboolean           found   = false;
    rf4ce_device_update_image_info_t upgrade;
    upgrade.version = version_software;
-   
+   errno_t safec_rc = -1;
+
 #ifdef CTRLM_NETWORK_RF4CE
    LOG_INFO("%s: Controller type <%s> Current  image type <%s> theme <%s> hw ver <%u.%u.%u.%u> bldr ver <%u.%u.%u.%u> sw ver <%u.%u.%u.%u>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(type), ctrlm_rf4ce_device_update_image_type_str(image_type), ctrlm_rf4ce_device_update_audio_theme_str(audio_theme), version_hardware.manufacturer, version_hardware.model, version_hardware.hw_revision, version_hardware.lot_code,
          version_bootloader.major, version_bootloader.minor, version_bootloader.revision, version_bootloader.patch, version_software.major, version_software.minor, version_software.revision, version_software.patch);
@@ -1089,7 +1094,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                upgrade.crc          = it->crc;
                upgrade.force_update = true; // Themes are always force updates
                upgrade.do_not_load  = g_ctrlm_device_update.prefs.download.load_immediately ? false : true;
-               strncpy(upgrade.file_name, it->file_path_archive.c_str(), sizeof(upgrade.file_name));
+               safec_rc = strncpy_s(upgrade.file_name, sizeof(upgrade.file_name), it->file_path_archive.c_str(), sizeof(upgrade.file_name) - 1);
+               ERR_CHK(safec_rc);
                found = true;
 #ifdef CTRLM_NETWORK_RF4CE
                LOG_INFO("%s: Found AUDIO THEME <%s> sw version <%u.%u.%u.%u> id %u size %u crc 0x%08X\n", __FUNCTION__, ctrlm_rf4ce_device_update_audio_theme_str(audio_theme), it->version_software.major, it->version_software.minor, it->version_software.revision, it->version_software.patch, it->id, it->size, it->crc);
@@ -1123,7 +1129,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                upgrade.crc          = it->crc;
                upgrade.force_update = true;
                upgrade.do_not_load  = g_ctrlm_device_update.prefs.download.load_immediately ? false : true;
-               strncpy(upgrade.file_name, it->file_path_archive.c_str(), sizeof(upgrade.file_name));
+               safec_rc = strncpy_s(upgrade.file_name, sizeof(upgrade.file_name), it->file_path_archive.c_str(), sizeof(upgrade.file_name) - 1);
+               ERR_CHK(safec_rc);
                found = true;
                LOG_INFO("%s: Found FORCE UPDATE sw version <%u.%u.%u.%u> id %u size %u crc 0x%08X\n", __FUNCTION__, it->version_software.major, it->version_software.minor, it->version_software.revision, it->version_software.patch, it->id, it->size, it->crc);
             } else {
@@ -1138,7 +1145,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                upgrade.crc          = it->crc;
                upgrade.force_update = false;
                upgrade.do_not_load  = g_ctrlm_device_update.prefs.download.load_immediately ? false : true;
-               strncpy(upgrade.file_name, it->file_path_archive.c_str(), sizeof(upgrade.file_name));
+               safec_rc = strncpy_s(upgrade.file_name, sizeof(upgrade.file_name), it->file_path_archive.c_str(), sizeof(upgrade.file_name) - 1);
+               ERR_CHK(safec_rc);
                found = true;
                LOG_INFO("%s: Found sw version <%u.%u.%u.%u> id %u size %u crc 0x%08X\n", __FUNCTION__, it->version_software.major, it->version_software.minor, it->version_software.revision, it->version_software.patch, it->id, it->size, it->crc);
             } else {
@@ -1148,6 +1156,7 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
          // The highest software version will always win regardless of the mix of force update and non-force update images
       }
    }
+   upgrade.file_name[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
 
    DEVICE_UPDATE_MUTEX_UNLOCK();
 
@@ -1234,7 +1243,9 @@ gboolean ctrlm_device_update_process_xconf_update(string fileLocation) {
    }
 
    data->header.type = DEVICE_UPDATE_QUEUE_MSG_TYPE_PROCESS_XCONF;
-   strncpy(data->update_file_name,fileLocation.c_str(),CTRLM_DEVICE_UPDATE_PATH_LENGTH);
+   errno_t safec_rc = strncpy_s(data->update_file_name, sizeof(data->update_file_name), fileLocation.c_str(), CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1);
+   ERR_CHK(safec_rc);
+   data->update_file_name[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
 
    ctrlm_device_update_queue_msg_push((gpointer) data);
 
@@ -1359,9 +1370,15 @@ gpointer ctrlm_device_update_thread(gpointer param) {
             bool network_managing_upgrade = false;
 
             ctrlm_main_queue_msg_network_fw_upgrade_t msg;
-            memset(&msg, 0, sizeof(msg));
-            strncpy(msg.temp_dir_path, g_ctrlm_device_update.prefs.temp_file_path.c_str(), sizeof(msg.temp_dir_path));
-            strncpy(msg.archive_file_path, xconf_msg->update_file_name, sizeof(msg.archive_file_path));
+            errno_t safec_rc = -1;
+            safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+            ERR_CHK(safec_rc);
+            safec_rc = strncpy_s(msg.temp_dir_path, sizeof(msg.temp_dir_path), g_ctrlm_device_update.prefs.temp_file_path.c_str(), sizeof(msg.temp_dir_path) - 1);
+            ERR_CHK(safec_rc);
+	    msg.temp_dir_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
+            safec_rc = strncpy_s(msg.archive_file_path, sizeof(msg.archive_file_path), xconf_msg->update_file_name, sizeof(msg.archive_file_path) - 1);
+            ERR_CHK(safec_rc);
+	    msg.archive_file_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
             msg.semaphore = &semaphore;
             msg.network_managing_upgrade = &network_managing_upgrade;
 
@@ -1370,7 +1387,7 @@ gpointer ctrlm_device_update_thread(gpointer param) {
             // Wait for the result condition to be signaled
             sem_wait(&semaphore);
             sem_destroy(&semaphore);
-            
+
             if (!network_managing_upgrade) {
                ctrlm_device_update_process_device_file(xconf_msg->update_file_name, "", NULL);
                ctrlm_device_update_rf4ce_session_resume_check(g_ctrlm_device_update.sessions, false);
@@ -1573,7 +1590,8 @@ gpointer ctrlm_device_update_thread(gpointer param) {
 
 guint16 ctrlm_device_update_rf4ce_image_data_read(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint16 image_id, guint32 offset, guint16 length, guchar *data) {
    guint16 qty_read = 0;
-   
+   errno_t safec_rc = -1;
+
    // is image id valid?
    if(image_id >= g_ctrlm_device_update.rf4ce_images->size()) {
       LOG_ERROR("%s: Controller id %u Image not found %u\n", __FUNCTION__, controller_id, image_id);
@@ -1610,21 +1628,26 @@ guint16 ctrlm_device_update_rf4ce_image_data_read(ctrlm_network_id_t network_id,
 
    // Read the data
    if(offset >= session_info->offset_even && (offset + length) <= (session_info->offset_even + DEVICE_UPDATE_IMAGE_CHUNK_SIZE)) { // Data is in even chunk
-      memcpy(data, &session_info->chunk_even[offset - session_info->offset_even], length);
+      safec_rc = memcpy_s(data, length, &session_info->chunk_even[offset - session_info->offset_even], length);
+      ERR_CHK(safec_rc);
       qty_read = length;
    } else if(offset >= session_info->offset_odd && (offset + length) <= (session_info->offset_odd + DEVICE_UPDATE_IMAGE_CHUNK_SIZE)) { // Data is in odd chunk
-      memcpy(data, &session_info->chunk_odd[offset - session_info->offset_odd], length);
+      safec_rc = memcpy_s(data, length, &session_info->chunk_odd[offset - session_info->offset_odd], length);
+      ERR_CHK(safec_rc);
       qty_read = length;
    } else if(session_info->offset_odd  > session_info->offset_even && offset < session_info->offset_odd && (offset + length) > session_info->offset_even) { // Data crosses from even to odd
-      memcpy(data, &session_info->chunk_even[offset - session_info->offset_even], length);
+      safec_rc = memcpy_s(data, length, &session_info->chunk_even[offset - session_info->offset_even], length);
+      ERR_CHK(safec_rc);
       qty_read = length;
    } else if(session_info->offset_even > session_info->offset_odd  && offset < session_info->offset_even  && (offset + length) > session_info->offset_odd)  { // Data crosses from odd to even
       guint16 length_odd, length_even;
       length_odd  = session_info->offset_even - offset;
       length_even = length - length_odd;
       //LOG_INFO("%s: Odd to even crossing. length odd %u even %u\n", __FUNCTION__, length_odd, length_even);
-      memcpy(data, &session_info->chunk_odd[offset - session_info->offset_odd], length_odd);
-      memcpy(&data[length_odd], &session_info->chunk_even[0], length_even);
+      safec_rc = memcpy_s(data, length, &session_info->chunk_odd[offset - session_info->offset_odd], length_odd);
+      ERR_CHK(safec_rc);
+      safec_rc = memcpy_s(&data[length_odd], length, &session_info->chunk_even[0], length_even);
+      ERR_CHK(safec_rc);
       qty_read = length;
    } else {
       LOG_INFO("%s: Controller id %u: Data not found. offset odd <%u> even <%u> chunk size <%u> resume pending <%s>\n", __FUNCTION__, controller_id, session_info->offset_odd, session_info->offset_even, DEVICE_UPDATE_IMAGE_CHUNK_SIZE, session_info->resume_pending ? "YES" : "NO");
@@ -2059,22 +2082,26 @@ gboolean ctrlm_device_update_image_device_get_by_id(ctrlm_device_update_session_
 }
 
 void ctrlm_device_update_device_get_from_session(ctrlm_device_update_rf4ce_session_t *session, ctrlm_device_update_device_t *device) {
-   memset(device->name,               0, CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
-   memset(device->version_software,   0, CTRLM_DEVICE_UPDATE_VERSION_LENGTH);
-   memset(device->version_hardware,   0, CTRLM_DEVICE_UPDATE_VERSION_LENGTH);
-   memset(device->version_bootloader, 0, CTRLM_DEVICE_UPDATE_VERSION_LENGTH);
-   strncpy(device->name, session->device_name.c_str(), CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
-   snprintf(device->version_software,   CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  session->version_software.major,        session->version_software.minor,   session->version_software.revision,    session->version_software.patch);
-   snprintf(device->version_hardware,   CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  session->version_hardware.manufacturer, session->version_hardware.model,   session->version_hardware.hw_revision, session->version_hardware.lot_code);
-   snprintf(device->version_bootloader, CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  session->version_bootloader.major,      session->version_bootloader.minor, session->version_bootloader.revision,  session->version_bootloader.patch);
+   errno_t safec_rc = -1;
+   safec_rc = strncpy_s(device->name, sizeof(device->name), session->device_name.c_str(), CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH - 1);
+   ERR_CHK(safec_rc);
+   safec_rc = sprintf_s(device->version_software,   CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  session->version_software.major,        session->version_software.minor,   session->version_software.revision,    session->version_software.patch);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
+   safec_rc = sprintf_s(device->version_hardware,   CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  session->version_hardware.manufacturer, session->version_hardware.model,   session->version_hardware.hw_revision, session->version_hardware.lot_code);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
+   safec_rc = sprintf_s(device->version_bootloader, CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  session->version_bootloader.major,      session->version_bootloader.minor, session->version_bootloader.revision,  session->version_bootloader.patch);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
    device->name[CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH - 1]           = '\0';
-   device->version_software[CTRLM_DEVICE_UPDATE_VERSION_LENGTH - 1]   = '\0';
-   device->version_hardware[CTRLM_DEVICE_UPDATE_VERSION_LENGTH - 1]   = '\0';
-   device->version_bootloader[CTRLM_DEVICE_UPDATE_VERSION_LENGTH - 1] = '\0';
 }
 
 gboolean ctrlm_device_update_image_get_by_id(ctrlm_device_update_image_id_t image_id, ctrlm_device_update_image_t *image) {
-
+   errno_t safec_rc = -1;
    DEVICE_UPDATE_MUTEX_LOCK();
 
    if(image_id >= g_ctrlm_device_update.rf4ce_images->size() || image == NULL) {
@@ -2090,17 +2117,19 @@ gboolean ctrlm_device_update_image_get_by_id(ctrlm_device_update_image_id_t imag
    }
    image->force_update = image_info->force_update;
    image->image_size = image_info->size;
-   memset(image->device_name,     0, CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
-   memset(image->device_class,    0, CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
-   memset(image->image_version,   0, CTRLM_DEVICE_UPDATE_VERSION_LENGTH);
-   memset(image->image_file_path, 0, CTRLM_DEVICE_UPDATE_PATH_LENGTH);
-   strncpy(image->device_name,     image_info->device_name.c_str(), CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
-   strncpy(image->device_class,    "remotes", CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
-   snprintf(image->image_version, CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  image_info->version_software.major, image_info->version_software.minor, image_info->version_software.revision, image_info->version_software.patch);
-   strncpy(image->image_file_path, image_info->file_path_archive.c_str(), CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH);
+   safec_rc = strncpy_s(image->device_name,  sizeof(image->device_name),  image_info->device_name.c_str(), CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH - 1);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s(image->device_class, sizeof(image->device_class), "remotes");
+   ERR_CHK(safec_rc);
+   safec_rc = sprintf_s(image->image_version, CTRLM_DEVICE_UPDATE_VERSION_LENGTH, "%u.%u.%u.%u",  image_info->version_software.major, image_info->version_software.minor, image_info->version_software.revision, image_info->version_software.patch);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
+   safec_rc = strncpy_s(image->image_file_path, sizeof(image->image_file_path), image_info->file_path_archive.c_str(), CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH - 1);
+   ERR_CHK(safec_rc);
+
    image->device_name[CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH - 1]  = '\0';
-   image->device_class[CTRLM_DEVICE_UPDATE_DEVICE_NAME_LENGTH - 1] = '\0';
-   image->image_version[CTRLM_DEVICE_UPDATE_VERSION_LENGTH - 1]    = '\0';
+
    image->image_file_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1]     = '\0';
 
    DEVICE_UPDATE_MUTEX_UNLOCK();
@@ -2293,7 +2322,8 @@ void ctrlm_device_update_check_for_update_file_delete(ctrlm_device_update_image_
    LOG_INFO("%s: checking delete image type %d\n", __FUNCTION__,image_info->image_type);
    msg->update_type=image_info->image_type;
    LOG_INFO("%s: checking delete file archive %s\n", __FUNCTION__,image_info->file_path_archive.c_str());
-   strncpy(msg->file_path_archive,image_info->file_path_archive.c_str(),sizeof(msg->file_path_archive));
+   errno_t safec_rc = strncpy_s(msg->file_path_archive,sizeof(msg->file_path_archive), image_info->file_path_archive.c_str(),sizeof(msg->file_path_archive) - 1);
+   ERR_CHK(safec_rc);
    LOG_INFO("%s: checking delete line %d\n", __FUNCTION__,__LINE__);
    msg->update_version=image_info->version_software;
    LOG_INFO("%s: sending update file check msg for %s\n", __FUNCTION__,image_info->file_path_archive.c_str());
@@ -2321,7 +2351,10 @@ string ctrlm_device_update_get_software_version(guint16 image_id){
    if(image_id < g_ctrlm_device_update.rf4ce_images->size()){
       ctrlm_device_update_rf4ce_image_info_t *image_info = &(*g_ctrlm_device_update.rf4ce_images)[image_id];
       version_software_t version = image_info->version_software;
-      snprintf(sw_version, DEVICE_UPDATE_SOFTWARE_VERSION_LENGTH, "<%u.%u.%u.%u>", version.major, version.minor, version.revision, version.patch);
+      errno_t safec_rc = sprintf_s(sw_version, DEVICE_UPDATE_SOFTWARE_VERSION_LENGTH, "<%u.%u.%u.%u>", version.major, version.minor, version.revision, version.patch);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
    }
 
    return string(sw_version);

@@ -76,13 +76,16 @@ void *ctrlm_hal_rf4ce_main(ctrlm_hal_rf4ce_main_init_t *main_init_) {
 
    LOG_INFO("%s: STUB, Network id: %u\n", __FUNCTION__, (unsigned)main_init.network_id);
 
-   memcpy(&main_init, main_init_, sizeof (ctrlm_hal_rf4ce_main_init_t));
+   errno_t safec_rc = memcpy_s(&main_init, sizeof(ctrlm_hal_rf4ce_main_init_t), main_init_,sizeof (ctrlm_hal_rf4ce_main_init_t));
+   ERR_CHK(safec_rc);
 
    if (main_init.cfm_init != 0) {
       ctrlm_hal_rf4ce_cfm_init_params_t params;
       params.result = CTRLM_HAL_RESULT_SUCCESS;
-      strcpy(params.version,"0.0.0.0");
-      strcpy(params.chipset,"generic");
+      safec_rc = strcpy_s(params.version, sizeof(params.version), "0.0.0.0");
+      ERR_CHK(safec_rc);
+      safec_rc = strcpy_s(params.chipset, sizeof(params.chipset), "generic");
+      ERR_CHK(safec_rc);
       params.pan_id = 0;
       params.ieee_address = 0;
       params.short_address = 0;

@@ -467,9 +467,8 @@ IARM_Result_t ctrlm_main_iarm_call_audio_capture_start(void *arg) {
    msg->header.type       = CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_START;
    msg->header.network_id = CTRLM_MAIN_NETWORK_ID_INVALID;
    msg->container         = capture_start->container;
-   snprintf(msg->file_path, sizeof(msg->file_path), "%s", capture_start->file_path);
-   msg->raw_mic_enable    = (capture_start->raw_mic_enable) ? true : false;
-   ctrlm_main_queue_msg_push(msg);
+   errno_t safec_rc = strcpy_s(msg->file_path, sizeof(msg->file_path), capture_start->file_path);
+   ERR_CHK(safec_rc);
 
    capture_start->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
 
@@ -765,7 +764,8 @@ IARM_Result_t ctrlm_main_iarm_call_voice_session_begin(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_voice_session_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -801,7 +801,8 @@ IARM_Result_t ctrlm_main_iarm_call_voice_session_end(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_voice_session_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -838,7 +839,8 @@ IARM_Result_t ctrlm_main_iarm_call_start_pairing(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_start_pairing_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -874,7 +876,8 @@ IARM_Result_t ctrlm_main_iarm_call_start_pair_with_code(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_pair_with_code_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -910,7 +913,8 @@ IARM_Result_t ctrlm_main_iarm_call_find_my_remote(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_find_my_remote_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -946,7 +950,8 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_status(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_get_rcu_status_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -1048,7 +1053,8 @@ IARM_Result_t ctrlm_main_iarm_call_last_keypress_get(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_get_last_keypress_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 

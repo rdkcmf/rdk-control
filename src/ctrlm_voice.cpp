@@ -218,7 +218,8 @@ void ctrlm_voice_init(json_t *json_obj_voice) {
 
    ctrlm_voice_server_ready_set(true);
 
-   memset(&g_ctrlm_voice.vrex_prefs.query_strings, 0, sizeof(ctrlm_voice_query_strings_t));
+   errno_t safec_rc = memset_s(&g_ctrlm_voice.vrex_prefs.query_strings, sizeof(ctrlm_voice_query_strings_t), 0, sizeof(ctrlm_voice_query_strings_t));
+   ERR_CHK(safec_rc);
 
    // Check to see if temp settings exist in case of crash
    if(FALSE == g_ctrlm_voice.vrex_prefs.force_voice_settings) {
@@ -419,7 +420,8 @@ void ctrlm_voice_load_temp_voice_settings() {
       return;
    }
 
-   memset(voice_settings, 0, sizeof(ctrlm_voice_iarm_call_settings_t));
+   errno_t safec_rc = memset_s(voice_settings, sizeof(ctrlm_voice_iarm_call_settings_t), 0, sizeof(ctrlm_voice_iarm_call_settings_t));
+   ERR_CHK(safec_rc);
    ctrlm_db_voice_settings_read((guchar **)&voice_settings, &length);
 
    if(sizeof(ctrlm_voice_iarm_call_settings_t) != length) {
@@ -454,14 +456,21 @@ gboolean ctrlm_req_voice_settings_update(const char *server_url_vrex, const char
       return(FALSE);
    }
 
-   memset(msg, 0, sizeof(ctrlm_main_queue_msg_voice_settings_update_t));
+   errno_t safec_rc = -1;
+   safec_rc = memset_s(msg, sizeof(ctrlm_main_queue_msg_voice_settings_update_t), 0, sizeof(ctrlm_main_queue_msg_voice_settings_update_t));
+   ERR_CHK(safec_rc);
    msg->header.type       = CTRLM_MAIN_QUEUE_MSG_TYPE_VOICE_SETTINGS_UPDATE;
    msg->header.network_id = CTRLM_MAIN_NETWORK_ID_ALL;
-   strncpy(msg->server_url_vrex, server_url_vrex, sizeof(msg->server_url_vrex));
-   strncpy(msg->server_url_vrex_src_ff, server_url_vrex_src_ff, sizeof(msg->server_url_vrex_src_ff));
-   strncpy(msg->aspect_ratio, aspect_ratio, sizeof(msg->aspect_ratio));
-   strncpy(msg->guide_language, guide_language, sizeof(msg->guide_language));
-   memcpy(&msg->query_strings, &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   safec_rc = strcpy_s(msg->server_url_vrex, sizeof(msg->server_url_vrex), server_url_vrex);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s(msg->server_url_vrex_src_ff, sizeof(msg->server_url_vrex_src_ff), server_url_vrex_src_ff);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s(msg->aspect_ratio, sizeof(msg->aspect_ratio), aspect_ratio);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s(msg->guide_language, sizeof(msg->guide_language), guide_language);
+   ERR_CHK(safec_rc);
+   safec_rc = memcpy_s(&msg->query_strings, sizeof(msg->query_strings), &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   ERR_CHK(safec_rc);
 
    ctrlm_main_queue_msg_push(msg);
    return(TRUE);
@@ -686,7 +695,7 @@ bool ctrlm_voice_ind_voice_session_request(ctrlm_network_id_t network_id, ctrlm_
    #endif
 
    ctrlm_voice_rsp_session_request(network_id, controller_id, timestamp, status, reason);
-   
+
    ctrlm_device_update_timeout_update_activity(network_id, controller_id);
    return(true);
 }
@@ -696,7 +705,8 @@ bool ctrlm_voice_ind_voice_session_request(ctrlm_network_id_t network_id, ctrlm_
 void ctrlm_voice_rsp_session_request(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_timestamp_t timestamp, voice_session_response_status_t status, ctrlm_voice_session_abort_reason_t reason) {
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_voice_session_request_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    msg.header.network_id = network_id;
    msg.controller_id     = controller_id;
@@ -859,8 +869,7 @@ ctrlm_hal_frequency_agility_t ctrlm_voice_ind_voice_session_end(ctrlm_network_id
    ctrlm_voice_audio_stream_completed();
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_voice_session_end_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_voice_session_end_t msg = {0};
 
    msg.controller_id         = controller_id;
    msg.reason                = reason;
@@ -1005,7 +1014,8 @@ void ctrlm_voice_ind_voice_session_fragment(ctrlm_network_id_t network_id, ctrlm
    }
    // Copy the voice packet to the local buffer
    if(data != NULL) {
-      memcpy(&g_ctrlm_voice.utterance_buffer[g_ctrlm_voice.utterance_buffer_index_write], data, data_length);
+      errno_t safec_rc = memcpy_s(&g_ctrlm_voice.utterance_buffer[g_ctrlm_voice.utterance_buffer_index_write], sizeof(g_ctrlm_voice.utterance_buffer), data, data_length);
+      ERR_CHK(safec_rc);
    } else {
       if(data_length != cb_data_read(data_length, &g_ctrlm_voice.utterance_buffer[g_ctrlm_voice.utterance_buffer_index_write], cb_data_param)) {
          LOG_ERROR("%s: unable to read voice fragment data\n", __FUNCTION__);
@@ -1092,9 +1102,9 @@ void ctrlm_voice_session_fragment(ctrlm_controller_id_t controller_id, guchar *d
 
 void ctrlm_voice_session_begin(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id) {
    LOG_INFO("%s: voice session begin\n", __FUNCTION__);
+   errno_t safec_rc = -1;
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_voice_session_begin_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_voice_session_begin_t msg = {0};
 
    unsigned long session_id = ctrlm_voice_session_id_get_next();
    g_ctrlm_voice.vrex_session_id = session_id;
@@ -1129,17 +1139,12 @@ void ctrlm_voice_session_begin(ctrlm_network_id_t network_id, ctrlm_controller_i
    msg.voice_data_pipe_read = pipefd[0];
    msg.session_id           = session_id;
 
-   memset(msg.mime_type, 0, CTRLM_VOICE_MIME_MAX_LENGTH);
-   memset(msg.sub_type,  0, CTRLM_VOICE_SUBTYPE_MAX_LENGTH);
-   memset(msg.language,  0, CTRLM_VOICE_LANG_MAX_LENGTH);
-
-   strncpy((char *)msg.mime_type, CTRLM_VOICE_MIMETYPE_ADPCM, CTRLM_VOICE_MIME_MAX_LENGTH);
-   strncpy((char *)msg.sub_type,  CTRLM_VOICE_SUBTYPE_ADPCM,  CTRLM_VOICE_SUBTYPE_MAX_LENGTH);
-   strncpy((char *)msg.language,  CTRLM_VOICE_LANGUAGE,       CTRLM_VOICE_LANG_MAX_LENGTH);
-
-   msg.mime_type[CTRLM_VOICE_MIME_MAX_LENGTH - 1]   = '\0';
-   msg.sub_type[CTRLM_VOICE_SUBTYPE_MAX_LENGTH - 1] = '\0';
-   msg.language[CTRLM_VOICE_LANG_MAX_LENGTH - 1]    = '\0';
+   safec_rc = strcpy_s((char *)msg.mime_type, sizeof(msg.mime_type), CTRLM_VOICE_MIMETYPE_ADPCM);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s((char *)msg.sub_type,  sizeof(msg.sub_type), CTRLM_VOICE_SUBTYPE_ADPCM);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s((char *)msg.language,  sizeof(msg.language), CTRLM_VOICE_LANGUAGE);
+   ERR_CHK(safec_rc);
 
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_begin, &msg, sizeof(msg), NULL, network_id);
 
@@ -1154,6 +1159,7 @@ void ctrlm_voice_session_begin(ctrlm_network_id_t network_id, ctrlm_controller_i
 }
 
 void ctrlm_voice_iarm_event_session_begin(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long session_id) {
+   errno_t safec_rc = -1;
    ctrlm_voice_iarm_event_session_begin_t event;
 
    // create IARM structure
@@ -1164,17 +1170,12 @@ void ctrlm_voice_iarm_event_session_begin(ctrlm_network_id_t network_id, ctrlm_c
    event.session_id          = session_id;
    event.is_voice_assistant  = ctrlm_is_voice_assistant(g_ctrlm_voice.controller_type);
 
-   memset(event.mime_type, 0, CTRLM_VOICE_MIME_MAX_LENGTH);
-   memset(event.sub_type,  0, CTRLM_VOICE_SUBTYPE_MAX_LENGTH);
-   memset(event.language,  0, CTRLM_VOICE_LANG_MAX_LENGTH);
-
-   strncpy((char *)event.mime_type, CTRLM_VOICE_MIMETYPE_ADPCM, CTRLM_VOICE_MIME_MAX_LENGTH);
-   strncpy((char *)event.sub_type,  CTRLM_VOICE_SUBTYPE_ADPCM,  CTRLM_VOICE_SUBTYPE_MAX_LENGTH);
-   strncpy((char *)event.language,  CTRLM_VOICE_LANGUAGE,       CTRLM_VOICE_LANG_MAX_LENGTH);
-
-   event.mime_type[CTRLM_VOICE_MIME_MAX_LENGTH - 1]   = '\0';
-   event.sub_type[CTRLM_VOICE_SUBTYPE_MAX_LENGTH - 1] = '\0';
-   event.language[CTRLM_VOICE_LANG_MAX_LENGTH - 1]    = '\0';
+   safec_rc = strcpy_s((char *)event.mime_type, sizeof(event.mime_type), CTRLM_VOICE_MIMETYPE_ADPCM);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s((char *)event.sub_type,  sizeof(event.sub_type), CTRLM_VOICE_SUBTYPE_ADPCM);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s((char *)event.language,  sizeof(event.language), CTRLM_VOICE_LANGUAGE);
+   ERR_CHK(safec_rc);
 
    ctrlm_voice_iarm_event_session_begin(&event);
 }
@@ -1405,8 +1406,7 @@ void ctrlm_voice_notify_stats_none(ctrlm_network_id_t network_id, ctrlm_controll
    LOG_WARN("%s: (%u, %u)\n", __FUNCTION__, network_id, controller_id);
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_voice_session_stats_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_voice_session_stats_t msg = {0};
 
    msg.controller_id          = controller_id;
    msg.reboot.available       = 0;
@@ -1532,7 +1532,8 @@ void ctrlm_voice_minimum_utterance_duration_set(unsigned long duration) {
 }
 
 void ctrlm_voice_query_strings_set(ctrlm_voice_query_strings_t query_strings) {
-   memcpy(&g_ctrlm_voice.vrex_prefs.query_strings, &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   errno_t safec_rc = memcpy_s(&g_ctrlm_voice.vrex_prefs.query_strings, sizeof(g_ctrlm_voice.vrex_prefs.query_strings), &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   ERR_CHK(safec_rc);
 }
 
 
@@ -1543,8 +1544,7 @@ void ctrlm_voice_notify_stats_reboot(ctrlm_network_id_t network_id, ctrlm_contro
    ctrlm_timeout_destroy(&g_ctrlm_voice.timeout_tag_stats);
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_voice_session_stats_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_voice_session_stats_t msg = {0};
 
    msg.controller_id             = controller_id;
    msg.session.available         = 0;
@@ -1566,8 +1566,7 @@ void ctrlm_voice_notify_stats_session(ctrlm_network_id_t network_id, ctrlm_contr
    ctrlm_timeout_destroy(&g_ctrlm_voice.timeout_tag_stats);
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_voice_session_stats_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_voice_session_stats_t msg = {0};
 
    msg.controller_id          = controller_id;
    msg.reboot.available       = 0;

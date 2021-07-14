@@ -196,7 +196,8 @@ ctrlm_hal_result_t ctrlm_hal_ble_cfm_init(ctrlm_network_id_t network_id, ctrlm_h
    sem_init(&semaphore, 0, 0);
 
    ctrlm_main_queue_msg_hal_cfm_init_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    msg.params.ble   = params;
    msg.semaphore    = &semaphore;
@@ -271,9 +272,11 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
       // IR controller does not exist, so create it
       LOG_INFO("%s: controller <%s> does not exist in DB, adding now...\n", __PRETTY_FUNCTION__, BROADCAST_PRODUCT_NAME_IR_DEVICE);
       ctrlm_hal_ble_rcu_data_t rcu_data;
-      memset(&rcu_data, 0, sizeof(rcu_data));
+      errno_t safec_rc = memset_s(&rcu_data, sizeof(rcu_data), 0, sizeof(rcu_data));
+      ERR_CHK(safec_rc);
       rcu_data.ieee_address = 0;
-      strcpy(rcu_data.name, BROADCAST_PRODUCT_NAME_IR_DEVICE);
+      safec_rc = strcpy_s(rcu_data.name, sizeof(rcu_data.name), BROADCAST_PRODUCT_NAME_IR_DEVICE);
+      ERR_CHK(safec_rc);
       controller_add(rcu_data);
    }
 
@@ -286,7 +289,8 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
             if (!getControllerId(it, &controller_id)) {
                LOG_WARN("%s: Controller from HAL <0x%llX> doesn't exist in network, adding...\n", __PRETTY_FUNCTION__, it);
                ctrlm_hal_ble_RcuStatusData_t rcu_props;
-               memset(&rcu_props, 0, sizeof(rcu_props));
+               errno_t safec_rc = memset_s(&rcu_props, sizeof(rcu_props), 0, sizeof(rcu_props));
+               ERR_CHK(safec_rc);
                rcu_props.rcu_data.ieee_address = it;
                if (hal_api_get_all_rcu_props_) {
                   hal_api_get_all_rcu_props_(rcu_props);
@@ -337,7 +341,8 @@ void ctrlm_obj_network_ble_t::req_process_network_status(void *data, int size) {
    g_assert(dqm->cmd_result);
 
    ctrlm_network_status_ble_t *network_status  = &dqm->status->status.ble;
-   strncpy(network_status->version_hal, version_get(), CTRLM_MAIN_VERSION_LENGTH);
+   errno_t safec_rc = strncpy_s(network_status->version_hal, sizeof(network_status->version_hal), version_get(), CTRLM_MAIN_VERSION_LENGTH - 1);
+   ERR_CHK(safec_rc);
    network_status->version_hal[CTRLM_MAIN_VERSION_LENGTH - 1] = '\0';
    network_status->controller_qty = controllers_.size();
    LOG_INFO("%s: HAL Version <%s> Controller Qty %u\n", __FUNCTION__, network_status->version_hal, network_status->controller_qty);
@@ -895,8 +900,9 @@ void ctrlm_obj_network_ble_t::req_process_get_last_keypress(void *data, int size
          dqm->params->controller_id          = lastKeypressControllerID;
          dqm->params->source_key_code        = controllers_[lastKeypressControllerID]->getLastKeyCode();
          dqm->params->timestamp              = controllers_[lastKeypressControllerID]->getLastKeyTime() * 1000LL; //Not sure why its converted to long long, but I'm staying consistent with rf4ce
-         
-         strncpy(dqm->params->source_name, controllers_[lastKeypressControllerID]->getName().c_str(), sizeof(dqm->params->source_name));
+
+         errno_t safec_rc = strncpy_s(dqm->params->source_name, sizeof(dqm->params->source_name), controllers_[lastKeypressControllerID]->getName().c_str(), CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1);
+         ERR_CHK(safec_rc);
          dqm->params->source_name[CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1] = '\0';
 
          if (BLE_CONTROLLER_TYPE_IR == controllers_[lastKeypressControllerID]->getControllerType()) {
@@ -1274,7 +1280,6 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
    }
 }
 
-
 void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_params_t *msg) {
    LOG_DEBUG("%s, Enter...\n", __PRETTY_FUNCTION__);
 
@@ -1283,6 +1288,7 @@ void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_p
    msg->ir_state = ir_state_;
 
    int i = 0;
+   errno_t safec_rc = -1;
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
       if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType()) {
          msg->remotes[i].controller_id = it->second->controller_id_get();
@@ -1290,19 +1296,18 @@ void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_p
          msg->remotes[i].batterylevel  = it->second->getBatteryPercent();
          msg->remotes[i].connected     = (it->second->getConnected()) ? 1 : 0;
 
-         strncpy(msg->remotes[i].ieee_address_str, ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].btlswver, it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].hwrev, it->second->getHwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].rcuswver, it->second->getSwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         safec_rc = strncpy_s(msg->remotes[i].ieee_address_str, sizeof(msg->remotes[i].ieee_address_str), ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].btlswver, sizeof(msg->remotes[i].btlswver), it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].hwrev, sizeof(msg->remotes[i].hwrev), it->second->getHwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].rcuswver, sizeof(msg->remotes[i].rcuswver), it->second->getSwRevision().toString().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
 
-         strncpy(msg->remotes[i].make, it->second->getManufacturer().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].model, it->second->getModel().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].name, it->second->getName().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].serialno, it->second->getSerialNumber().c_str(), CTRLM_MAX_PARAM_STR_LEN);
+         safec_rc = strncpy_s(msg->remotes[i].make, sizeof(msg->remotes[i].make), it->second->getManufacturer().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].model, sizeof(msg->remotes[i].model), it->second->getModel().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].name, sizeof(msg->remotes[i].name), it->second->getName().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].serialno, sizeof(msg->remotes[i].serialno), it->second->getSerialNumber().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
 
-         strncpy(msg->remotes[i].tv_code, it->second->get_irdb_entry_id_name_tv().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-         strncpy(msg->remotes[i].avr_code, it->second->get_irdb_entry_id_name_avr().c_str(), CTRLM_MAX_PARAM_STR_LEN);
-
+         safec_rc = strncpy_s(msg->remotes[i].tv_code, sizeof(msg->remotes[i].tv_code), it->second->get_irdb_entry_id_name_tv().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
+         safec_rc = strncpy_s(msg->remotes[i].avr_code, sizeof(msg->remotes[i].avr_code), it->second->get_irdb_entry_id_name_avr().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
          i++;
       }
    }
@@ -1515,7 +1520,8 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_RcuStatus(ctrlm_network_id_t id, ctrlm_
    }
 
    ctrlm_hal_ble_RcuStatusData_t dqm;
-   memset(&dqm, 0, sizeof(dqm));
+   errno_t safec_rc = memset_s(&dqm, sizeof(dqm), 0, sizeof(dqm));
+   ERR_CHK(safec_rc);
    dqm = *params;
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::ind_process_rcu_status, &dqm, sizeof(dqm), NULL, id);
    return(CTRLM_HAL_RESULT_SUCCESS);
@@ -1528,8 +1534,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_Paired(ctrlm_network_id_t id, ctrlm_hal
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
    }
 
-   ctrlm_hal_ble_IndPaired_params_t dqm;
-   memset(&dqm, 0, sizeof(dqm));
+   ctrlm_hal_ble_IndPaired_params_t dqm = {0};
    dqm = *params;
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::ind_process_paired, &dqm, sizeof(dqm), NULL, id);
    return(CTRLM_HAL_RESULT_SUCCESS);
@@ -1541,8 +1546,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_UnPaired(ctrlm_network_id_t id, ctrlm_h
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
    }
 
-   ctrlm_hal_ble_IndUnPaired_params_t dqm;
-   memset(&dqm, 0, sizeof(dqm));
+   ctrlm_hal_ble_IndUnPaired_params_t dqm = {0};
    dqm = *params;
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::ind_process_unpaired, &dqm, sizeof(dqm), NULL, id);
    return(CTRLM_HAL_RESULT_SUCCESS);
@@ -1564,7 +1568,8 @@ ctrlm_hal_result_t ctrlm_ble_Request_VoiceSessionBegin(ctrlm_network_id_t id, ct
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_voice_session_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.params            = &v_params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
    msg.semaphore         = &semaphore;
@@ -1593,7 +1598,8 @@ ctrlm_hal_result_t ctrlm_ble_Request_VoiceSessionEnd(ctrlm_network_id_t id, ctrl
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_voice_session_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.params            = &v_params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
    msg.semaphore         = &semaphore;
@@ -1627,8 +1633,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_Keypress(ctrlm_network_id_t network_id,
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
    }
 
-   ctrlm_hal_ble_IndKeypress_params_t dqm;
-   memset(&dqm, 0, sizeof(dqm));
+   ctrlm_hal_ble_IndKeypress_params_t dqm = {0};
    dqm = *params;
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::ind_process_keypress, &dqm, sizeof(dqm), NULL, network_id);
    return(CTRLM_HAL_RESULT_SUCCESS);
@@ -1804,6 +1809,7 @@ json_t *ctrlm_obj_network_ble_t::xconf_export_controllers() {
       }
    }
    json_t *ret = json_array();
+   errno_t safec_rc = -1;
 
    for (auto const ctrlType : minVersions) {
       char product_name[CTRLM_MAX_PARAM_STR_LEN];
@@ -1811,13 +1817,16 @@ json_t *ctrlm_obj_network_ble_t::xconf_export_controllers() {
       // XCONF expects a different name than product name, so need to map here
       switch(ctrlType.first) {
          case BLE_CONTROLLER_TYPE_PR1:
-            strncpy(product_name, XCONF_PRODUCT_NAME_PR1, CTRLM_MAX_PARAM_STR_LEN);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), XCONF_PRODUCT_NAME_PR1);
+            ERR_CHK(safec_rc);
             break;
          case BLE_CONTROLLER_TYPE_LC103:
-            strncpy(product_name, XCONF_PRODUCT_NAME_LC103, CTRLM_MAX_PARAM_STR_LEN);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), XCONF_PRODUCT_NAME_LC103);
+            ERR_CHK(safec_rc);
             break;
          case BLE_CONTROLLER_TYPE_EC302:
-            strncpy(product_name, XCONF_PRODUCT_NAME_EC302, CTRLM_MAX_PARAM_STR_LEN);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), XCONF_PRODUCT_NAME_EC302);
+            ERR_CHK(safec_rc);
             break;
          default:
             LOG_WARN("%s: controller of type %s ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(ctrlType.first));

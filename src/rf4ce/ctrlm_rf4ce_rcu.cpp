@@ -452,13 +452,14 @@ void ctrlm_obj_network_rf4ce_t::ind_process_data_rcu(ctrlm_main_queue_msg_rf4ce_
                      combo_keys[combo_keys_index++] = ',';
                   }
                   if(combo_keys_index < COMBO_KEYS_BUF_SIZE) {
-                     int size = snprintf(&combo_keys[combo_keys_index], COMBO_KEYS_BUF_SIZE - combo_keys_index, "%s", ctrlm_key_code_str((ctrlm_key_code_t)((guchar)cmd_data[index + 2])));
+                     int size = sprintf_s(&combo_keys[combo_keys_index], COMBO_KEYS_BUF_SIZE - combo_keys_index, "%s", ctrlm_key_code_str((ctrlm_key_code_t)((guchar)cmd_data[index + 2])));
                      if(size > 0) {
                         combo_keys_index += size;
+                     }  else {
+                        ERR_CHK(size);
                      }
                   }
                }
-               combo_keys[COMBO_KEYS_BUF_SIZE - 1] = '\0';
 
                LOG_INFO("%s: Key Combo - Unsupported <%s>\n", __FUNCTION__, combo_keys);
             }

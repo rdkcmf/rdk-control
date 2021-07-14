@@ -210,6 +210,7 @@ voice_session_t::voice_session_t(const string& route, const string& aspect_ratio
    m_do_not_close_read_pipe(false),
    m_terminate_speech_server_thread(false)
 {
+   errno_t safec_rc = -1;
    CURLcode res;
    LOG_INFO("voice_session_t constructor for controller %u, %s, %s\n", m_controller_id, m_receiver_id.c_str(), m_app_id.c_str());
    res = curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -229,11 +230,13 @@ voice_session_t::voice_session_t(const string& route, const string& aspect_ratio
 
    user_agent_string_refresh();
    uuid_clear(m_uuid);
-   memset(m_primary_ip, 0, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH);
+   safec_rc = memset_s(m_primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH, 0, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH);
+   ERR_CHK(safec_rc);
    m_lookup_time  = 0.0;
    m_connect_time = 0.0;
 
-   memcpy(&m_query_strings, &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   safec_rc = memcpy_s(&m_query_strings, sizeof(ctrlm_voice_query_strings_t), &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   ERR_CHK(safec_rc);
 }
 
 voice_session_t::~voice_session_t() {
@@ -253,12 +256,13 @@ void voice_session_t::server_details_update(const string& server_url_vrex, const
    m_aspect_ratio           = aspect_ratio;
    m_guide_language         = guide_language;
    m_server_url_vrex_src_ff = server_url_vrex_src_ff;
-   memcpy(&m_query_strings, &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   errno_t safec_rc = memcpy_s(&m_query_strings,  sizeof(ctrlm_voice_query_strings_t), &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   ERR_CHK(safec_rc);
 }
 
 void voice_session_t::notify_result_success() {
-   ctrlm_voice_iarm_event_session_result_t result;
-   memset(&result, 0, sizeof(result));
+   errno_t safec_rc = -1;
+   ctrlm_voice_iarm_event_session_result_t result = {0};
 
    result.api_revision              = CTRLM_VOICE_IARM_BUS_API_REVISION;
    result.network_id                = m_network_id;
@@ -273,19 +277,24 @@ void voice_session_t::notify_result_success() {
    result.curl_request_dns_time     = m_lookup_time;
    result.curl_request_connect_time = m_connect_time;
 
-   strncpy(result.vrex_session_id, m_session_id_vrex.c_str(), CTRLM_VOICE_SESSION_ID_MAX_LENGTH);
+   safec_rc = strncpy_s(result.vrex_session_id, sizeof(result.vrex_session_id), m_session_id_vrex.c_str(), CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.vrex_session_id[CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.vrex_session_text, m_session_text_vrex.c_str(), CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH);
+   safec_rc = strncpy_s(result.vrex_session_text, sizeof(result.vrex_session_text), m_session_text_vrex.c_str(), CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.vrex_session_text[CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.vrex_session_message, m_session_message_vrex.c_str(), CTRLM_VOICE_SESSION_MSG_MAX_LENGTH);
+   safec_rc = strncpy_s(result.vrex_session_message, sizeof(result.vrex_session_message), m_session_message_vrex.c_str(), CTRLM_VOICE_SESSION_MSG_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.vrex_session_message[CTRLM_VOICE_SESSION_MSG_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.curl_request_ip, m_primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH);
+   safec_rc = strncpy_s(result.curl_request_ip, sizeof(result.curl_request_ip), m_primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.curl_request_ip[CTRLM_VOICE_REQUEST_IP_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.session_uuid, m_uuid_str, CTRLM_VOICE_SESSION_ID_MAX_LENGTH);
+   safec_rc = strncpy_s(result.session_uuid, sizeof(result.session_uuid), m_uuid_str, CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.session_uuid[CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1] = '\0';
 
    // Broadcast event to any listeners
@@ -293,8 +302,8 @@ void voice_session_t::notify_result_success() {
 }
 
 void voice_session_t::notify_result_error() {
-   ctrlm_voice_iarm_event_session_result_t result;
-   memset(&result, 0, sizeof(result));
+   errno_t safec_rc = -1;
+   ctrlm_voice_iarm_event_session_result_t result = {0};
 
    result.api_revision             = CTRLM_VOICE_IARM_BUS_API_REVISION;
    result.network_id               = m_network_id;
@@ -315,19 +324,24 @@ void voice_session_t::notify_result_error() {
    result.curl_request_dns_time     = m_lookup_time;
    result.curl_request_connect_time = m_connect_time;
 
-   strncpy(result.vrex_session_id, m_session_id_vrex.c_str(), CTRLM_VOICE_SESSION_ID_MAX_LENGTH);
+   safec_rc = strncpy_s(result.vrex_session_id, sizeof(result.vrex_session_id), m_session_id_vrex.c_str(), CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.vrex_session_id[CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.vrex_session_text, m_session_text_vrex.c_str(), CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH);
+   safec_rc = strncpy_s(result.vrex_session_text, sizeof(result.vrex_session_text), m_session_text_vrex.c_str(), CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.vrex_session_text[CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.vrex_session_message, m_session_message_vrex.c_str(), CTRLM_VOICE_SESSION_MSG_MAX_LENGTH);
+   safec_rc = strncpy_s(result.vrex_session_message, sizeof(result.vrex_session_message), m_session_message_vrex.c_str(), CTRLM_VOICE_SESSION_MSG_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.vrex_session_message[CTRLM_VOICE_SESSION_MSG_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.curl_request_ip, m_primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH);
+   safec_rc = strncpy_s(result.curl_request_ip, sizeof(result.curl_request_ip), m_primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.curl_request_ip[CTRLM_VOICE_REQUEST_IP_MAX_LENGTH - 1] = '\0';
 
-   strncpy(result.session_uuid, m_uuid_str, CTRLM_VOICE_SESSION_ID_MAX_LENGTH);
+   safec_rc = strncpy_s(result.session_uuid, sizeof(result.session_uuid), m_uuid_str, CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    result.session_uuid[CTRLM_VOICE_SESSION_ID_MAX_LENGTH - 1] = '\0';
 
    // Broadcast event to any listeners
@@ -335,8 +349,7 @@ void voice_session_t::notify_result_error() {
 }
 
 void voice_session_t::notify_result_short() {
-   ctrlm_voice_iarm_event_session_short_t event;
-   memset(&event, 0, sizeof(event));
+   ctrlm_voice_iarm_event_session_short_t event = {0};
 
    event.api_revision          = CTRLM_VOICE_IARM_BUS_API_REVISION;
    event.network_id            = m_network_id;
@@ -856,7 +869,8 @@ void voice_session_t::start_transfer_server() {
                      // Broadcast event to any listeners
                      ctrlm_voice_iarm_event_media_service_t event;
                      event.api_revision = CTRLM_VOICE_IARM_BUS_API_REVISION;
-                     strncpy(event.media_service_url, json_string_value(json_obj), 2083);
+                     errno_t safec_rc = strncpy_s(event.media_service_url, sizeof(event.media_service_url), json_string_value(json_obj), sizeof(event.media_service_url) - 1);
+                     ERR_CHK(safec_rc);
                      event.media_service_url[2082] = '\0';
                      ctrlm_voice_iarm_event_media_service(&event);
                   }
@@ -932,7 +946,10 @@ char *voice_session_t::request_metrics_get(CURL *curl, char *buffer, unsigned lo
    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE,      &response_code);
    curl_easy_getinfo(curl, CURLINFO_SSL_VERIFYRESULT,   &ssl_verify);
 
-   snprintf(buffer, bufsize, "\nHttpRequestEnd %s code=%lu times={total=%g, connect=%g startTransfer=%g resolve=%g, appConnect=%g, preTransfer=%g, redirect=%g, sslVerify=%lu}\n", url, response_code, total, connect, start_transfer, resolve, app_connect, pre_transfer, redirect, ssl_verify);
+   errno_t safec_rc = sprintf_s(buffer, bufsize, "\nHttpRequestEnd %s code=%lu times={total=%g, connect=%g startTransfer=%g resolve=%g, appConnect=%g, preTransfer=%g, redirect=%g, sslVerify=%lu}\n", url, response_code, total, connect, start_transfer, resolve, app_connect, pre_transfer, redirect, ssl_verify);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
    buffer[bufsize - 1] = '\0';
    return buffer;
 }
@@ -945,7 +962,10 @@ void voice_session_t::remote_user_string_set(const char *user_string) {
 
 void voice_session_t::remote_software_version_set(guchar major, guchar minor, guchar revision, guchar patch) {
    char temp_buffer[TEMP_BUFFER_SIZE];
-   snprintf(temp_buffer, TEMP_BUFFER_SIZE, "%u.%u.%u.%u", major, minor, revision, patch);
+   errno_t safec_rc = sprintf_s(temp_buffer, TEMP_BUFFER_SIZE, "%u.%u.%u.%u", major, minor, revision, patch);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
    temp_buffer[TEMP_BUFFER_SIZE-1] = '\0';
    m_remote_software_version = temp_buffer;
 
@@ -955,7 +975,10 @@ void voice_session_t::remote_software_version_set(guchar major, guchar minor, gu
 
 void voice_session_t::remote_hardware_version_set(guchar manufacturer, guchar model, guchar revision, guint16 lot_code) {
    char temp_buffer[TEMP_BUFFER_SIZE];
-   snprintf(temp_buffer, TEMP_BUFFER_SIZE, "%u.%u.%u.%u", manufacturer, model, revision, lot_code);
+   errno_t safec_rc = sprintf_s(temp_buffer, TEMP_BUFFER_SIZE, "%u.%u.%u.%u", manufacturer, model, revision, lot_code);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
    temp_buffer[TEMP_BUFFER_SIZE-1] = '\0';
    m_remote_hardware_version = temp_buffer;
 
@@ -965,7 +988,10 @@ void voice_session_t::remote_hardware_version_set(guchar manufacturer, guchar mo
 
 void voice_session_t::remote_battery_voltage_set(guchar voltage, guchar percentage) {
    char temp_buffer[TEMP_BUFFER_SIZE];
-   snprintf(temp_buffer, TEMP_BUFFER_SIZE, "%.2fV", (((float)voltage) *  4.0 / 255));
+   errno_t safec_rc = sprintf_s(temp_buffer, TEMP_BUFFER_SIZE, "%.2fV", (((float)voltage) *  4.0 / 255));
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
    temp_buffer[TEMP_BUFFER_SIZE-1] = '\0';
    m_remote_battery_voltage    = temp_buffer;
    m_remote_battery_value      = voltage;
@@ -1063,7 +1089,8 @@ void voice_session_t::curl_info_for_session_result_get(CURL *curl) {
    m_lookup_time  = lookup_time;
    m_connect_time = connect_time;
 
-   strncpy(m_primary_ip, primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH);
+   errno_t safec_rc  = strncpy_s(m_primary_ip, sizeof(m_primary_ip), primary_ip, CTRLM_VOICE_REQUEST_IP_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    m_primary_ip[CTRLM_VOICE_REQUEST_IP_MAX_LENGTH - 1] = '\0';
 }
 //#error Enable to check for warnings

@@ -115,7 +115,8 @@ void ctrlm_rcu_iarm_event_key_press_validation(ctrlm_network_id_t network_id, ct
    msg.binding_type  = binding_type;
    msg.key_status    = key_status;
    msg.key_code      = key_code;
-   strncpy(msg.controller_type, ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH);
+   errno_t safec_rc = strncpy_s(msg.controller_type, sizeof(msg.controller_type), ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.controller_type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
    if(ctrlm_is_key_code_mask_enabled()) {
       LOG_INFO("%s: (%u, %u) Controller Type <%s> key %s *\n", __FUNCTION__, network_id, controller_id, msg.controller_type, ctrlm_key_status_str(key_status));
@@ -133,7 +134,8 @@ void ctrlm_rcu_iarm_event_validation_begin(ctrlm_network_id_t network_id, ctrlm_
    init_iarm_event_struct(msg, network_id, controller_id);
    msg.binding_type    = binding_type;
    msg.validation_type = validation_type;
-   strncpy(msg.controller_type, ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH);
+   errno_t safec_rc = strncpy_s(msg.controller_type, sizeof(msg.controller_type), ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.controller_type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
    if(validation_keys != NULL) {
       for(unsigned long index = 0; index < CTRLM_RCU_VALIDATION_KEY_QTY; index++) {
@@ -158,7 +160,8 @@ void ctrlm_rcu_iarm_event_validation_end(ctrlm_network_id_t network_id, ctrlm_co
    msg.binding_type    = binding_type;
    msg.validation_type = validation_type;
    msg.result          = validation_result;
-   strncpy(msg.controller_type, ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH);
+   errno_t safec_rc = strncpy_s(msg.controller_type, sizeof(msg.controller_type), ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.controller_type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
 
    LOG_INFO("%s: (%u, %u) Binding Type <%s> Validation Type <%s> Controller Type <%s> Result <%s>\n", __FUNCTION__, network_id, controller_id, ctrlm_rcu_binding_type_str(binding_type), ctrlm_rcu_validation_type_str(validation_type), msg.controller_type, ctrlm_rcu_validation_result_str(validation_result));
@@ -173,9 +176,11 @@ void ctrlm_rcu_iarm_event_configuration_complete(ctrlm_network_id_t network_id, 
    init_iarm_event_struct(msg, network_id, controller_id);
    msg.binding_type    = binding_type;
    msg.result          = configuration_result;
-   strncpy(msg.controller_type, ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH);
+   errno_t safec_rc = strncpy_s(msg.controller_type, sizeof(msg.controller_type), ctrlm_rcu_controller_type_str(controller_type), CTRLM_RCU_MAX_USER_STRING_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.controller_type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
-   memcpy(&msg.status, status, sizeof(ctrlm_controller_status_t));
+   safec_rc = memcpy_s(&msg.status, sizeof(ctrlm_controller_status_t), status, sizeof(ctrlm_controller_status_t));
+   ERR_CHK(safec_rc);
 
    LOG_INFO("%s: (%u, %u) Controller Type <%s> Binding Type <%s> Result <%s>\n", __FUNCTION__, network_id, controller_id, msg.controller_type, ctrlm_rcu_binding_type_str(binding_type), ctrlm_rcu_configuration_result_str(configuration_result));
    IARM_Result_t result = IARM_Bus_BroadcastEvent(CTRLM_MAIN_IARM_BUS_NAME, CTRLM_RCU_IARM_EVENT_CONFIGURATION_COMPLETE, &msg, sizeof(msg));
@@ -212,15 +217,19 @@ void ctrlm_rcu_iarm_event_key_ghost(ctrlm_network_id_t network_id, ctrlm_control
 
 void ctrlm_rcu_iarm_event_control(int controller_id, const char *event_source, const char *event_type, const char *event_data, int event_value, int spare_value) {
    ctrlm_rcu_iarm_event_control_t msg;
+   errno_t safec_rc = -1;
    msg.api_revision  = CTRLM_RCU_IARM_BUS_API_REVISION;
    msg.controller_id = controller_id;
    msg.event_value   = event_value;
    msg.spare_value   = spare_value;
-   strncpy(msg.event_source, event_source, CTRLM_RCU_MAX_EVENT_SOURCE_LENGTH);
+   safec_rc = strncpy_s(msg.event_source, sizeof(msg.event_source), event_source, CTRLM_RCU_MAX_EVENT_SOURCE_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.event_source[CTRLM_RCU_MAX_EVENT_SOURCE_LENGTH - 1] = '\0';
-   strncpy(msg.event_type, event_type, CTRLM_RCU_MAX_EVENT_TYPE_LENGTH);
+   safec_rc = strncpy_s(msg.event_type, sizeof(msg.event_type), event_type, CTRLM_RCU_MAX_EVENT_TYPE_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.event_type[CTRLM_RCU_MAX_EVENT_TYPE_LENGTH - 1] = '\0';
-   strncpy(msg.event_data, event_data, CTRLM_RCU_MAX_EVENT_DATA_LENGTH);
+   safec_rc = strncpy_s(msg.event_data, sizeof(msg.event_data), event_data, CTRLM_RCU_MAX_EVENT_DATA_LENGTH - 1);
+   ERR_CHK(safec_rc);
    msg.event_data[CTRLM_RCU_MAX_EVENT_DATA_LENGTH - 1] = '\0';
 
    LOG_INFO("%s: Controller Id <%d> Source <%s> Type <%s> Data <%s> value <%u>\n", __FUNCTION__, controller_id, event_source, event_type, event_data, event_value);
@@ -260,7 +269,8 @@ void ctrlm_rcu_iarm_event_reverse_cmd(ctrlm_network_id_t network_id, ctrlm_contr
    msg.result = cmd_result;
    msg.result_data_size = result_data_size;
    if (result_data_size > 0) {
-      memcpy(&msg.result_data[0], result_data, result_data_size);
+      errno_t safec_rc = memcpy_s(&msg.result_data[0], msg.result_data_size, result_data, result_data_size);
+      ERR_CHK(safec_rc);
    }
    IARM_Result_t result = IARM_Bus_BroadcastEvent(CTRLM_MAIN_IARM_BUS_NAME, event, &msg, msg_size);
    if(IARM_RESULT_SUCCESS != result) {

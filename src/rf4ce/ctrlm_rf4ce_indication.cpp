@@ -44,7 +44,7 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrl
       LOG_ERROR("%s: Invalid Network Id %u\n", __FUNCTION__, id);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
    }
-   
+
    if(NULL == cond) { // asynchronous
       if(NULL == cb) { // Invalid callback
          LOG_ERROR("%s: Invalid callback\n", __FUNCTION__);
@@ -54,8 +54,7 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrl
    }
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_rf4ce_ind_discovery_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_rf4ce_ind_discovery_t msg = {0};
 
    msg.cond              = cond;
    msg.cb                = cb;
@@ -64,7 +63,7 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrl
    msg.rsp_params        = rsp_params;
 
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_rf4ce_t::ind_process_discovery, (void *)&msg, sizeof(msg), NULL, id);
-   
+
    return(CTRLM_HAL_RESULT_SUCCESS);
 }
 
@@ -122,8 +121,7 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_int(ctrlm_network_id_t id, ctrlm_hal
    }
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_rf4ce_ind_pair_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_rf4ce_ind_pair_t msg = {0};
 
    msg.cond              = cond;
    msg.cb                = cb;
@@ -180,8 +178,7 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_result(ctrlm_network_id_t id, ctrlm_
    }
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_rf4ce_ind_pair_result_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_rf4ce_ind_pair_result_t msg = {0};
 
    msg.result            = params.result;
    msg.controller_id     = params.controller_id;
@@ -210,8 +207,7 @@ ctrlm_hal_result_t ctrlm_hal_ind_unpair_int(ctrlm_network_id_t id, ctrlm_hal_rf4
    }
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_rf4ce_ind_unpair_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_rf4ce_ind_unpair_t msg = {0};
 
    msg.cond              = cond;
    msg.cb                = cb;
@@ -328,15 +324,15 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_data(ctrlm_network_id_t network_id, ctrlm
    }
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_rf4ce_ind_data_t msg;
+   ctrlm_main_queue_msg_rf4ce_ind_data_t msg = {0};
 
-   memset(&msg, 0, sizeof(msg));
    msg.controller_id     = controller_id;
    msg.timestamp         = params.timestamp;
    msg.profile_id        = params.profile_id;
    msg.length            = params.length;
    if(params.data != NULL) {
-      memcpy(msg.data, params.data, params.length);
+      errno_t safec_rc = memcpy_s(msg.data, msg.length, params.data, params.length);
+      ERR_CHK(safec_rc);
    } else {
       if(params.length != params.cb_data_read(params.length, msg.data, params.cb_data_param)) {
          LOG_ERROR("%s: unable to read data!\n", __FUNCTION__);
@@ -394,8 +390,7 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
          }
       }
 
-      ctrlm_main_queue_msg_voice_session_request_t msg;
-      memset(&msg, 0, sizeof(msg));
+      ctrlm_main_queue_msg_voice_session_request_t msg = {0};
 
       msg.controller_id     = controller_id;
       msg.timestamp         = timestamp;
@@ -405,7 +400,8 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
       msg.reason            = CTRLM_VOICE_SESSION_ABORT_REASON_MAX;
       if(request_data_len && request_data != NULL) {
          msg.data_len          = request_data_len;
-         memcpy(msg.data, request_data, request_data_len);
+         errno_t safec_rc = memcpy_s(msg.data, sizeof(msg.data), request_data, request_data_len);
+         ERR_CHK(safec_rc);
       }
       ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_request, &msg, sizeof(msg), NULL, network_id);
 #else

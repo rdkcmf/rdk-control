@@ -163,6 +163,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
    guchar   response[RF4CE_DEVICE_UPDATE_CMD_LEN_IMAGE_AVAILABLE];
    guchar   response_length;
    gboolean manual_poll = false;
+   errno_t safec_rc = -1;
 
 #ifdef XR15_704
    if(did_reset_) {
@@ -318,8 +319,8 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
       response[16] = (guchar)(image_info.crc >> 24);
       response[17] = (guchar)((version_hardware_.manufacturer << 4) | (version_hardware_.model & 0xF)); // Hardware Version
       response[18] = version_hardware_.hw_revision;
-      memset(&response[19], 0, 20);
-      strncpy((char *)&response[19], product_name_, 20);
+      safec_rc = strcpy_s((char *)&response[19], sizeof(response)-19, product_name_);
+      ERR_CHK(safec_rc);
       response_length = RF4CE_DEVICE_UPDATE_CMD_LEN_IMAGE_AVAILABLE;
 
       if(device_update_session_resume_support()) { // Store download session info in persistent memory
@@ -331,7 +332,8 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
          state.when                = begin_info.when;
          state.time                = begin_info.time;
          state.background_download = begin_info.background_download;
-         strncpy(state.file_name, image_info.file_name, sizeof(image_info.file_name));
+         safec_rc = strcpy_s(state.file_name, sizeof(state.file_name), image_info.file_name);
+         ERR_CHK(safec_rc);
 
          ctrlm_timestamp_get(&state.expiration);
          ctrlm_timestamp_add_secs(&state.expiration, obj_network_rf4ce_->device_update_session_timeout_get());
@@ -339,7 +341,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
          device_update_session_resume_store(&state);
       }
    }
-   
+
    // Determine when to send the response (50 ms after receipt)
    unsigned long long nsecs = timestamp.tv_nsec + (CTRLM_RF4CE_CONST_RESPONSE_IDLE_TIME * 1000000);
    timestamp.tv_nsec  = nsecs % 1000000000;

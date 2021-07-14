@@ -41,7 +41,8 @@ void ctrlm_network_property_set(ctrlm_network_id_t network_id, ctrlm_hal_network
    msg->property          = property;
    msg->value             = (void *)&msg[1];
 
-   memcpy(msg->value, value, length);
+   errno_t safec_rc = memcpy_s(msg->value, length, value, length);
+   ERR_CHK(safec_rc);
 
    ctrlm_main_queue_msg_push(msg);
 }

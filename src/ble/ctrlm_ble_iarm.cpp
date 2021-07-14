@@ -90,7 +90,8 @@ IARM_Result_t ctrlm_main_iarm_call_get_ble_log_levels(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_ble_log_levels_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    msg.params            = params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
@@ -124,7 +125,8 @@ IARM_Result_t ctrlm_main_iarm_call_set_ble_log_levels(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_ble_log_levels_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.params            = params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
    msg.semaphore         = &semaphore;
@@ -157,7 +159,8 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_unpair_reason(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_get_rcu_unpair_reason_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.params            = params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
    msg.semaphore         = &semaphore;
@@ -190,7 +193,8 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_reboot_reason(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_get_rcu_reboot_reason_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.params            = params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
    msg.semaphore         = &semaphore;
@@ -222,7 +226,8 @@ IARM_Result_t ctrlm_main_iarm_call_send_rcu_action(void *arg) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_send_rcu_action_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.params            = params;
    msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
    msg.semaphore         = &semaphore;

@@ -111,12 +111,13 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
     standby_params.ipv4_fallback          = STANDBY_PARAMS_IPV4_FALLBACK;
     standby_params.backoff_delay          = STANDBY_PARAMS_BACKOFF_DELAY;
 
-    memset(&routes, 0, sizeof(routes));
+    errno_t safec_rc = memset_s(&routes, sizeof(routes), 0, sizeof(routes));
+    ERR_CHK(safec_rc);
 
     // iterate over source to url mapping
     for(int j = 0; j < XRSR_SRC_INVALID; j++) {
         xrsr_src_t            src        = (xrsr_src_t)j;
-        ctrlm_voice_device_t  src_device = xrsr_to_voice_device(src); 
+        ctrlm_voice_device_t  src_device = xrsr_to_voice_device(src);
         std::string          *url        = NULL;
 
         sem_wait(&this->device_status_semaphore);
@@ -153,8 +154,7 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
         }
 
         if(url->rfind("http", 0) == 0) {
-            xrsr_handlers_t handlers_xrsr;
-            memset(&handlers_xrsr, 0, sizeof(handlers_xrsr));
+            xrsr_handlers_t handlers_xrsr = {0};
 
             if(!this->obj_http->get_handlers(&handlers_xrsr)) {
                 LOG_ERROR("%s: failed to get handlers http\n", __FUNCTION__);
@@ -182,8 +182,7 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 i++;
             }
         } else if(url->rfind("ws", 0) == 0) {
-            xrsr_handlers_t    handlers_xrsr;
-            memset(&handlers_xrsr, 0, sizeof(handlers_xrsr));
+            xrsr_handlers_t    handlers_xrsr = {0};
 
             if(!this->obj_ws->get_handlers(&handlers_xrsr)) {
                 LOG_ERROR("%s: failed to get handlers ws\n", __FUNCTION__);
@@ -202,9 +201,8 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 i++;
             }
         } else if(url->rfind("vrng", 0) == 0) {
-            xrsr_handlers_t    handlers_xrsr;
+            xrsr_handlers_t    handlers_xrsr = {0};
             int                translated_index = urls_translated.size();
-            memset(&handlers_xrsr, 0, sizeof(handlers_xrsr));
 
             urls_translated.push_back("ws" + url->substr(4));
 

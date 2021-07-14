@@ -39,7 +39,8 @@ ctrlm_tr181_result_t ctrlm_tr181_string_get(const char *parameter, char *s, size
 
    --len;
    if(CTRLM_TR181_RESULT_SUCCESS == result) {
-      strncpy(s, param.value, (len < MAX_PARAM_LEN ? len : MAX_PARAM_LEN));
+      errno_t safec_rc = strncpy_s(s, len + 1, param.value, (len < MAX_PARAM_LEN ? len : MAX_PARAM_LEN));
+      ERR_CHK(safec_rc);
       s[len] = '\0';
    }
    return result;

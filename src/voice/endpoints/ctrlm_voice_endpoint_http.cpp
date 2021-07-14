@@ -106,9 +106,9 @@ bool ctrlm_voice_endpoint_http_t::get_handlers(xrsr_handlers_t *handlers) {
         return(false);
     }
 
-    xrsv_http_handlers_t handlers_xrsv;
-    memset(handlers, 0, sizeof(xrsr_handlers_t));
-    memset(&handlers_xrsv, 0, sizeof(handlers_xrsv));
+    xrsv_http_handlers_t handlers_xrsv = {0};
+    errno_t safec_rc = memset_s(handlers, sizeof(xrsr_handlers_t), 0, sizeof(xrsr_handlers_t));
+    ERR_CHK(safec_rc);
 
     // Set up handlers
     handlers_xrsv.session_begin = &ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin;
@@ -167,6 +167,7 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
     std::string sat;
     xrsr_session_configuration_http_t *http = &dqm->configuration->http;
     std::ostringstream user_agent;
+    errno_t safec_rc = -1;
     LOG_INFO("%s: session begin\n", __FUNCTION__);
 
     if(NULL == http) {
@@ -182,9 +183,15 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
     if(sat != "") {
         LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
     }
+    /* LIMITATION :
+     * Following strncpy() can't modified to safec strncpy_s() api
+     * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
+     * And here, we have destination buffer size more than 4K i.e 5120.
+     */
     strncpy(http->sat_token, sat.c_str(), sizeof(http->sat_token));
-    strncpy(http->user_agent, user_agent.str().c_str(), sizeof(http->user_agent));
-
+    safec_rc = strncpy_s(http->user_agent, sizeof(http->user_agent), user_agent.str().c_str(), sizeof(http->user_agent)-1);
+    ERR_CHK(safec_rc);
+    http->user_agent[XRSR_USER_AGENT_LEN_MAX - 1] = '\0';
     if(dqm->src == XRSR_SRC_RCU_PTT && this->query_str_qty > 0) { // Add the application defined query string parameters
        http->query_strs = this->query_strs;
     }
@@ -283,9 +290,8 @@ void ctrlm_voice_endpoint_http_t::voice_session_recv_msg_http(const char *transc
 // Static Callbacks
 void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, rdkx_timestamp_t *timestamp, void *user_data) {
     ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
-    ctrlm_voice_session_begin_cb_http_t msg;
+    ctrlm_voice_session_begin_cb_http_t msg = {0};
     sem_t semaphore;
-    memset(&msg, 0, sizeof(msg));
     sem_init(&semaphore, 0, 0);
 
     if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
@@ -293,7 +299,7 @@ void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const u
         LOG_DEBUG("%s: Checking if VSR is done\n", __FUNCTION__);
         sem_wait(endpoint->voice_session_vsr_semaphore_get());
     }
-    
+
     uuid_copy(msg.uuid, uuid);
     msg.semaphore     = &semaphore;
     msg.src           = src;

@@ -62,6 +62,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_discovery(void *data, int size) {
 
    ctrlm_hal_rf4ce_rsp_disc_params_t params;
    params.result = CTRLM_HAL_RESULT_DISCOVERY_IGNORE;
+   errno_t safec_rc = -1;
 
    if(ctrlm_pairing_window_active_get()) {
       gboolean is_voice_remote    = ctrlm_rf4ce_is_voice_remote((char *)dqm->params.org_user_string);
@@ -114,9 +115,9 @@ void ctrlm_obj_network_rf4ce_t::ind_process_discovery(void *data, int size) {
    params.rec_profile_id_list[0] = CTRLM_RF4CE_PROFILE_ID_COMCAST_RCU;
    params.disc_req_lqi           = dqm->params.rx_link_quality;
 
-   memset(params.rec_user_string, 0, 16);
    // Octets 0-8 MSO User String
-   strncpy((char *)params.rec_user_string, user_string_.c_str(), 9);
+   safec_rc = strncpy_s((char *)params.rec_user_string, sizeof(params.rec_user_string), user_string_.c_str(), 9);
+   ERR_CHK(safec_rc);
    params.rec_user_string[9]  = '\0'; // Null
 #ifdef ASB
    if(is_asb_enabled() && (dqm->params.org_user_string[10] & CTRLM_RF4CE_DISCOVERY_ASB_OCTET_ENABLED)) {
@@ -178,6 +179,7 @@ void ctrlm_obj_network_rf4ce_t::process_discovery_stb(ctrlm_main_queue_msg_rf4ce
    //dqm->vendor_str
    //dqm->user_str
    gboolean discovery_enabled, require_line_of_sight, is_line_of_sight;
+   errno_t safec_rc = -1;
 
    if(NULL == params) {
        LOG_ERROR("%s: Params is null\n", __FUNCTION__);
@@ -218,9 +220,8 @@ void ctrlm_obj_network_rf4ce_t::process_discovery_stb(ctrlm_main_queue_msg_rf4ce
       class_number += class_inc_xr_;
       // store user string and timestamp for ieee address
       ctrlm_rf4ce_user_string_t user_string_entry;
-      strncpy(user_string_entry.user_string, (const char*)dqm->params.org_user_string, sizeof (user_string_entry.user_string));
-      // user string from discovery might be not null terminated
-      user_string_entry.user_string[CTRLM_HAL_RF4CE_VENDOR_STRING_SIZE - 1] = '\0';
+      safec_rc = strcpy_s(user_string_entry.user_string, sizeof(user_string_entry.user_string), (const char*)dqm->params.org_user_string);
+      ERR_CHK(safec_rc);
       ctrlm_timestamp_get(&user_string_entry.timestamp);
       // replace user string with older timestamp for the same ieee address
       discovered_user_strings_.erase(dqm->params.src_ieee_addr);

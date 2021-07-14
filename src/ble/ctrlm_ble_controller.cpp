@@ -280,11 +280,15 @@ guchar ctrlm_obj_controller_ble_t::property_write_irdb_entry_id_name_tv(guchar *
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
 
    // Clear the array
-   memset(irdb_entry_id_name_tv, 0, length);
+   safec_rc = memset_s(irdb_entry_id_name_tv, sizeof(irdb_entry_id_name_tv), 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
-   strncpy(irdb_entry_id_name_tv, (gchar *)data, length);
+   safec_rc = strncpy_s(irdb_entry_id_name_tv, sizeof(irdb_entry_id_name_tv), (gchar *)data, length);
+   ERR_CHK(safec_rc);
+
    irdb_entry_id_name_tv[length-1] = 0;
 
    if(irdb_entry_id_name_tv_ != irdb_entry_id_name_tv) {
@@ -305,11 +309,14 @@ guchar ctrlm_obj_controller_ble_t::property_read_irdb_entry_id_name_tv(guchar *d
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
 
    // Clear the array
-   memset(irdb_entry_id_name_tv, 0, length);
+   safec_rc = memset_s(irdb_entry_id_name_tv, sizeof(irdb_entry_id_name_tv), 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
-   strncpy((char *)irdb_entry_id_name_tv, (char *)data, length);
+   safec_rc = strncpy_s((char *)irdb_entry_id_name_tv, sizeof(irdb_entry_id_name_tv), (char *)data, length);
+   ERR_CHK(safec_rc);
    irdb_entry_id_name_tv[length-1] = 0;
 
    if(irdb_entry_id_name_tv_ != (char *)irdb_entry_id_name_tv) {
@@ -327,11 +334,14 @@ guchar ctrlm_obj_controller_ble_t::property_write_irdb_entry_id_name_avr(guchar 
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
 
    // Clear the array
-   memset(irdb_entry_id_name_avr, 0, length);
+   safec_rc = memset_s(irdb_entry_id_name_avr, sizeof(irdb_entry_id_name_avr), 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
-   strncpy(irdb_entry_id_name_avr, (gchar *)data, length);
+   safec_rc = strncpy_s(irdb_entry_id_name_avr, sizeof(irdb_entry_id_name_avr), (gchar *)data, length);
+   ERR_CHK(safec_rc);
    irdb_entry_id_name_avr[length-1] = 0;
 
    if(irdb_entry_id_name_avr_ != irdb_entry_id_name_avr) {
@@ -352,11 +362,14 @@ guchar ctrlm_obj_controller_ble_t::property_read_irdb_entry_id_name_avr(guchar *
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
 
    // Clear the array
-   memset(irdb_entry_id_name_avr, 0, length);
+   safec_rc = memset_s(irdb_entry_id_name_avr, sizeof(irdb_entry_id_name_avr), 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
-   strncpy((char *)irdb_entry_id_name_avr, (char *)data, length);
+   safec_rc = strncpy_s((char *)irdb_entry_id_name_avr, sizeof(irdb_entry_id_name_avr),  (char *)data, length);
+   ERR_CHK(safec_rc);
    irdb_entry_id_name_avr[length-1] = 0;
 
    if(irdb_entry_id_name_avr_ != (char *)irdb_entry_id_name_avr) {
@@ -604,6 +617,7 @@ guchar ctrlm_obj_controller_ble_t::property_parse_voice_metrics(guchar *data, gu
 
 
 void ctrlm_obj_controller_ble_t::getStatus(ctrlm_controller_status_t *status) {
+   errno_t safec_rc = -1;
    if(status == NULL) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return;
@@ -640,9 +654,11 @@ void ctrlm_obj_controller_ble_t::getStatus(ctrlm_controller_status_t *status) {
    status->utterances_exceeding_packet_loss_threshold_today     = utterances_exceeding_packet_loss_threshold_today_;
    status->utterances_exceeding_packet_loss_threshold_yesterday = utterances_exceeding_packet_loss_threshold_yesterday_;
 
-   strncpy(status->manufacturer, manufacturer_.c_str(), CTRLM_RCU_MAX_MANUFACTURER_LENGTH);
+   safec_rc = strncpy_s(status->manufacturer, sizeof(status->manufacturer), manufacturer_.c_str(),CTRLM_RCU_MAX_MANUFACTURER_LENGTH-1);
+   ERR_CHK(safec_rc);
    status->manufacturer[CTRLM_RCU_MAX_MANUFACTURER_LENGTH - 1] = '\0';
-   strncpy(status->type, product_name_.c_str(), CTRLM_RCU_MAX_USER_STRING_LENGTH);
+   safec_rc = strncpy_s(status->type, sizeof(status->type), product_name_.c_str(), CTRLM_RCU_MAX_USER_STRING_LENGTH - 1);
+   ERR_CHK(safec_rc);
    status->type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
 
    status->battery_level_percent = battery_percent_;
@@ -653,16 +669,19 @@ void ctrlm_obj_controller_ble_t::getStatus(ctrlm_controller_status_t *status) {
 void ctrlm_obj_controller_ble_t::print_status() {
    char time_binding_str[CTRLM_BLE_TIME_STR_LEN];
    char time_last_key_str[CTRLM_BLE_TIME_STR_LEN];
+   errno_t safec_rc = -1;
 
    // Format time strings
    if(time_binding_ == 0) {
-      strncpy(time_binding_str, "NEVER", CTRLM_BLE_TIME_STR_LEN);
+      safec_rc = strcpy_s(time_binding_str, sizeof(time_binding_str), "NEVER");
+      ERR_CHK(safec_rc);
    } else {
       time_binding_str[0]        = '\0';
       strftime(time_binding_str,        CTRLM_BLE_TIME_STR_LEN, "%F %T", localtime((time_t *)&time_binding_));
    }
    if(last_key_time_ == 0) {
-      strncpy(time_last_key_str, "NEVER", CTRLM_BLE_TIME_STR_LEN);
+      safec_rc = strcpy_s(time_last_key_str, sizeof(time_last_key_str), "NEVER");
+      ERR_CHK(safec_rc);
    } else {
       time_last_key_str[0]        = '\0';
       strftime(time_last_key_str,        CTRLM_BLE_TIME_STR_LEN, "%F %T", localtime((time_t *)&last_key_time_));

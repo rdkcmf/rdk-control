@@ -61,8 +61,7 @@ bool ctrlm_irdb_t::_set_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller
 
     IRDB_LOG_INFO("%s: Setting IR codes for (%u, %u)\n", __FUNCTION__, network_id, controller_id);
 
-    ctrlm_main_queue_msg_ir_set_code_t msg;
-    memset(&msg, 0, sizeof(msg));
+    ctrlm_main_queue_msg_ir_set_code_t msg = {0};
 
     sem_init(&semaphore, 0, 0);
 
@@ -86,8 +85,7 @@ bool ctrlm_irdb_t::_clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controll
 
     IRDB_LOG_INFO("%s: Clearing IR codes for (%u, %u)\n", __FUNCTION__, network_id, controller_id);
 
-    ctrlm_main_queue_msg_ir_clear_t msg;
-    memset(&msg, 0, sizeof(msg));
+    ctrlm_main_queue_msg_ir_clear_t msg = {0};
 
     sem_init(&semaphore, 0, 0);
 

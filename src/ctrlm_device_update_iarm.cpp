@@ -93,9 +93,13 @@ IARM_Result_t ctrlm_device_update_update_available(void *arg) {
    // firmwareLocation - "/opt/CDL"
    // firmwareNames - "test.bin,test1.bin,test2.bin"
 
-   gchar *tok;
+   gchar *tok = NULL;
    gchar *saveptr = NULL;
-   tok  = strtok_r(params->firmwareNames, ",", &saveptr);
+   size_t  len = 0;
+   len = strlen(params->firmwareNames);
+   if(len != 0){
+      tok  = strtok_s(params->firmwareNames, &len, ",", &saveptr);
+   }
    while(tok!=NULL){
       string filename=params->firmwareLocation;
       filename+="/";
@@ -110,7 +114,7 @@ IARM_Result_t ctrlm_device_update_update_available(void *arg) {
          // something went wrong so send error back
          params->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
       }
-      tok  = strtok_r(NULL, ",", &saveptr);
+      tok = strtok_s(NULL, &len, ",", &saveptr);
 
    }
    return IARM_RESULT_SUCCESS;
@@ -264,8 +268,7 @@ IARM_Result_t ctrlm_device_update_load_initiate(void *arg) {
 }
 
 void ctrlm_device_update_iarm_event_ready_to_download(ctrlm_device_update_session_id_t session_id) {
-   ctrlm_device_update_iarm_event_ready_to_download_t event;
-   memset(&event, 0, sizeof(event));
+   ctrlm_device_update_iarm_event_ready_to_download_t event = {0};
    event.api_revision = CTRLM_DEVICE_UPDATE_IARM_BUS_API_REVISION;
    event.session_id   = session_id;
 
@@ -283,8 +286,7 @@ void ctrlm_device_update_iarm_event_ready_to_download(ctrlm_device_update_sessio
 }
 
 void ctrlm_device_update_iarm_event_download_status(ctrlm_device_update_session_id_t session_id, guchar percent_complete) {
-   ctrlm_device_update_iarm_event_download_status_t event;
-   memset(&event, 0, sizeof(event));
+   ctrlm_device_update_iarm_event_download_status_t event = {0};
    event.api_revision     = CTRLM_DEVICE_UPDATE_IARM_BUS_API_REVISION;
    event.session_id       = session_id;
    event.percent_complete = percent_complete;
@@ -297,8 +299,7 @@ void ctrlm_device_update_iarm_event_download_status(ctrlm_device_update_session_
 }
 
 void ctrlm_device_update_iarm_event_load_begin(ctrlm_device_update_session_id_t session_id) {
-   ctrlm_device_update_iarm_event_load_begin_t event;
-   memset(&event, 0, sizeof(event));
+   ctrlm_device_update_iarm_event_load_begin_t event = {0};
    event.api_revision = CTRLM_DEVICE_UPDATE_IARM_BUS_API_REVISION;
    event.session_id   = session_id;
    LOG_INFO("%s: Session Id %u\n", __FUNCTION__, session_id);
@@ -310,8 +311,7 @@ void ctrlm_device_update_iarm_event_load_begin(ctrlm_device_update_session_id_t 
 }
 
 void ctrlm_device_update_iarm_event_load_end(ctrlm_device_update_session_id_t session_id, ctrlm_device_update_iarm_load_result_t result) {
-   ctrlm_device_update_iarm_event_load_end_t event;
-   memset(&event, 0, sizeof(event));
+   ctrlm_device_update_iarm_event_load_end_t event = {0};
    event.api_revision = CTRLM_DEVICE_UPDATE_IARM_BUS_API_REVISION;
    event.session_id   = session_id;
    event.result       = result;

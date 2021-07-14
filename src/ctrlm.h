@@ -34,6 +34,7 @@
 #include "ctrlm_ipc.h"
 #include "ctrlm_ipc_rcu.h"
 #include "libIBus.h"
+#include "safec_lib.h"
 
 #define CTRLM_MAIN_QUEUE_MSG_TYPE_GLOBAL (0x100)
 #define CTRLM_THREAD_SYNC_DELAY          (10000)
@@ -469,7 +470,7 @@ void ctrlm_main_queue_handler_push(ctrlm_handler_type_t type, T handler, void *d
    if (size > 1) {
       --msg_size;
    }
-
+   errno_t safec_rc = -1;
    ctrlm_main_queue_msg_handler_t *msg = (ctrlm_main_queue_msg_handler_t *)g_malloc(msg_size);
 
    if(NULL == msg) {
@@ -477,7 +478,8 @@ void ctrlm_main_queue_handler_push(ctrlm_handler_type_t type, T handler, void *d
       g_assert(0);
       return;
    }
-   memset(msg, 0, msg_size);
+   safec_rc = memset_s(msg, msg_size, 0, msg_size);
+   ERR_CHK(safec_rc);
    msg->header.type       = CTRLM_MAIN_QUEUE_MSG_TYPE_HANDLER;
    msg->header.network_id = network_id;
    msg->obj               = obj;
@@ -490,7 +492,8 @@ void ctrlm_main_queue_handler_push(ctrlm_handler_type_t type, T handler, void *d
    }
    msg->data_len          = size;
    if (size > 0) {
-      memcpy(msg->data, data, size);
+      safec_rc = memcpy_s(msg->data, msg->data_len, data, size);
+      ERR_CHK(safec_rc);
    }
    ctrlm_main_queue_msg_push(msg);
 }

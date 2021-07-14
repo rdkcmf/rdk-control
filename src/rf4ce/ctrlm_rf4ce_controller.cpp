@@ -64,9 +64,43 @@ static char samsung_0x34[] = {0x88, 0x00, 0x29, 0x04, 0x11, 0x04, 0x00, 0x22, 0x
 #define XR15V2_IEEE_PREFIX                 0x00155F0000000000
 #define XR15V2_IEEE_PREFIX_UP_TO_FEB_2018  0x48D0CF0000000000
 #define XR15V2_IEEE_PREFIX_THIRD           0x00CC3F0000000000
+
+#define NUM_OF_PRODUCT_NAME_TYPES (sizeof(Product_name_pair_type__table)/sizeof(Product_name_pair_type__table[0]))
+
 const guchar xr11v2_hardware_versions[NUM_XR11V2_HARDWARE_VERSIONS][CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING] = { {0x22, 0x01, 0x00, 0x00}                           };
 const guchar xr15v1_hardware_versions[NUM_XR15V1_HARDWARE_VERSIONS][CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING] = { {0x23, 0x01, 0x00, 0x00}                           };
 const guchar xr15v2_hardware_versions[NUM_XR15V2_HARDWARE_VERSIONS][CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING] = { {0x23, 0x02, 0x00, 0x00}, {0x13, 0x02, 0x00, 0x00} };
+
+/* Below structure table and helper function used for better optinamization of multiple if- else cases */
+/* table with Product name with corresponding type */
+ctrlm_rf4ce_product_name_pair_t Product_name_pair_type__table[] = {
+  { "XR2-",    XR2,    RF4CE_CONTROLLER_TYPE_XR2    },
+  { "XR5-",    XR5,    RF4CE_CONTROLLER_TYPE_XR5    },
+  { "XR11-",   XR11,   RF4CE_CONTROLLER_TYPE_XR11   },
+  { "XR15-1",  XR15_1, RF4CE_CONTROLLER_TYPE_XR15   },
+  { "XR15-2",  XR15_2, RF4CE_CONTROLLER_TYPE_XR15V2 },
+  { "XR16-",   XR16,   RF4CE_CONTROLLER_TYPE_XR16   },
+  { "XR18-",   XR18,   RF4CE_CONTROLLER_TYPE_XR18   },
+  { "XR19-",   XR19,   RF4CE_CONTROLLER_TYPE_XR19   },
+  { "XRA-",    XRA,    RF4CE_CONTROLLER_TYPE_XRA    },
+};
+
+/* Function to get the corresponding product name type from the given product name */
+bool ctrlm_rf4ce_get_product_type_from_product_name(const char *name, ctrlm_rf4ce_product_name_t *product_type, ctrlm_rf4ce_controller_type_t *controller_type) {
+  unsigned int i = 0;
+
+  if((name == NULL) || (product_type == NULL) || (controller_type == NULL) )
+     return false;
+
+  for (i = 0 ; i < NUM_OF_PRODUCT_NAME_TYPES ; ++i) {
+      if(0 == strncmp(name, Product_name_pair_type__table[i].name, strlen(Product_name_pair_type__table[i].name))) {
+         *product_type = Product_name_pair_type__table[i].product_type;
+         *controller_type = Product_name_pair_type__table[i].controller_type;
+         return true;
+      }
+  }
+  return false;
+}
 
 ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_rf4ce_t &network, unsigned long long ieee_address, ctrlm_rf4ce_result_validation_t result_validation, ctrlm_rcu_configuration_result_t result_configuration) :
    ctrlm_obj_controller_t(controller_id, network),
@@ -182,8 +216,10 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    #endif
 
    // Clear out build_id
-   memset(&version_build_id_, 0, sizeof(version_build_id_));
-   memset(&version_dsp_build_id_, 0, sizeof(version_dsp_build_id_));
+   errno_t safec_rc = memset_s(&version_build_id_, sizeof(version_build_id_), 0, sizeof(version_build_id_));
+   ERR_CHK(safec_rc);
+   safec_rc = memset_s(&version_dsp_build_id_, sizeof(version_dsp_build_id_), 0, sizeof(version_dsp_build_id_));
+   ERR_CHK(safec_rc);
 
    print_firmware_on_button_press = true;
 
@@ -203,21 +239,28 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    battery_milestones_.battery_0_percent_actual_percent  = 0;
 
    // Far Field
-   memset(&ff_metrics_, 0, sizeof(ff_metrics_));
-   memset(&dsp_metrics_, 0, sizeof(dsp_metrics_));
- 
+   safec_rc = memset_s(&ff_metrics_, sizeof(ff_metrics_), 0, sizeof(ff_metrics_));
+   ERR_CHK(safec_rc);
+   safec_rc = memset_s(&dsp_metrics_, sizeof(dsp_metrics_), 0, sizeof(dsp_metrics_));
+   ERR_CHK(safec_rc);
+
    // Uptime / Privacy Mode
-   memset(&uptime_privacy_info_, 0, sizeof(uptime_privacy_info_));
+   safec_rc = memset_s(&uptime_privacy_info_, sizeof(uptime_privacy_info_), 0, sizeof(uptime_privacy_info_));
+   ERR_CHK(safec_rc);
    time_since_last_saved_ = 0;
 
    // Polling Init
-   memset(&polling_configurations_[RF4CE_POLLING_METHOD_HEARTBEAT], 0, sizeof(ctrlm_rf4ce_polling_configuration_t));
-   memset(&polling_configurations_[RF4CE_POLLING_METHOD_MAC],       0, sizeof(ctrlm_rf4ce_polling_configuration_t));
+   safec_rc = memset_s(&polling_configurations_[RF4CE_POLLING_METHOD_HEARTBEAT], sizeof(ctrlm_rf4ce_polling_configuration_t), 0, sizeof(ctrlm_rf4ce_polling_configuration_t));
+   ERR_CHK(safec_rc);
+   safec_rc = memset_s(&polling_configurations_[RF4CE_POLLING_METHOD_MAC], sizeof(ctrlm_rf4ce_polling_configuration_t), 0, sizeof(ctrlm_rf4ce_polling_configuration_t));
+   ERR_CHK(safec_rc);
    polling_actions_ = g_async_queue_new_full(ctrlm_rf4ce_polling_action_free);
-   memset(&checkin_time_,0, sizeof (checkin_time_));
+   safec_rc = memset_s(&checkin_time_, sizeof(checkin_time_), 0, sizeof(checkin_time_));
+   ERR_CHK(safec_rc);
 
    // Clear Voice Command Status
-   memset(voice_command_status_, 0, sizeof(voice_command_status_));
+   safec_rc = memset_s(voice_command_status_, sizeof(voice_command_status_), 0, sizeof(voice_command_status_));
+   ERR_CHK(safec_rc);
 }
 
 ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t() {
@@ -226,7 +269,7 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t() {
 
 ctrlm_obj_controller_rf4ce_t::~ctrlm_obj_controller_rf4ce_t() {
    LOG_INFO("ctrlm_obj_controller_rf4ce_t deconstructor\n");
-   
+
    if(pairing_data_ != NULL) {
       ctrlm_hal_free(pairing_data_);
    }
@@ -288,16 +331,18 @@ ctrlm_timestamp_t ctrlm_obj_controller_rf4ce_t::last_mac_poll_checkin_time_get()
 void ctrlm_obj_controller_rf4ce_t::user_string_set(guchar *user_string) {
    controller_type_ = obj_network_rf4ce_->controller_type_from_user_string(user_string);
 
-   strncpy(product_name_, (char *)user_string, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-   product_name_[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+   errno_t safec_rc = strcpy_s(product_name_, sizeof(product_name_),(char *)user_string);
+   ERR_CHK(safec_rc);
 
    // If string is comcast, assume XR2
    if(0 == strncmp((const char *)&user_string[7], "COMCAST", 7)) {
       LOG_WARN("%s: Assuming XR2.\n", __FUNCTION__);
-      strncpy(product_name_, "XR2-10", CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+      safec_rc = strcpy_s(product_name_, sizeof(product_name_),"XR2-10");
+      ERR_CHK(safec_rc);
    } else if (controller_type_ == RF4CE_CONTROLLER_TYPE_UNKNOWN) {
       LOG_WARN("%s: Assuming XR5.\n", __FUNCTION__);
-      strncpy(product_name_, "XR5-40", CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+      safec_rc = strcpy_s(product_name_, sizeof(product_name_),"XR5-40");
+      ERR_CHK(safec_rc);
    }
 
    controller_chipset_from_product_name();
@@ -307,44 +352,25 @@ void ctrlm_obj_controller_rf4ce_t::user_string_set(guchar *user_string) {
 }
 
 void ctrlm_obj_controller_rf4ce_t::controller_chipset_from_product_name(void) {
+   ctrlm_rf4ce_product_name_t product_type;
+   ctrlm_rf4ce_controller_type_t ctrlm_type;
+   errno_t safec_rc = -1;
+
    // Convert the string to controller type
-   if(0 == strncmp(product_name_, "XR2-", 4)) {
-      // XR2-30, XR2-10
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR2;
-      strncpy(chipset_,      "TI",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XR5-", 4)) {
-      // XR5-10, XR5-40
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR5;
-      strncpy(chipset_,      "TI",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XR11-", 5)) {
-      // XR11-20
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR11;
-      strncpy(chipset_,      "TI",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XR15-1", 6)) {
-      // XR15-10
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR15;
-      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XR15-2", 6)) {
-      // XR15-20
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR15V2;
-      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XR16-", 5)) {
-      // XR16-10
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR16;
-      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XR18-", 5)) {
-      // XR18-10
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR18;
-      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   }  else if(0 == strncmp(product_name_, "XR19-", 5)) {
-     // XR19-10
-     controller_type_ = RF4CE_CONTROLLER_TYPE_XR19;
-     strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else if(0 == strncmp(product_name_, "XRA-", 4)) {
-      // XRA-10
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XRA;
-      strncpy(chipset_,      "QORVO",  CTRLM_RCU_MAX_CHIPSET_LENGTH);      chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1]           = '\0';
-   } else {
+   if(ctrlm_rf4ce_get_product_type_from_product_name(product_name_,&product_type,&ctrlm_type)) {
+      controller_type_ = ctrlm_type;
+
+      if(product_type == XR2 || product_type == XR5 || product_type == XR11 ) {
+         // XR2-30, XR2-10, XR5-10, XR5-40 , // XR11-20
+         safec_rc = strcpy_s(chipset_, sizeof(chipset_), "TI");
+         ERR_CHK(safec_rc);
+      } else if(product_type == XR15_1 || product_type == XR15_2 || product_type == XR16 || product_type == XR18 || product_type == XR19 || product_type == XRA) {
+         // XR15-10 , // XR15-20 , // XR16-10 , // XR18-10 , // XR19-10, // XRA
+         safec_rc = strcpy_s(chipset_, sizeof(chipset_), "QORVO");
+         ERR_CHK(safec_rc);
+      }
+   }
+   else {
       LOG_ERROR("%s: Unsupported controller type <%s>\n", __FUNCTION__, product_name_);
    }
 }
@@ -495,6 +521,8 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
       return;
    }
 
+   errno_t safec_rc = -1;
+
    //If the day has changed, store the values related to today and yesterday
    if(handle_day_change()) {
       property_write_voice_metrics();
@@ -534,34 +562,66 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
    status->utterances_exceeding_packet_loss_threshold_yesterday = utterances_exceeding_packet_loss_threshold_yesterday_;
    status->firmware_updated                                     = firmware_updated_;
 
-   strncpy(status->manufacturer, manufacturer_, CTRLM_RCU_MAX_MANUFACTURER_LENGTH);
-   status->manufacturer[CTRLM_RCU_MAX_MANUFACTURER_LENGTH - 1] = '\0';
-   strncpy(status->chipset, chipset_, CTRLM_RCU_MAX_CHIPSET_LENGTH);
-   status->chipset[CTRLM_RCU_MAX_CHIPSET_LENGTH - 1] = '\0';
+   safec_rc = strcpy_s(status->manufacturer, sizeof(status->manufacturer),manufacturer_);
+   ERR_CHK(safec_rc);
 
-   strncpy(status->version_build_id, version_build_id_.build_id, CTRLM_RCU_VERSION_LENGTH);
+   safec_rc = strcpy_s(status->chipset, sizeof(status->chipset),chipset_);
+   ERR_CHK(safec_rc);
+
+   safec_rc = strncpy_s(status->version_build_id, sizeof(status->version_build_id),version_build_id_.build_id,CTRLM_RCU_VERSION_LENGTH);
+   ERR_CHK(safec_rc);
    status->version_build_id[CTRLM_RCU_VERSION_LENGTH-1] = '\0';
-   strncpy(status->version_dsp_build_id, version_dsp_build_id_.build_id, CTRLM_RCU_DSP_BUILD_ID_LENGTH);
-   status->version_dsp_build_id[CTRLM_RCU_DSP_BUILD_ID_LENGTH-1] = '\0';
-   snprintf(status->version_software, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
-   status->version_software[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_dsp, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_dsp_.major, version_dsp_.minor, version_dsp_.revision, version_dsp_.patch);
-   status->version_dsp[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_keyword_model, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_keyword_model_.major, version_keyword_model_.minor, version_keyword_model_.revision, version_keyword_model_.patch);
-   status->version_keyword_model[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_arm, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_arm_.major, version_arm_.minor, version_arm_.revision, version_arm_.patch);
-   status->version_arm[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_hardware, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_hardware_.manufacturer, version_hardware_.model, version_hardware_.hw_revision, version_hardware_.lot_code);
-   status->version_hardware[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_irdb, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_irdb_.major, version_irdb_.minor, version_irdb_.revision, version_irdb_.patch);
-   status->version_irdb[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_bootloader, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_bootloader_.major, version_bootloader_.minor, version_bootloader_.revision, version_bootloader_.patch);
-   status->version_bootloader[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_golden, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_golden_.major, version_golden_.minor, version_golden_.revision, version_golden_.patch);
-   status->version_golden[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   snprintf(status->version_audio_data, CTRLM_RCU_VERSION_LENGTH, "%u.%u.%u.%u", version_audio_data_.major, version_audio_data_.minor, version_audio_data_.revision, version_audio_data_.patch);
-   status->version_audio_data[CTRLM_RCU_VERSION_LENGTH - 1] = '\0';
-   strncpy(status->type, product_name_, CTRLM_RCU_MAX_USER_STRING_LENGTH);
+
+   safec_rc = strcpy_s(status->version_dsp_build_id, sizeof(status->version_dsp_build_id),version_dsp_build_id_.build_id);
+   ERR_CHK(safec_rc);
+
+   safec_rc = sprintf_s(status->version_software, sizeof(status->version_software), "%u.%u.%u.%u", version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_dsp, sizeof(status->version_dsp), "%u.%u.%u.%u", version_dsp_.major, version_dsp_.minor, version_dsp_.revision, version_dsp_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_keyword_model, sizeof(status->version_keyword_model), "%u.%u.%u.%u", version_keyword_model_.major, version_keyword_model_.minor, version_keyword_model_.revision, version_keyword_model_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_arm, sizeof(status->version_arm), "%u.%u.%u.%u", version_arm_.major, version_arm_.minor, version_arm_.revision, version_arm_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_hardware, sizeof(status->version_hardware), "%u.%u.%u.%u", version_hardware_.manufacturer, version_hardware_.model, version_hardware_.hw_revision, version_hardware_.lot_code);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_irdb, sizeof(status->version_irdb), "%u.%u.%u.%u", version_irdb_.major, version_irdb_.minor, version_irdb_.revision, version_irdb_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_bootloader, sizeof(status->version_bootloader), "%u.%u.%u.%u", version_bootloader_.major, version_bootloader_.minor, version_bootloader_.revision, version_bootloader_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_golden, sizeof(status->version_golden), "%u.%u.%u.%u", version_golden_.major, version_golden_.minor, version_golden_.revision, version_golden_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(status->version_audio_data, sizeof(status->version_audio_data), "%u.%u.%u.%u", version_audio_data_.major, version_audio_data_.minor, version_audio_data_.revision, version_audio_data_.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = strncpy_s(status->type, sizeof(status->type),product_name_, CTRLM_RCU_MAX_USER_STRING_LENGTH-1);
+   ERR_CHK(safec_rc);
    status->type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
 
    if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_TYPE) {
@@ -576,10 +636,11 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
       status->ir_db_code_download_supported = false;
    }
 
-   strncpy(status->ir_db_code_tv, "00000", CTRLM_RCU_MAX_IR_DB_CODE_LENGTH);
-   status->ir_db_code_tv[CTRLM_RCU_MAX_IR_DB_CODE_LENGTH - 1] = '\0';
-   strncpy(status->ir_db_code_avr, "00000", CTRLM_RCU_MAX_IR_DB_CODE_LENGTH);
-   status->ir_db_code_avr[CTRLM_RCU_MAX_IR_DB_CODE_LENGTH - 1] = '\0';
+   safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),"00000");
+   ERR_CHK(safec_rc);
+
+   safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),"00000");
+   ERR_CHK(safec_rc);
 
    if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_NO_IR_PROGRAMMED) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_NO_CODES;
@@ -587,27 +648,28 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_IR_RF_DB_CODES;
    } else if((controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV) && (controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR)) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_TV_AVR_CODES;
-      strncpy(status->ir_db_code_tv, controller_irdb_status_.irdb_string_tv, CTRLM_RCU_MAX_IR_DB_CODE_LENGTH);
-      status->ir_db_code_tv[CTRLM_RCU_MAX_IR_DB_CODE_LENGTH - 1] = '\0';
-      strncpy(status->ir_db_code_avr, controller_irdb_status_.irdb_string_avr, CTRLM_RCU_MAX_IR_DB_CODE_LENGTH);
-      status->ir_db_code_avr[CTRLM_RCU_MAX_IR_DB_CODE_LENGTH - 1] = '\0';
+      safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),controller_irdb_status_.irdb_string_tv);
+      ERR_CHK(safec_rc);
+
+      safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),controller_irdb_status_.irdb_string_avr);
+      ERR_CHK(safec_rc);
    } else if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_TV_CODE;
-      strncpy(status->ir_db_code_tv, controller_irdb_status_.irdb_string_tv, CTRLM_RCU_MAX_IR_DB_CODE_LENGTH);
-      status->ir_db_code_tv[CTRLM_RCU_MAX_IR_DB_CODE_LENGTH - 1] = '\0';
+      safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),controller_irdb_status_.irdb_string_tv);
+      ERR_CHK(safec_rc);
    } else if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_AVR_CODE;
-      strncpy(status->ir_db_code_avr, controller_irdb_status_.irdb_string_avr, CTRLM_RCU_MAX_IR_DB_CODE_LENGTH);
-      status->ir_db_code_avr[CTRLM_RCU_MAX_IR_DB_CODE_LENGTH - 1] = '\0';
+      safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),controller_irdb_status_.irdb_string_avr);
+      ERR_CHK(safec_rc);
    } else {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_NO_CODES;
    }
 
-   strncpy(status->irdb_entry_id_name_tv, irdb_entry_id_name_tv_.c_str(), CTRLM_MAX_PARAM_STR_LEN);
-   status->irdb_entry_id_name_tv[CTRLM_MAX_PARAM_STR_LEN - 1] = '\0';
+   safec_rc = strcpy_s(status->irdb_entry_id_name_tv, sizeof(status->irdb_entry_id_name_tv), irdb_entry_id_name_tv_.c_str());
+   ERR_CHK(safec_rc);
 
-   strncpy(status->irdb_entry_id_name_avr, irdb_entry_id_name_avr_.c_str(), CTRLM_MAX_PARAM_STR_LEN);
-   status->irdb_entry_id_name_avr[CTRLM_MAX_PARAM_STR_LEN - 1] = '\0';
+   safec_rc = strcpy_s(status->irdb_entry_id_name_avr, sizeof(status->irdb_entry_id_name_avr), irdb_entry_id_name_avr_.c_str());
+   ERR_CHK(safec_rc);
 
    //Check whether the remote checked in in the last x hours
    time_t now = time(NULL);
@@ -1465,7 +1527,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_version_hardware(guchar *dat
       }
    }
    //Set the manufacturer string from version_hardware
-   strncpy(manufacturer_, ctrlm_rf4ce_controller_manufacturer(version_hardware_.manufacturer), CTRLM_RCU_MAX_MANUFACTURER_LENGTH); manufacturer_[CTRLM_RCU_MAX_MANUFACTURER_LENGTH - 1] = '\0';
+   errno_t safec_rc = strcpy_s(manufacturer_, sizeof(manufacturer_),ctrlm_rf4ce_controller_manufacturer(version_hardware_.manufacturer));
+   ERR_CHK(safec_rc);
 
    LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_hardware_.manufacturer, version_hardware_.model, version_hardware_.hw_revision, version_hardware_.lot_code);
    return(length);
@@ -1672,14 +1735,22 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_version_build_id(guchar *dat
       return(0);
    }
 
-   if(length != version_build_id_.length || memcmp(version_build_id_.build_id, data, length)) {
+   errno_t safec_rc = -1;
+   int ind = -1;
+   bool IsValid = false;
+
+   (length != version_build_id_.length)? (IsValid= true): (safec_rc = memcmp_s(version_build_id_.build_id, sizeof(version_build_id_.build_id), data, length, &ind));
+   if((IsValid) || ((safec_rc == EOK) && (ind != 0))) {
       // Store the data on the controller object
-      memcpy(version_build_id_.build_id, data, length);
+      safec_rc = memcpy_s(version_build_id_.build_id, sizeof(version_build_id_.build_id), data, length);
+      ERR_CHK(safec_rc);
       version_build_id_.length = length;
 
       if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
          ctrlm_db_rf4ce_write_version_build_id(network_id_get(), controller_id_get(), data, length);
       }
+   } else if (safec_rc != EOK) {
+     ERR_CHK(safec_rc);
    }
 
    LOG_INFO("%s: %.*s\n", __FUNCTION__, version_build_id_.length, version_build_id_.build_id);
@@ -1693,7 +1764,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_version_build_id(guchar *data
    }
 
    // Load the data from the controller object
-   memcpy(data, version_build_id_.build_id, version_build_id_.length);
+   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, version_build_id_.build_id, version_build_id_.length);
+   ERR_CHK(safec_rc);
 
    LOG_INFO("%s: %.*s\n", __FUNCTION__, version_build_id_.length, version_build_id_.build_id);
 
@@ -1705,16 +1777,25 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_version_dsp_build_id(guchar 
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
+   int ind = -1;
+   bool IsValid = false;
 
-   if(length != version_dsp_build_id_.length || memcmp(version_dsp_build_id_.build_id, data, length)) {
+   (length != version_dsp_build_id_.length)? (IsValid= true): (safec_rc = memcmp_s(version_dsp_build_id_.build_id, sizeof(version_dsp_build_id_.build_id), data, length, &ind));
+   if((IsValid) || ((safec_rc == EOK) && (ind != 0))) {
       // Store the data on the controller object
-      memset(version_dsp_build_id_.build_id, 0, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID);
-      memcpy(version_dsp_build_id_.build_id, data, length);
+      safec_rc =  memset_s(version_dsp_build_id_.build_id, sizeof(version_dsp_build_id_.build_id), 0, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID);
+      ERR_CHK(safec_rc);
+      safec_rc = memcpy_s(version_dsp_build_id_.build_id, sizeof(version_dsp_build_id_.build_id), data, length);
+      ERR_CHK(safec_rc);
       version_dsp_build_id_.length = length;
 
       if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
          ctrlm_db_rf4ce_write_version_dsp_build_id(network_id_get(), controller_id_get(), data, length);
       }
+   }
+   else if(safec_rc != EOK) {
+     ERR_CHK(safec_rc);
    }
 
    LOG_INFO("%s: %.*s\n", __FUNCTION__, version_dsp_build_id_.length, version_dsp_build_id_.build_id);
@@ -1728,7 +1809,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_version_dsp_build_id(guchar *
    }
 
    // Load the data from the controller object
-   memcpy(data, version_dsp_build_id_.build_id, version_dsp_build_id_.length);
+   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, version_dsp_build_id_.build_id, version_dsp_build_id_.length);
+   ERR_CHK(safec_rc);
 
    LOG_INFO("%s: %.*s\n", __FUNCTION__, version_dsp_build_id_.length, version_dsp_build_id_.build_id);
 
@@ -1811,7 +1893,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar *d
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   memcpy(&battery_milestones_, data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
+   errno_t safec_rc = memcpy_s(&battery_milestones_, sizeof(battery_milestones_), data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
+   ERR_CHK(safec_rc);
    LOG_INFO("%s: battery_changed <%ld>, <%d%%> battery_75_percent_ <%ld>, <%d%%> battery_50_percent_ <%ld>, <%d%%> battery_25_percent_ <%ld>, <%d%%> battery_5_percent_ <%ld>, <%d%%> battery_0_percent_ <%ld>, <%d%%> \n",
    __FUNCTION__, battery_milestones_.battery_changed_timestamp, battery_milestones_.battery_changed_actual_percent, battery_milestones_.battery_75_percent_timestamp, battery_milestones_.battery_75_percent_actual_percent, battery_milestones_.battery_50_percent_timestamp, battery_milestones_.battery_50_percent_actual_percent,
    battery_milestones_.battery_25_percent_timestamp, battery_milestones_.battery_25_percent_actual_percent, battery_milestones_.battery_5_percent_timestamp, battery_milestones_.battery_5_percent_actual_percent, battery_milestones_.battery_0_percent_timestamp, battery_milestones_.battery_0_percent_actual_percent);
@@ -1820,6 +1903,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar *d
 void ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar flags, guchar percent, time_t timestamp) {
    guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES];
    ctrlm_rcu_battery_event_t battery_event = CTRLM_RCU_BATTERY_EVENT_NONE;
+   errno_t safec_rc = -1;
 
    if(!loading_db_) { // send the event
       gboolean send_event = true;
@@ -1862,8 +1946,9 @@ void ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar flag
       }
 
       if(send_event) {
-         memcpy(data, &battery_milestones_, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
-	     ctrlm_db_rf4ce_write_battery_milestones(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
+         safec_rc = memcpy_s(data, sizeof(data), &battery_milestones_, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
+         ERR_CHK(safec_rc);
+         ctrlm_db_rf4ce_write_battery_milestones(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
          send_battery_milestone_event(network_id_get(), controller_id_get(), battery_event, percent);
       }
    }
@@ -2353,7 +2438,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_time_last_checkin_for_device_
    data[3]  = (guchar)(time_last_checkin_for_device_update_ >> 24);
    
    LOG_INFO("%s: Time Last Checkin For Device Update <%ld>\n", __FUNCTION__, time_last_checkin_for_device_update_);
-   
+
    return(CTRLM_RF4CE_LEN_TIME_LAST_CHECKIN_FOR_DEVICE_UPDATE);
 }
 
@@ -2362,6 +2447,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_command_status(guchar 
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
 
    switch(data[0]) {
       case VOICE_COMMAND_STATUS_PENDING: LOG_INFO("%s: PENDING\n", __FUNCTION__); break;
@@ -2381,11 +2467,13 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_command_status(guchar 
    if(data[0] >= VOICE_COMMAND_STATUS_TV_AVR_CMD && controller_type_ != RF4CE_CONTROLLER_TYPE_XR19) {
       // Maintain compatibility for controllers that don't support TV/AVR, MIC, AUDIO cmds
       data[0] = VOICE_COMMAND_STATUS_SUCCESS;
-      memset(data+1, 0, length - 1);
+      safec_rc = memset_s(data+1, length - 1, 0, length - 1);
+      ERR_CHK(safec_rc);
    }
    #endif
 
-   memcpy(voice_command_status_, data, length);
+   safec_rc = memcpy_s(voice_command_status_, sizeof(voice_command_status_), data,length );
+   ERR_CHK(safec_rc);
    return(length);
 }
 
@@ -2394,9 +2482,10 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_command_status(guchar *
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   
+
    // Load the data from the controller object
-   memcpy(data, voice_command_status_, length);
+   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, voice_command_status_,length );
+   ERR_CHK(safec_rc);
 
 #ifdef USE_VOICE_SDK
    LOG_INFO("%s: %s", __FUNCTION__, ctrlm_voice_command_status_str((ctrlm_voice_command_status_t)data[0]));
@@ -2431,7 +2520,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_command_status(guchar *
 
    if(voice_command_status_[0] != VOICE_COMMAND_STATUS_PENDING) { // Reset back to "no cmds" after the controller has read the result
       voice_command_status_[0] = VOICE_COMMAND_STATUS_NO_CMDS;
-      memset(&voice_command_status_[1], 0, sizeof(voice_command_status_)-1);
+      safec_rc = memset_s(&voice_command_status_[1], sizeof(voice_command_status_)-1, 0, sizeof(voice_command_status_)-1);
+      ERR_CHK(safec_rc);
       #ifdef USE_VOICE_SDK
       ctrlm_get_voice_obj()->voice_controller_command_status_read(network_id_get(), controller_id_get());
       #endif
@@ -3017,7 +3107,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_opus_encoding_params(guchar *
    #else
    voice_params_opus_encoder_t params;
    ctrlm_get_voice_obj()->voice_params_opus_encoder_get(&params);
-   memcpy(data, params.data, CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
+   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, params.data, CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
+   ERR_CHK(safec_rc);
    return(CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
    #endif
 }
@@ -3219,7 +3310,8 @@ void ctrlm_obj_controller_rf4ce_t::property_write_product_name(const char *name)
       return;
    }
 
-   strncpy((char *)data, name, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+   errno_t safec_rc = strncpy_s((char *)data, sizeof(data), name, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME-1);
+   ERR_CHK(safec_rc);
    data[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
    property_write_product_name(data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
 }
@@ -3229,11 +3321,11 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_product_name(guchar *data, g
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   
+
    if(0 != strncmp(product_name_, (const char *)data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME)) {
       // Store the data on the controller object
-      strncpy(product_name_, (const char *)data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-      product_name_[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+      errno_t safec_rc = strcpy_s(product_name_, sizeof(product_name_), (const char *)data);
+      ERR_CHK(safec_rc);
       if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
          ctrlm_db_rf4ce_write_product_name(network_id_get(), controller_id_get(), data, length);
          obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_PRODUCT_NAME, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME, data);
@@ -3256,9 +3348,9 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_product_name(guchar *data, gu
    }
    
    // Load the data from the controller object
-   memset(data, 0, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-   strncpy((char *)data, product_name_, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-   
+   errno_t safec_rc = strcpy_s((char *)data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, product_name_);
+   ERR_CHK(safec_rc);
+
    LOG_INFO("%s: <%s>\n", __FUNCTION__, product_name_);
 
    return(CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
@@ -3767,10 +3859,12 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_irdb_entry_id_name_tv(guchar
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-
+   errno_t safec_rc = -1;
    // Clear the array
-   memset(irdb_entry_id_name_tv, 0, length);
+   safec_rc = memset_s(irdb_entry_id_name_tv, length, 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
+   // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
    strncpy(irdb_entry_id_name_tv, (gchar *)data, length);
    irdb_entry_id_name_tv[length-1] = 0;
 
@@ -3795,9 +3889,12 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_irdb_entry_id_name_tv(guchar 
    }
    len = (irdb_entry_id_name_tv_.length() > length ? length : irdb_entry_id_name_tv_.length());
 
+   errno_t safec_rc = -1;
    // Clear the array
-   memset(data, 0, length);
+   safec_rc = memset_s(data, length, 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
+   // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
    strncpy((gchar *)data, irdb_entry_id_name_tv_.c_str(), len);
    data[len-1] = 0;
 
@@ -3811,10 +3908,13 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_irdb_entry_id_name_avr(gucha
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+   errno_t safec_rc = -1;
 
    // Clear the array
-   memset(irdb_entry_id_name_avr, 0, length);
+   safec_rc = memset_s(irdb_entry_id_name_avr, length, 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
+   // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
    strncpy(irdb_entry_id_name_avr, (gchar *)data, length);
    irdb_entry_id_name_avr[length-1] = 0;
 
@@ -3839,9 +3939,12 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_irdb_entry_id_name_avr(guchar
    }
    len = (irdb_entry_id_name_avr_.length() > length ? length : irdb_entry_id_name_avr_.length());
 
+   errno_t safec_rc = -1;
    // Clear the array
-   memset(data, 0, length);
+   safec_rc = memset_s(data, length, 0, length);
+   ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
+   // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
    strncpy((gchar *)data, irdb_entry_id_name_avr_.c_str(), len);
    data[len-1] = 0;
 
@@ -3872,10 +3975,9 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_receiver_id(guchar *data, guc
    receiver_id = receiver_id_get();
    len = (receiver_id.length() > length ? length : receiver_id.length());
 
-   // Clear the array
-   memset(data, 0, length);
    // Copy receiver id to data buf
-   strncpy((gchar *)data, receiver_id.c_str(), len);
+   errno_t safec_rc = strncpy_s((gchar *)data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, receiver_id.c_str(),len);
+   ERR_CHK(safec_rc);
 
    return(len);
 
@@ -3904,10 +4006,9 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_device_id(guchar *data, gucha
    device_id = device_id_get();
    len = (device_id.length() > length ? length : device_id.length());
 
-   // Clear the array
-   memset(data, 0, length);
    // Copy receiver id to data buf
-   strncpy((gchar *)data, device_id.c_str(), len);
+   errno_t safec_rc = strncpy_s((gchar *)data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, device_id.c_str(),len);
+   ERR_CHK(safec_rc);
 
    return(len);
 
@@ -3919,6 +4020,10 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_dump(guchar index, gu
       return(0);
    }
 
+   int buf_index = 0;
+   guint16 memory_size = 0;
+   errno_t safec_rc = -1;
+
    LOG_INFO("%s: Index %u: %d bytes received\n", __FUNCTION__, index, length);
 
     // first chunk of data, Index 0 of memory dump RIB
@@ -3928,16 +4033,16 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_dump(guchar index, gu
           LOG_WARN("%s: Not all the Remote Memory Dump data has been received!\n", __FUNCTION__);
           ctrlm_hal_free(crash_dump_buf_);
           crash_dump_buf_ = NULL;
-       }
+      }
 
-       guint16 memory_size = (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE + 1] << 8 |
-                             (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE];
+      memory_size = (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE + 1] << 8 |
+                     (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE];
        // validate if Memory Size is in valid range
        if(memory_size == 0 || memory_size > CTRLM_CRASH_DUMP_MAX_SIZE) {
           LOG_ERROR("%s: Memory Size value %hu is bad\n", __FUNCTION__, memory_size);
           return(0);
        }
-       
+
        // perform extra checking if Reserved bytes are good
        const guchar* data_end =  data + length - CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF;
        if(data_end == (guchar *)find((const char*)data + CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF, (const char*)data_end, '\xFF')) {
@@ -3962,12 +4067,24 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_dump(guchar index, gu
                      __FUNCTION__, memory_size,  memory_id);
        // Fill out File Header
        // signature XDMP
-       memcpy(crash_dump_buf_, "XDMP", CTRLM_CRASH_DUMP_FILE_LEN_SIGNATURE);
+       safec_rc = strcpy_s((char*)crash_dump_buf_, memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE, "XDMP");
+       if(safec_rc != EOK) {
+         ERR_CHK(safec_rc);
+         ctrlm_hal_free(crash_dump_buf_);
+         crash_dump_buf_ = NULL;
+         return(0);
+       }
        // header size
        crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HDR_SIZE]     = CTRLM_CRASH_DUMP_FILE_HDR_SIZE & 0xFF;
        crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HDR_SIZE + 1] = CTRLM_CRASH_DUMP_FILE_HDR_SIZE >> 8;
        // device ID
-       strncpy((char *)crash_dump_buf_ + CTRLM_CRASH_DUMP_FILE_OFFSET_DEVICE_ID, ctrlm_rf4ce_controller_type_str(controller_type_), CTRLM_CRASH_DUMP_FILE_LEN_DEVICE_ID);
+       safec_rc = strncpy_s((char *)crash_dump_buf_ + CTRLM_CRASH_DUMP_FILE_OFFSET_DEVICE_ID, memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE - CTRLM_CRASH_DUMP_FILE_OFFSET_DEVICE_ID, ctrlm_rf4ce_controller_type_str(controller_type_), CTRLM_CRASH_DUMP_FILE_LEN_DEVICE_ID);
+       if(safec_rc != EOK) {
+         ERR_CHK(safec_rc);
+         ctrlm_hal_free(crash_dump_buf_);
+         crash_dump_buf_ = NULL;
+         return(0);
+       }
        // HW Version
        crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER]     = version_hardware_.manufacturer << 4 | version_hardware_.model;
        crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER + 1] = version_hardware_.hw_revision;
@@ -4010,8 +4127,14 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_dump(guchar index, gu
        length = crash_dump_expected_size_ % CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_DUMP;
     }
 
-    int buf_index = CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE + crash_dump_size_;
-    memcpy(&crash_dump_buf_[buf_index], data, length);
+    buf_index = CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE + crash_dump_size_;
+    safec_rc = memcpy_s(&crash_dump_buf_[buf_index],memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE - buf_index, data, length);
+    if(safec_rc != EOK) {
+      ERR_CHK(safec_rc);
+      ctrlm_hal_free(crash_dump_buf_);
+      crash_dump_buf_ = NULL;
+      return(0);
+    }
     crash_dump_size_ += length;
 
     // Check if transfer is completed
@@ -4261,7 +4384,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_controller_capabilities(gucha
       return(0);
    }
 
-   memset(data, 0, length);
+   errno_t safec_rc = memset_s(data, length , 0, length);
+   ERR_CHK(safec_rc);
    data[0] = (fmr_supported_? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR:0);
 
    LOG_INFO("%s: Controller Capabilities. FMR <%s>\n", __FUNCTION__, (fmr_supported_ ? "ENABLED" : "DISABLED"));
@@ -4283,7 +4407,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_far_field_metrics(guchar *da
       return(0);
    }
 
-   memset(&ff_metrics_, 0, sizeof(ff_metrics_));
+   errno_t safec_rc = memset_s(&ff_metrics_, sizeof(ff_metrics_) , 0, sizeof(ff_metrics_));
+   ERR_CHK(safec_rc);
    
    ff_metrics_.flags                = data[0];
    ff_metrics_.uptime               = data[1] + (data[2] << 8) + (data[3] << 16) + (data[4] << 24);
@@ -4305,7 +4430,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_far_field_metrics(guchar *dat
       return(0);
    }
 
-   memset(data, 0, length);
+   errno_t safec_rc = memset_s(data, length , 0, length);
+   ERR_CHK(safec_rc);
 
    // Load the data from the controller object
    data[0]  =  ff_metrics_.flags;
@@ -4337,7 +4463,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_dsp_metrics(guchar *data, gu
       return(0);
    }
 
-   memset(&dsp_metrics_, 0, sizeof(dsp_metrics_));
+   errno_t safec_rc = memset_s(&dsp_metrics_, sizeof(dsp_metrics_) , 0, sizeof(dsp_metrics_));
+   ERR_CHK(safec_rc);
 
    dsp_metrics_.dropped_mic_frames = data[0] + (data[1] << 8);
    dsp_metrics_.dropped_speaker_frames = data[2] + (data[3] << 8);
@@ -4371,7 +4498,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_dsp_metrics(guchar *data, guc
       return(0);
    }
 
-   memset(data, 0, length);
+   errno_t safec_rc = memset_s(data, length , 0, length);
+   ERR_CHK(safec_rc);
 
    data[0]  =  dsp_metrics_.dropped_mic_frames       & 0xFF;
    data[1]  = (dsp_metrics_.dropped_mic_frames >> 8) & 0xFF;
@@ -4418,14 +4546,15 @@ void ctrlm_obj_controller_rf4ce_t::update_voice_metrics(ctrlm_rf4ce_voice_uttera
 
    property_write_voice_metrics();
 }
- 
+
 guchar ctrlm_obj_controller_rf4ce_t::property_write_uptime_privacy_info(guchar *data, guchar length) {
    if(length != sizeof(uptime_privacy_info_t)) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
 
-   memset(&uptime_privacy_info_, 0, sizeof(uptime_privacy_info_t));
+   errno_t safec_rc = memset_s(&uptime_privacy_info_, sizeof(uptime_privacy_info_t) , 0, sizeof(uptime_privacy_info_t));
+   ERR_CHK(safec_rc);
 
    uptime_privacy_info_.time_uptime_start     = (data[3] << 24) + (data[2] << 16) + (data[1] << 8) + data[0];
    uptime_privacy_info_.uptime_seconds        = (data[7] << 24) + (data[6] << 16) + (data[5] << 8) + data[4];
@@ -4443,7 +4572,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_uptime_privacy_info(guchar *d
       return(0);
    }
 
-   memset(data, 0, length);
+   errno_t safec_rc = memset_s(data, length , 0, length);
+   ERR_CHK(safec_rc);
 
    data[0]   =  uptime_privacy_info_.time_uptime_start           & 0xFF;
    data[1]   = (uptime_privacy_info_.time_uptime_start >> 8)     & 0xFF;
@@ -4625,7 +4755,8 @@ void ctrlm_obj_controller_rf4ce_t::log_binding_for_telemetry() {
    ctrlm_controller_id_t controller_id = controller_id_get();
 
    if(time_binding_ == 0) {
-      strncpy(time_binding_str, "NEVER", 20);
+      errno_t safec_rc = strcpy_s(time_binding_str, sizeof(time_binding_str), "NEVER");
+      ERR_CHK(safec_rc);
    } else {
       time_binding_str[0] = '\0';
       strftime(time_binding_str, 20, "%F %T", localtime((time_t *)&time_binding_));
@@ -4644,9 +4775,12 @@ void ctrlm_obj_controller_rf4ce_t::log_unbinding_for_telemetry() {
 }
 
 void ctrlm_obj_controller_rf4ce_t::print_remote_firmware_debug_info(ctrlm_rf4ce_controller_firmware_log_t log_type, string message){
-   char remote_info[100];
-   memset(remote_info, '\0', sizeof(remote_info));
-   snprintf(remote_info, sizeof(remote_info), "%s ID - %u. Current Firmware: <%u.%u.%u.%u>. ", ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
+   char remote_info[100] = {'\0'};
+
+   errno_t safec_rc = sprintf_s(remote_info, sizeof(remote_info), "%s ID - %u. Current Firmware: <%u.%u.%u.%u>. ", ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 
    switch(log_type){
       case RF4CE_PRINT_FIRMWARE_LOG_BUTTON_PRESS:
@@ -4751,8 +4885,9 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_heartbeat(ctrlm_timestamp_t timestamp, 
    guint8 flags  = 0x00;
    ctrlm_rf4ce_polling_action_t      action     = RF4CE_POLLING_ACTION_NONE;
    ctrlm_rf4ce_polling_action_msg_t *action_msg = NULL;
-   guint8 response[3 + POLLING_RESPONSE_DATA_LEN];
+   guint8 response[3 + POLLING_RESPONSE_DATA_LEN] = {0};
    guint8 response_len = sizeof(response);
+   errno_t safec_rc = -1;
 
 #ifdef ASB
    bool link_key_validation = false;
@@ -4817,12 +4952,12 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_heartbeat(ctrlm_timestamp_t timestamp, 
       }
    }
    // Add Data to response
-   memset(response, 0, sizeof(response));
    response[0] = RF4CE_FRAME_CONTROL_HEARTBEAT_RESPONSE;
    response[1] = flags;
    response[2] = (uint8_t)action;
    if(action_msg) {
-      memcpy(&response[3], action_msg->data, POLLING_RESPONSE_DATA_LEN);
+      safec_rc = memcpy_s(&response[3], sizeof(response)-3, action_msg->data, POLLING_RESPONSE_DATA_LEN);
+      ERR_CHK(safec_rc);
    }
 
    // Send the response back to the controller
@@ -5023,17 +5158,15 @@ void ctrlm_obj_controller_rf4ce_t::asb_key_derivation_start(ctrlm_network_id_t n
 
 void ctrlm_obj_controller_rf4ce_t::asb_key_derivation_perform() {
    ctrlm_timestamp_t asb_key_derivation_ts_end;
-   unsigned char new_aes128_key[CTRLM_HAL_NETWORK_AES128_KEY_SIZE];
-   ctrlm_hal_network_property_encryption_key_t property;
+   unsigned char new_aes128_key[CTRLM_HAL_NETWORK_AES128_KEY_SIZE] = {0};
+   ctrlm_hal_network_property_encryption_key_t property = {0};
    // Get Link key
-   memset(&property, 0, sizeof(property));
    property.controller_id = controller_id_get();
    if(CTRLM_HAL_RESULT_SUCCESS != network_property_get(CTRLM_HAL_NETWORK_PROPERTY_ENCRYPTION_KEY, (void **)&property)) {
       LOG_ERROR("%s: Failed to get Link Key from HAL\n", __FUNCTION__);
       return;
    }
    // Perform link key derivation
-   memset(new_aes128_key, 0, sizeof(new_aes128_key));
 
    if(asb_key_derivation(property.aes128_key, new_aes128_key, asb_key_derivation_method_used_)) {
       LOG_ERROR("%s: Failed to perform key derivation\n", __FUNCTION__);
@@ -5041,7 +5174,8 @@ void ctrlm_obj_controller_rf4ce_t::asb_key_derivation_perform() {
       return;
    }
    // Set New Link key
-   memcpy(property.aes128_key, new_aes128_key, sizeof(property.aes128_key));
+   errno_t safec_rc = memcpy_s(property.aes128_key, sizeof(property.aes128_key), new_aes128_key, sizeof(property.aes128_key));
+   ERR_CHK(safec_rc);
    if(CTRLM_HAL_RESULT_SUCCESS != network_property_set(CTRLM_HAL_NETWORK_PROPERTY_ENCRYPTION_KEY, &property)) {
       LOG_ERROR("%s: Failed to set new link key\n", __FUNCTION__);
       return;

@@ -115,7 +115,8 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] = CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED;
 #endif
 
-    memset(&this->status, 0, sizeof(this->status));
+    errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
+    ERR_CHK(safec_rc);
     // These semaphores are used to make sure we have all the data before calling the session begin callback
     sem_init(&this->vsr_semaphore, 0, 0);
 
@@ -173,7 +174,10 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
          .dir_path      = this->prefs.utterance_path.c_str()
    };
 
-   if(0 == strcmp(capture_config.dir_path, JSON_STR_VALUE_VOICE_UTTERANCE_PATH)) {
+   int ind = -1;
+   errno_t safec_rc = strcmp_s(JSON_STR_VALUE_VOICE_UTTERANCE_PATH, strlen(JSON_STR_VALUE_VOICE_UTTERANCE_PATH), capture_config.dir_path, &ind);
+   ERR_CHK(safec_rc);
+   if((safec_rc == EOK) && (!ind)) {
       capture_config.dir_path = "/opt/logs"; // Default value specifies a file, but now it needs to be a directory
    }
 
@@ -600,13 +604,10 @@ bool ctrlm_voice_t::voice_init_set(const char *init, bool db_write) {
 void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
    LOG_INFO("%s: Voice XCONF Settings\n", __FUNCTION__);
    int result;
-   
-   char encoder_params_str[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS * 2 + 1];
-   char encoded_rfc_val[CTRLM_RFC_MAX_PARAM_LEN] = {0}; //MAX_PARAM_LEN from rfcapi.h is 2048
 
-   LOG_INFO("%s: Voice XCONF Settings\n", __FUNCTION__);
+   char encoder_params_str[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS * 2 + 1] = {0};
+   char vsdk_config_str[CTRLM_RFC_MAX_PARAM_LEN] = {0}; //MAX_PARAM_LEN from rfcapi.h is 2048
 
-   memset(encoder_params_str, 0, sizeof(encoder_params_str));
    result  = ctrlm_tr181_string_get(CTRLM_RF4CE_TR181_RF4CE_OPUS_ENCODER_PARAMS, encoder_params_str, sizeof(encoder_params_str));
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
       this->prefs.opus_encoder_params_str = encoder_params_str;
@@ -645,14 +646,14 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
       this->prefs.keyword_sensitivity = (keyword_sensitivity > 0) ? keyword_sensitivity : JSON_INT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY;
    }
 
-   result = ctrlm_tr181_string_get(CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION, &encoded_rfc_val[0], CTRLM_RFC_MAX_PARAM_LEN);
+   result = ctrlm_tr181_string_get(CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION, &vsdk_config_str[0], CTRLM_RFC_MAX_PARAM_LEN);
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
       json_error_t jerror;
       json_t *jvsdk;
       char *decoded_buf = NULL;
       size_t decoded_buf_len = 0;
 
-      decoded_buf = (char *)g_base64_decode((const gchar*)encoded_rfc_val, &decoded_buf_len);
+      decoded_buf = (char *)g_base64_decode((const gchar*)vsdk_config_str, &decoded_buf_len);
       if(decoded_buf) {
          if(decoded_buf_len > 0 && decoded_buf_len < CTRLM_RFC_MAX_PARAM_LEN) {
             LOG_INFO("%s: VSDK configuration taken from XCONF\n", __FUNCTION__);
@@ -716,7 +717,8 @@ void ctrlm_voice_t::voice_params_opus_encoder_get(voice_params_opus_encoder_t *p
       LOG_ERROR("%s: NULL param\n", __FUNCTION__);
       return;
    }
-   memcpy(params->data, this->prefs.opus_encoder_params, CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
+   errno_t safec_rc = memcpy_s(params->data, sizeof(params->data), this->prefs.opus_encoder_params, CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
+   ERR_CHK(safec_rc);
 }
 
 void ctrlm_voice_t::voice_params_opus_encoder_default(void) {
@@ -997,7 +999,8 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
        xrsr_session_keyword_info_set(XRSR_SRC_RCU_FF, stream_params->pre_keyword_sample_qty, stream_params->keyword_sample_qty);
     }
 
-    memset(&this->status, 0, sizeof(this->status));
+    errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
+    ERR_CHK(safec_rc);
     this->status.controller_id  = this->controller_id;
     this->voice_status_set();
     this->last_cmd_id           = 0;
@@ -1199,7 +1202,8 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
            // Copy to local buffer to perform a single write to the pipe.  TODO: have the caller reserve 1 bytes at the beginning
            // of the buffer to eliminate this copy
            local_buf[0] = length;
-           memcpy(&local_buf[1], buffer, length);
+           errno_t safec_rc = memcpy_s(&local_buf[1], sizeof(local_buf)-1, buffer, length);
+           ERR_CHK(safec_rc);
            buffer = local_buf;
            length++;
        }
@@ -1249,8 +1253,7 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     }
 
     // Send main queue message
-    ctrlm_main_queue_msg_voice_session_end_t end;
-    memset(&end, 0, sizeof(end));
+    ctrlm_main_queue_msg_voice_session_end_t end = {0};
 
     end.controller_id       = this->controller_id;
     end.reason              = reason;
@@ -1320,7 +1323,7 @@ void ctrlm_voice_t::voice_session_stats_clear() {
 
 void ctrlm_voice_t::voice_session_stats_print() {
    ctrlm_voice_session_timing_t *timing = &this->session_timing;
-
+   errno_t safec_rc = -1;
    if(!timing->available) {
       LOG_INFO("%s: not available\n", __FUNCTION__);
       return;
@@ -1340,7 +1343,10 @@ void ctrlm_voice_t::voice_session_stats_print() {
 
       ctrl_audio_rxd_kwd   = rdkx_timestamp_subtract_us(timing->ctrl_audio_rxd_first,   timing->ctrl_audio_rxd_keyword);
       ctrl_audio_rxd_final = rdkx_timestamp_subtract_us(timing->ctrl_audio_rxd_keyword, timing->ctrl_audio_rxd_final);
-      snprintf(str_keyword, sizeof(str_keyword), "keyword <%lld> ", ctrl_audio_rxd_kwd);
+      safec_rc = sprintf_s(str_keyword, sizeof(str_keyword), "keyword <%lld> ", ctrl_audio_rxd_kwd);
+      if(safec_rc < EOK) {
+        ERR_CHK(safec_rc);
+      }
    } else {
       ctrl_audio_rxd_final = rdkx_timestamp_subtract_us(timing->ctrl_audio_rxd_first, timing->ctrl_audio_rxd_final);
    }
@@ -1368,7 +1374,10 @@ void ctrlm_voice_t::voice_session_stats_print() {
             srvr_audio_txd_kwd    = rdkx_timestamp_subtract_us(timing->srvr_audio_txd_first,   timing->srvr_audio_txd_keyword);
             srvr_audio_txd_final  = rdkx_timestamp_subtract_us(timing->srvr_audio_txd_keyword, timing->srvr_audio_txd_final);
             srvr_audio_kwd_verify = rdkx_timestamp_subtract_us(timing->srvr_audio_txd_keyword, timing->srvr_rsp_keyword);
-            snprintf(str_keyword, sizeof(str_keyword), "keyword <%lld> verify <%lld> ", srvr_audio_txd_kwd, srvr_audio_kwd_verify);
+            safec_rc = sprintf_s(str_keyword, sizeof(str_keyword), "keyword <%lld> verify <%lld> ", srvr_audio_txd_kwd, srvr_audio_kwd_verify);
+            if(safec_rc < EOK) {
+              ERR_CHK(safec_rc);
+            }
          } else {
             srvr_audio_txd_final = rdkx_timestamp_subtract_us(timing->srvr_audio_txd_first, timing->srvr_audio_txd_final);
          }
@@ -1629,7 +1638,8 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
     this->endpoint_current                  = session_begin->endpoint;
     this->end_reason                        = CTRLM_VOICE_SESSION_END_REASON_DONE;
 
-    memset(&this->status, 0, sizeof(this->status));
+    errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0 , sizeof(this->status));
+    ERR_CHK(safec_rc);
     this->status.controller_id  = this->controller_id;
     this->voice_status_set();
 
@@ -1692,6 +1702,7 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         LOG_ERROR("%s: NULL data\n", __FUNCTION__);
         return;
     }
+    errno_t safec_rc = -1;
 
     //If this is a voice assistant, unmute the audio
     if(is_voice_assistant(this->voice_device)) {
@@ -1699,7 +1710,7 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
     }
 
     xrsr_session_stats_t *stats = &session_end->stats;
-    
+
     if(stats == NULL) {
         LOG_ERROR("%s: stats are NULL\n", __FUNCTION__);
         return;
@@ -1758,14 +1769,13 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
             server_stats.dns_time = stats->time_dns;
             server_stats.connect_time = stats->time_connect;
             end.server_stats = &server_stats;
-            
+
             this->voice_ipc->session_end(end);
         }
     }
 
     // Update controller metrics
-    ctrlm_main_queue_msg_controller_voice_metrics_t metrics;
-    memset(&metrics, 0, sizeof(ctrlm_main_queue_msg_controller_voice_metrics_t));
+    ctrlm_main_queue_msg_controller_voice_metrics_t metrics = {0};
     metrics.controller_id       = this->controller_id;
     metrics.short_utterance     = (stats->reason == XRSR_SESSION_END_REASON_ERROR_AUDIO_DURATION ? 1 : 0);
     metrics.packets_total       = this->packets_processed + this->packets_lost;
@@ -1774,10 +1784,11 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
 
     // Send results internally to controlMgr
     if(this->network_id != CTRLM_MAIN_NETWORK_ID_INVALID && this->controller_id != CTRLM_MAIN_CONTROLLER_ID_INVALID) {
-        ctrlm_main_queue_msg_voice_session_result_t msg;
-        memset(&msg, 0, sizeof(msg));
+        ctrlm_main_queue_msg_voice_session_result_t msg = {0};
         msg.controller_id     = this->controller_id;
-        strncpy(msg.transcription, this->transcription.c_str(), sizeof(msg.transcription));
+        safec_rc = strncpy_s(msg.transcription, sizeof(msg.transcription), this->transcription.c_str(), sizeof(msg.transcription)-1);
+        ERR_CHK(safec_rc);
+        msg.transcription[CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH - 1] = '\0';
         msg.success           =  (session_end->success == true ? 1 : 0);
         ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_result, &msg, sizeof(msg), NULL, this->network_id);
     }

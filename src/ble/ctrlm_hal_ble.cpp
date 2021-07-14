@@ -402,6 +402,7 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
 {
     LOG_INFO("%s: Network id: %u\n", __FUNCTION__, (unsigned)main_init_->network_id);
     ctrlm_hal_result_t result = CTRLM_HAL_RESULT_SUCCESS;
+    errno_t safec_rc = -1;
 
     g_ctrlm_hal_ble = new ctrlm_hal_ble_global_t();
 
@@ -411,11 +412,14 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
     // initialize the IR input device
     g_ctrlm_hal_ble->rcu_metadata[0].input_device_filename = KEY_INPUT_DEVICE_FILE_IR;
 
-    memcpy(&g_ctrlm_hal_ble->main_init, main_init_, sizeof(ctrlm_hal_ble_main_init_t));
+    safec_rc = memcpy_s(&g_ctrlm_hal_ble->main_init, sizeof(ctrlm_hal_ble_main_init_t), main_init_, sizeof(ctrlm_hal_ble_main_init_t));
+    ERR_CHK(safec_rc);
+
     if (g_ctrlm_hal_ble->main_init.cfm_init != 0) {
         ctrlm_hal_ble_cfm_init_params_t params;
         params.result = result;
-        strcpy(params.version,"1.0.0.0");
+        safec_rc = strcpy_s(params.version, sizeof(params.version), "1.0.0.0");
+        ERR_CHK(safec_rc);
 
         params.term = ctrlm_hal_ble_req_Terminate;
         params.property_get = ctrlm_hal_ble_req_PropertyGet;
@@ -542,7 +546,8 @@ static void ctrlm_hal_ble_DBusOnSignalReceivedCB (  GDBusProxy *proxy,
 
         if (0 == g_strcmp0(signal_name, "DeviceAdded")) {
             ctrlm_hal_ble_RcuStatusData_t rcu_status;
-            memset(&rcu_status, 0, sizeof(rcu_status));
+            errno_t safec_rc = memset_s(&rcu_status, sizeof(rcu_status), 0, sizeof(rcu_status));
+            ERR_CHK(safec_rc);
             rcu_status.rcu_data.ieee_address = ieee_address;
             ctrlm_hal_ble_GetAllRcuProperties(rcu_status);
 
@@ -1280,6 +1285,7 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
     gboolean bool_variant;
     guint32 uint_variant;
     gint32 int_variant;
+    errno_t safec_rc = -1;
 
     rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_UNKNOWN;
 
@@ -1290,37 +1296,44 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
     } else if (0 == prop.compare("Manufacturer")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.manufacturer, str_variant, sizeof(rcu_status.rcu_data.manufacturer));
+        safec_rc = strcpy_s(rcu_status.rcu_data.manufacturer, sizeof(rcu_status.rcu_data.manufacturer), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_MANUFACTURER;
     } else if (0 == prop.compare("Model")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.model, str_variant, sizeof(rcu_status.rcu_data.model));
+        safec_rc = strcpy_s(rcu_status.rcu_data.model, sizeof(rcu_status.rcu_data.model), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_MODEL;
     } else if (0 == prop.compare("Name")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.name, str_variant, sizeof(rcu_status.rcu_data.name));
+        safec_rc = strcpy_s(rcu_status.rcu_data.name, sizeof(rcu_status.rcu_data.name), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_NAME;
     } else if (0 == prop.compare("SerialNumber")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.serial_number, str_variant, sizeof(rcu_status.rcu_data.serial_number));
+        safec_rc = strcpy_s(rcu_status.rcu_data.serial_number, sizeof(rcu_status.rcu_data.serial_number), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_SERIAL_NUMBER;
     } else if (0 == prop.compare("HardwareRevision")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.hw_revision, str_variant, sizeof(rcu_status.rcu_data.hw_revision));
+        safec_rc = strcpy_s(rcu_status.rcu_data.hw_revision, sizeof(rcu_status.rcu_data.hw_revision), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_HW_REVISION;
     } else if (0 == prop.compare("FirmwareRevision")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.fw_revision, str_variant, sizeof(rcu_status.rcu_data.fw_revision));
+        safec_rc = strcpy_s(rcu_status.rcu_data.fw_revision, sizeof(rcu_status.rcu_data.fw_revision), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_FW_REVISION;
     } else if (0 == prop.compare("SoftwareRevision")) {
         g_variant_get (value, "s", &str_variant);
         LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
-        strncpy(rcu_status.rcu_data.sw_revision, str_variant, sizeof(rcu_status.rcu_data.sw_revision));
+        safec_rc = strcpy_s(rcu_status.rcu_data.sw_revision, sizeof(rcu_status.rcu_data.sw_revision), str_variant);
+        ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_SW_REVISION;
     } else if (0 == prop.compare("BatteryLevel")) {
         g_variant_get (value, "y", &char_variant);
@@ -1924,6 +1937,7 @@ void *ctrlm_hal_ble_KeyMonitorThread(void *data)
 
     struct input_event event;
     struct timeval tv;
+    errno_t safec_rc = -1;
 
     do {
         fd_set rfds;
@@ -1956,7 +1970,8 @@ void *ctrlm_hal_ble_KeyMonitorThread(void *data)
         for (auto it = rcu_metadata.begin(); it != rcu_metadata.end(); it++) {
             if (it->second.input_device_fd >= 0) {
                 if (FD_ISSET(it->second.input_device_fd, &rfds)) {
-                    memset((void*) &event, 0, sizeof(event));
+                    safec_rc = memset_s ((void*) &event, sizeof(event), 0, sizeof(event));
+                    ERR_CHK(safec_rc);
                     ret = read(it->second.input_device_fd, (void*)&event, sizeof(event));
                     if (ret < 0) {
                         // int errsv = errno;

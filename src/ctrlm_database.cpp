@@ -264,7 +264,8 @@ gboolean ctrlm_db_init(const char *db_path) {
    g_ctrlm_db.created_default_db = false;
 #ifdef DEEPSLEEP_CLOSE_DB
    g_ctrlm_db.ds_mode = false;
-   snprintf(g_ctrlm_db.path, sizeof(g_ctrlm_db.path), "%s", db_path);
+   errno_t safec_rc = strcpy_s(g_ctrlm_db.path, sizeof(g_ctrlm_db.path), db_path);
+   ERR_CHK(safec_rc);
    sem_init(&g_ctrlm_db.ds_signal, 0, 0);
 #endif
 
@@ -684,6 +685,8 @@ bool ctrlm_db_key_exists(const char *table, const char *key) {
 
    sqlite3_stmt *p_stmt;
    int rc;
+   errno_t safec_rc = -1;
+   int ind = -1;
    stringstream sql;
    sql << "SELECT key FROM " << table << ";";
 
@@ -706,7 +709,9 @@ bool ctrlm_db_key_exists(const char *table, const char *key) {
          }
          LOG_DEBUG("%s: key <%s>\n", __FUNCTION__, col_name);
 
-         if(strcmp(key, (const char *)col_name) == 0) {
+         safec_rc = strcmp_s(key, strlen(key), (const char *)col_name, &ind);
+         ERR_CHK(safec_rc);
+         if((safec_rc == EOK) && (!ind)) {
             found = true;
             break;
          }
@@ -750,14 +755,19 @@ void ctrlm_db_free(guchar *value) {
 }
 
 void ctrlm_db_write_uint64(const char *table, const char *key, sqlite_uint64 value) {
+   errno_t safec_rc = -1;
    ctrlm_db_queue_msg_write_uint64_t *msg = (ctrlm_db_queue_msg_write_uint64_t *)g_malloc(sizeof(ctrlm_db_queue_msg_write_uint64_t));
    if(msg == NULL) {
       LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
       return;
    }
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_UINT64;
-   strncpy(msg->table, table, CONTROLLER_TABLE_NAME_MAX_LEN);
-   strncpy(msg->key,   key,   CONTROLLER_KEY_NAME_MAX_LEN);
+   safec_rc = strncpy_s(msg->table, sizeof(msg->table), table, CONTROLLER_TABLE_NAME_MAX_LEN - 1);
+   ERR_CHK(safec_rc);
+   msg->table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   safec_rc = strncpy_s(msg->key, sizeof(msg->key),  key,   CONTROLLER_KEY_NAME_MAX_LEN - 1);
+   ERR_CHK(safec_rc);
+   msg->key[CONTROLLER_KEY_NAME_MAX_LEN - 1] = '\0';
    msg->value = value;
 
    ctrlm_db_queue_msg_push((gpointer)msg);
@@ -777,16 +787,20 @@ void ctrlm_db_write_uint64_(const char *table, const char *key, sqlite_uint64 va
 
 void ctrlm_db_write_str(const char *table, const char *key, const guchar *value) {
    size_t length = strlen((const char *)value);
+   errno_t safec_rc = -1;
    ctrlm_db_queue_msg_write_string_t *msg = (ctrlm_db_queue_msg_write_string_t *)g_malloc(sizeof(ctrlm_db_queue_msg_write_string_t) + length + 1);
    if(msg == NULL) {
       LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
       return;
    }
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_STRING;
-   strncpy(msg->table, table, CONTROLLER_TABLE_NAME_MAX_LEN);
-   strncpy(msg->key,   key,   CONTROLLER_KEY_NAME_MAX_LEN);
+   safec_rc = strcpy_s(msg->table, sizeof(msg->table), table);
+   ERR_CHK(safec_rc);
+   safec_rc = strcpy_s(msg->key,  sizeof(msg->key), key);
+   ERR_CHK(safec_rc);
    msg->value = (guchar *) &msg[1];
-   strncpy((char *)(msg->value), (const char *)value, length + 1);
+   safec_rc = strcpy_s((char *)(msg->value), length + 1, (const char *)value);
+   ERR_CHK(safec_rc);
 
    ctrlm_db_queue_msg_push((gpointer)msg);
 }
@@ -798,17 +812,23 @@ void ctrlm_db_write_str_(const char *table, const char *key, const guchar *value
 }
 
 void ctrlm_db_write_blob(const char *table, const char *key, const guchar *value, guint32 length) {
+   errno_t safec_rc = -1;
    ctrlm_db_queue_msg_write_blob_t *msg = (ctrlm_db_queue_msg_write_blob_t *)g_malloc(sizeof(ctrlm_db_queue_msg_write_blob_t) + length);
    if(msg == NULL) {
       LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
       return;
    }
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_BLOB;
-   strncpy(msg->table, table, CONTROLLER_TABLE_NAME_MAX_LEN);
-   strncpy(msg->key,   key,   CONTROLLER_KEY_NAME_MAX_LEN);
+   safec_rc = strncpy_s(msg->table, sizeof(msg->table),table, CONTROLLER_TABLE_NAME_MAX_LEN - 1);
+   ERR_CHK(safec_rc);
+   msg->table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   safec_rc = strncpy_s(msg->key, sizeof(msg->key),  key,   CONTROLLER_KEY_NAME_MAX_LEN - 1);
+   ERR_CHK(safec_rc);
+   msg->key[CONTROLLER_KEY_NAME_MAX_LEN - 1] = '\0';
    msg->value  = (guchar *)&msg[1];
    msg->length = length;
-   memcpy(msg->value, value, length);
+   safec_rc = memcpy_s(msg->value, msg->length, value, length);
+   ERR_CHK(safec_rc);
 
    ctrlm_db_queue_msg_push((gpointer)msg);
 }
@@ -1049,7 +1069,8 @@ int ctrlm_db_select_keys(const char *table, vector<char *> *keys_str, vector<ctr
             if(value_str == NULL) {
                LOG_ERROR("%s: out of memory! %d bytes requested\n", __FUNCTION__, byte_qty + 1);
             } else {
-               memcpy(value_str, text, byte_qty);
+               errno_t safec_rc = memcpy_s(value_str, byte_qty + 1, text, byte_qty);
+               ERR_CHK(safec_rc);
                value_str[byte_qty] = '\0';
                keys_str->insert(keys_str->end(), value_str);
             }
@@ -1068,6 +1089,7 @@ int ctrlm_db_select_keys(const char *table, vector<char *> *keys_str, vector<ctr
 // Select (read) an existing key/value pair from the database
 int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_uint64 *value_int64, guchar **value_str, guint32 *value_len) {
    int retval = -1;
+   errno_t safec_rc = -1;
    if(table == NULL || key == NULL) {
       LOG_WARN("%s: invalid parameters!\n", __FUNCTION__);
       return(retval);
@@ -1115,7 +1137,8 @@ int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_u
          if(*value_str == NULL) {
             LOG_ERROR("%s: out of memory! %d bytes requested\n", __FUNCTION__, byte_qty);
          } else {
-            memcpy(*value_str, blob, byte_qty);
+            safec_rc = memcpy_s(*value_str, byte_qty, blob, byte_qty);
+            ERR_CHK(safec_rc);
             *value_len = (guint32)byte_qty;
             retval = 0;
          }
@@ -1132,7 +1155,8 @@ int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_u
          if(*value_str == NULL) {
             LOG_ERROR("%s: out of memory! %d bytes requested\n", __FUNCTION__, byte_qty + 1);
          } else {
-            memcpy(*value_str, text, byte_qty);
+            safec_rc = memcpy_s(*value_str, byte_qty + 1, text, byte_qty);
+            ERR_CHK(safec_rc);
             (*value_str)[byte_qty] = '\0';
             retval = 0;
          }
@@ -1469,8 +1493,13 @@ void ctrlm_db_rf4ce_controller_destroy(ctrlm_network_id_t network_id, ctrlm_cont
 
 int ctrlm_db_integrity_check_result(void *param, int argc, char **argv, char **column) {
    bool& db_error = *(bool*)param;
+   errno_t safec_rc = -1;
+   int ind = -1;
+   size_t strSize = strlen("ok");
    for (int i=0; i < argc; ++i) {
-      if (strcmp(argv[i],"ok") != 0) {
+      safec_rc = strcmp_s("ok", strSize, argv[i], &ind);
+      ERR_CHK(safec_rc);
+      if ((safec_rc == EOK) &&(ind != 0)) {
          LOG_ERROR("%s: %s\n", __FUNCTION__, argv[i]);
          db_error = true;
       } else {
@@ -1498,24 +1527,30 @@ bool ctrlm_db_verify_integrity() {
 bool ctrlm_db_recovery() {
    int rc = sqlite3_exec(g_ctrlm_db.handle, "VACUUM;", NULL, NULL, NULL);
    if(rc != SQLITE_OK) {
-      LOG_ERROR("%s: database recovery attempt failed (%d)", __FUNCTION__, rc);    
-   }  
+      LOG_ERROR("%s: database recovery attempt failed (%d)", __FUNCTION__, rc);
+   }
    return (rc == SQLITE_OK);
 }
 
 void ctrlm_db_rf4ce_global_table_name(ctrlm_network_id_t network_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_RF4CE_GLOBAL, network_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_RF4CE_GLOBAL, network_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 void ctrlm_db_rf4ce_controller_list_table_name(ctrlm_network_id_t network_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_RF4CE_CONTROLLER_LIST, network_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_RF4CE_CONTROLLER_LIST, network_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 void ctrlm_db_rf4ce_controller_entry_table_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_RF4CE_CONTROLLER_ENTRY, network_id, controller_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_RF4CE_CONTROLLER_ENTRY, network_id, controller_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 
    // TODO would it be better to look up the table name from the controller list instead?
 }
@@ -2245,7 +2280,8 @@ void ctrlm_db_rf4ce_write_file(const char *path, guchar *data, guint32 length) {
    }
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_FILE;
    msg->path =  (char *)&msg[1];
-   memcpy(msg->path, path, path_len);
+   errno_t safec_rc = memcpy_s(msg->path, path_len, path, path_len);
+   ERR_CHK(safec_rc);
    msg->data  = data;
    msg->length = length; // length of externally allocated buffer
 
@@ -2293,8 +2329,10 @@ void ctrlm_db_controller_destroy(ctrlm_network_id_t network_id, ctrlm_controller
       }
    }
 
-   snprintf(key, 3, "%02X", controller_id);
-   key[2] = '\0';
+   errno_t safec_rc = sprintf_s(key, sizeof(key), "%02X", controller_id);
+   if(safec_rc < EOK) {
+       ERR_CHK(safec_rc);
+   }
 
    // Delete the entry in the RF4CE controller table
    if(!ctrlm_db_key_exists(table_name_controller_list, key)) {
@@ -2348,8 +2386,10 @@ void ctrlm_db_controller_create(ctrlm_network_id_t network_id, ctrlm_controller_
       }
    }
 
-   snprintf(key, 3, "%02X", controller_id);
-   key[2] = '\0';
+   errno_t safec_rc = sprintf_s(key, sizeof(key), "%02X", controller_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 
    // Create an entry in the RF4CE controller table pointing to the controller's table name
    if(ctrlm_db_key_exists(table_name_controller_list, key)) {
@@ -2441,18 +2481,24 @@ void ctrlm_db_ip_controller_destroy(ctrlm_network_id_t network_id, ctrlm_control
 }
 
 void ctrlm_db_ip_global_table_name(ctrlm_network_id_t network_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_IP_GLOBAL, network_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_IP_GLOBAL, network_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 void ctrlm_db_ip_controller_list_table_name(ctrlm_network_id_t network_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_IP_CONTROLLER_LIST, network_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_IP_CONTROLLER_LIST, network_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 void ctrlm_db_ip_controller_entry_table_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_IP_CONTROLLER_ENTRY, network_id, controller_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_IP_CONTROLLER_ENTRY, network_id, controller_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 
    // TODO would it be better to look up the table name from the controller list instead?
 }
@@ -2629,18 +2675,24 @@ void ctrlm_db_ble_controller_destroy(ctrlm_network_id_t network_id, ctrlm_contro
 }
 
 void ctrlm_db_ble_global_table_name(ctrlm_network_id_t network_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_BLE_GLOBAL, network_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_BLE_GLOBAL, network_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 void ctrlm_db_ble_controller_list_table_name(ctrlm_network_id_t network_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_BLE_CONTROLLER_LIST, network_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_BLE_CONTROLLER_LIST, network_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 void ctrlm_db_ble_controller_entry_table_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, char *table) {
-   snprintf(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_BLE_CONTROLLER_ENTRY, network_id, controller_id);
-   table[CONTROLLER_TABLE_NAME_MAX_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(table, CONTROLLER_TABLE_NAME_MAX_LEN, CTRLM_DB_TABLE_NET_BLE_CONTROLLER_ENTRY, network_id, controller_id);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
 }
 
 // --------------------------------------------------------------------------------------------------------------------------

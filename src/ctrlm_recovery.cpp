@@ -173,7 +173,8 @@ ctrlm_recovery_status_t ctrlm_recovery_shared_memory_open() {
       }
 
       if(created) {
-         memset(g_ctrlm_recovery_shared_memory, 0, sizeof(ctrlm_recovery_shared_memory_t));
+         errno_t safec_rc = memset_s(g_ctrlm_recovery_shared_memory, sizeof(ctrlm_recovery_shared_memory_t), 0, sizeof(ctrlm_recovery_shared_memory_t));
+         ERR_CHK(safec_rc);
       }
    }
 

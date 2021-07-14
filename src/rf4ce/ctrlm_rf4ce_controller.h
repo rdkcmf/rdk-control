@@ -451,14 +451,37 @@ typedef enum {
    RF4CE_VOICE_SHORT_UTTERANCE              = 1
 } ctrlm_rf4ce_voice_utterance_type_t;
 
+/* Below enum and Structure are defined for better optinamization of multiple if- else cases */
+typedef enum {
+    XR2  = 0,
+    XR5,
+    XR11,
+    XR15_1,
+    XR15_2,
+    XR16,
+    XR18,
+    XR19,
+    XRA
+} ctrlm_rf4ce_product_name_t;
+
+/*Structure defined to get the product_name */
+typedef struct {
+  const char                         *name;
+  ctrlm_rf4ce_product_name_t     product_type;
+  ctrlm_rf4ce_controller_type_t controller_type;
+} ctrlm_rf4ce_product_name_pair_t;
+
+/* Function to get the corresponding product name type from the given product name */
+bool ctrlm_rf4ce_get_product_type_from_product_name(const char *name, ctrlm_rf4ce_product_name_t *product_type, ctrlm_rf4ce_controller_type_t *controller_type);
+
 typedef struct {
    gchar  build_id[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID];
-   guint8 length; 
+   guint8 length;
 } version_build_id_t;
 
 typedef struct {
    gchar  build_id[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID];
-   guint8 length; 
+   guint8 length;
 } version_dsp_build_id_t;
 
 typedef struct {

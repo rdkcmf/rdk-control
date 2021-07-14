@@ -493,14 +493,16 @@ void ctrlm_voice_ipc_iarm_thunder_t::json_result_bool(bool result, char *result_
 void ctrlm_voice_ipc_iarm_thunder_t::json_result(json_t *obj, char *result_str, size_t result_str_len) {
     if(obj != NULL && result_str != NULL) {
         char   *obj_str = NULL;
-        memset(result_str, 0, result_str_len * sizeof(char));
+        errno_t safec_rc = memset_s(result_str, result_str_len * sizeof(char), 0, result_str_len * sizeof(char));
+        ERR_CHK(safec_rc);
 
         obj_str = json_dumps(obj, JSON_COMPACT);
         if(obj_str) {
             if(strlen(obj_str) >= result_str_len) {
                 LOG_ERROR("%s: result string buffer not big enough!\n", __FUNCTION__);
             }
-            snprintf(result_str, result_str_len, "%s", obj_str);
+            safec_rc = strcpy_s(result_str, result_str_len, obj_str);
+            ERR_CHK(safec_rc);
             free(obj_str);
             obj_str = NULL;
         }
@@ -535,9 +537,11 @@ bool broadcast_event(const char *bus_name, int event, const char *str) {
     ctrlm_voice_iarm_event_json_t *data = (ctrlm_voice_iarm_event_json_t *)malloc(size);
     if(data) {
         IARM_Result_t result;
-        
-        memset(data, 0, size);
+
+        errno_t safec_rc = memset_s(data, size, 0, size);
+        ERR_CHK(safec_rc);
         data->api_revision = CTRLM_VOICE_IARM_BUS_API_REVISION;
+        //Can't be replaced with safeC version of this, as safeC string functions doesn't allow string size more than 4K
         sprintf(data->payload, "%s", str);
         result = IARM_Bus_BroadcastEvent(bus_name, event, data, size);
         if(IARM_RESULT_SUCCESS != result) {

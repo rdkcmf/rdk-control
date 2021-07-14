@@ -143,6 +143,7 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    hal_api_data_            = NULL;
    hal_api_rib_data_import_ = NULL;
    hal_api_rib_data_export_ = NULL;
+   errno_t safec_rc = -1;
 
    discovery_config_normal_.enabled               = JSON_BOOL_VALUE_NETWORK_RF4CE_DISCOVERY_CONFIG_ENABLE;
    discovery_config_normal_.require_line_of_sight = JSON_BOOL_VALUE_NETWORK_RF4CE_DISCOVERY_CONFIG_REQUIRE_LINE_OF_SIGHT;
@@ -225,7 +226,8 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    #ifdef USE_VOICE_SDK
    voice_session_rsp_confirm_ = NULL;
    voice_session_rsp_confirm_param_ = NULL;
-   memset(&voice_session_rsp_params_, 0, sizeof(voice_session_rsp_params_));
+   safec_rc = memset_s(&voice_session_rsp_params_, sizeof(voice_session_rsp_params_), 0, sizeof(voice_session_rsp_params_));
+   ERR_CHK(safec_rc);
    voice_session_rsp_params_.network_id = (ctrlm_network_id_t *)malloc(sizeof(ctrlm_network_id_t));
    (*voice_session_rsp_params_.network_id) = network_id_get();
    #endif
@@ -250,7 +252,8 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
                          .ic_config_atten_update         = JSON_INT_VALUE_NETWORK_RF4CE_DSP_IC_ATTEN_UPDATE,
                          .ic_config_detect               = JSON_INT_VALUE_NETWORK_RF4CE_DSP_IC_DETECT};
    force_dsp_configuration_ = JSON_BOOL_VALUE_NETWORK_RF4CE_DSP_FORCE_SETTINGS;
-   memset(&ff_configuration_, 0, sizeof(ff_configuration_));
+   safec_rc = memset_s(&ff_configuration_, sizeof(ff_configuration_), 0, sizeof(ff_configuration_));
+   ERR_CHK(safec_rc);
 
    process_xconf();
    load_config(json_obj_net_rf4ce);
@@ -270,7 +273,8 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    binding_in_progress_tag_ = 0;
    binding_in_progress_timeout_ = JSON_INT_VALUE_NETWORK_RF4CE_BINDING_STATE_TIMEOUT;
 
-   memset(&target_irdb_status_, 0, sizeof(target_irdb_status_t));
+   safec_rc = memset_s(&target_irdb_status_, sizeof(target_irdb_status_t), 0, sizeof(target_irdb_status_t));
+   ERR_CHK(safec_rc);
    target_irdb_status_.flags = TARGET_IRDB_STATUS_DEFAULT;
    g_mutex_init(&reverse_cmd_event_pending_mutex_);
    reverse_cmd_end_event_timer_id_ = 0;
@@ -537,6 +541,8 @@ ctrlm_rf4ce_controller_type_t ctrlm_obj_network_rf4ce_t::controller_type_from_us
    THREAD_ID_VALIDATE();
    ctrlm_rf4ce_controller_type_t controller_type = RF4CE_CONTROLLER_TYPE_UNKNOWN;
    gchar                         product_name[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME + 1];
+   ctrlm_rf4ce_product_name_t product_type;
+   ctrlm_rf4ce_controller_type_t ctrlm_type;
 
    if(user_string == NULL) {
       LOG_ERROR("%s: NULL User string\n", __FUNCTION__);
@@ -544,33 +550,21 @@ ctrlm_rf4ce_controller_type_t ctrlm_obj_network_rf4ce_t::controller_type_from_us
    }
 
    LOG_INFO("%s: User string <%s>\n", __FUNCTION__, user_string);
-   strncpy(product_name, (const char *)user_string, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-   product_name[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+   errno_t safec_rc = strcpy_s(product_name, sizeof(product_name), (const char *)user_string);
+   ERR_CHK(safec_rc);
 
    // Convert the string to controller type
    if(0 == strncmp((const char *)&user_string[7], "COMCAST", 7)) {
       LOG_WARN("%s: Assuming XR2. 0x%02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X\n", __FUNCTION__, user_string[0], user_string[1], user_string[2],  user_string[3],  user_string[4],  user_string[5],  user_string[6],  user_string[7],
                                                                                                                           user_string[8], user_string[9], user_string[10], user_string[11], user_string[12], user_string[13], user_string[14], user_string[15]);
       controller_type = RF4CE_CONTROLLER_TYPE_XR2;
-   } else if(0 == strncmp(product_name, "XR2-", 4)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR2;
-   } else if(0 == strncmp(product_name, "XR5-", 4)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR5;
-   } else if(0 == strncmp(product_name, "XR11-", 5)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR11;
-   } else if(0 == strncmp(product_name, "XR15-1", 6)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR15;
-   } else if(0 == strncmp(product_name, "XR15-2", 6)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR15V2;
-   } else if(0 == strncmp(product_name, "XR16-", 5)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR16;
-   } else if(0 == strncmp(product_name, "XR19-", 5)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XR19;
-   } else if(0 == strncmp(product_name, "XRA-", 4)) {
-      controller_type = RF4CE_CONTROLLER_TYPE_XRA;
+   } else if(ctrlm_rf4ce_get_product_type_from_product_name(product_name,&product_type,&ctrlm_type)) {
+
+      controller_type = ctrlm_type;
+
    } else {
-      LOG_ERROR("%s: Unsupported controller type <%s> 0x%02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X\n", __FUNCTION__, product_name, user_string[0], user_string[1], user_string[2],  user_string[3],  user_string[4],  user_string[5],  user_string[6],  user_string[7],
-                                                                                                                                                             user_string[8], user_string[9], user_string[10], user_string[11], user_string[12], user_string[13], user_string[14], user_string[15]);
+
+      LOG_ERROR("%s: Unsupported controller type <%s> 0x%02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X %02X%02X%02X%02X\n", __FUNCTION__, product_name, user_string[0], user_string[1], user_string[2],  user_string[3],  user_string[4],  user_string[5],  user_string[6],  user_string[7], user_string[8], user_string[9], user_string[10], user_string[11], user_string[12], user_string[13], user_string[14], user_string[15]);
    }
 
    return controller_type;
@@ -781,8 +775,8 @@ void ctrlm_hal_rf4ce_cfm_data(ctrlm_hal_rf4ce_result_t result, void *user_data) 
 
 ctrlm_hal_result_t ctrlm_obj_network_rf4ce_t::req_data(ctrlm_rf4ce_profile_id_t profile_id, ctrlm_controller_id_t controller_id, ctrlm_timestamp_t tx_window_start, unsigned char length, guchar *data, ctrlm_hal_rf4ce_data_read_t cb_data_read, void *cb_data_param, bool tx_indirect, bool single_channel, ctrlm_hal_rf4ce_cfm_data_t cb_confirm, void *cb_confirm_param) {
    THREAD_ID_VALIDATE();
-   ctrlm_hal_rf4ce_req_data_params_t params;
-   memset(&params, 0, sizeof params);
+   ctrlm_hal_rf4ce_req_data_params_t params = {0};
+
    params.controller_id       = controller_id;
    params.profile_id          = profile_id;
    params.vendor_id           = CTRLM_RF4CE_VENDOR_ID_COMCAST;
@@ -952,7 +946,7 @@ bool ctrlm_obj_network_rf4ce_t::discovery_config_set(ctrlm_controller_discovery_
 void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controller_id, unsigned long long ieee_address, bool validated) {
    ctrlm_hal_rf4ce_rib_data_import_params_t params;
    const char *                             attribute_name;
-   unsigned char                            audio_profiles[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES];     // Needed for determining product name
+   unsigned char                            audio_profiles[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES] = {0};     // Needed for determining product name
    unsigned char                            voice_remote_audio_profiles[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES] = {0x01, 0x00}; // Needed for determining product name
    LOG_INFO("%s: controller id %u ieee address 0x%016llX\n", __FUNCTION__, controller_id, ieee_address);
    // Set binding type and validation type
@@ -960,6 +954,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    ctrlm_rcu_validation_type_t validation_type = CTRLM_RCU_VALIDATION_TYPE_INTERNAL;
 
    ctrlm_hal_network_property_controller_import_t controller_import;
+   errno_t safec_rc = -1;
+   int ind = -1;
 
    controller_import.controller_id = controller_id;
    controller_import.ieee_address  = ieee_address;
@@ -990,7 +986,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING;
    params.index      = 0;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VERSIONING;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Version Software";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1001,7 +998,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    }
 
    params.index      = 1;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Version Hardware";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1012,7 +1010,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    }
 
    params.index      = 2;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Version IR DB";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1023,19 +1022,20 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    }
 
    // Audio Profiles
-   memset(audio_profiles,     0, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
 
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_VOICE_CTRL_AUDIO_PROFILES;
    params.index      = 0;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Audio Profiles Controller";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
    } else if(params.length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES) {
       LOG_WARN("%s: Invalid size <%u> importing <%s>\n", __FUNCTION__, params.length, attribute_name);
    } else {
-      memcpy(audio_profiles, params.data, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
+      safec_rc = memcpy_s(audio_profiles, sizeof(audio_profiles), params.data, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
+      ERR_CHK(safec_rc);
       controllers_[controller_id]->rf4ce_rib_set_target((ctrlm_rf4ce_rib_attr_id_t)params.identifier, params.index, params.length, params.data);
    }
 
@@ -1043,28 +1043,31 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_PRODUCT_NAME;
    params.index      = 0;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Product Name";
    version_hardware_t version_hardware = controllers_[controller_id]->version_hardware_get();
 
    //rf4ceMgr product name cannot be trusted so we will use the hw version to determine product name
    // Check audio profile to see if the remote is a voice remote
-   if(!memcmp(audio_profiles, voice_remote_audio_profiles, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES)) {
+   safec_rc = memcmp_s(audio_profiles, sizeof(audio_profiles), voice_remote_audio_profiles, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES, &ind);
+   ERR_CHK(safec_rc);
+   if((safec_rc == EOK) && (ind == 0)) {
       // This is a voice remote according to rf4ceMgr
       if (is_xr11_hardware_version(version_hardware)) {
-         strncpy((char *)params.data, RF4CE_PRODUCT_NAME_XR11, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-         params.data[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME] = 0;
+         safec_rc = strcpy_s((char *)params.data, sizeof(params.data), RF4CE_PRODUCT_NAME_XR11);
+         ERR_CHK(safec_rc);
       } else if (is_xr15_hardware_version(version_hardware)) {
-         strncpy((char *)params.data, RF4CE_PRODUCT_NAME_XR15, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-         params.data[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME] = 0;
+         safec_rc = strcpy_s((char *)params.data, sizeof(params.data), RF4CE_PRODUCT_NAME_XR15);
+         ERR_CHK(safec_rc);
       } else { // Something is not right, fall back to XR5
-         strncpy((char *)params.data, RF4CE_PRODUCT_NAME_XR5, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-         params.data[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME] = 0;
+         safec_rc = strcpy_s((char *)params.data, sizeof(params.data), RF4CE_PRODUCT_NAME_XR5);
+         ERR_CHK(safec_rc);
       }
    } //All others will be treated as XR5
    else {
-      strncpy((char *)params.data, RF4CE_PRODUCT_NAME_XR5, CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-      params.data[CTRLM_HAL_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME] = 0;
+      safec_rc = strcpy_s((char *)params.data, sizeof(params.data), RF4CE_PRODUCT_NAME_XR5);
+      ERR_CHK(safec_rc);
    }
    LOG_INFO("%s: For <%s>, using <%s>\n", __FUNCTION__, attribute_name, (char *)params.data);
    controllers_[controller_id]->rf4ce_rib_set_target((ctrlm_rf4ce_rib_attr_id_t)params.identifier, params.index, params.length, params.data);
@@ -1073,7 +1076,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_BATTERY_STATUS;
    params.index      = 0;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Battery Status";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1087,7 +1091,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_VOICE_STATISTICS;
    params.index      = 0;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Voice Statistics";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1101,7 +1106,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING;
    params.index      = 1;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Version Bootloader";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1112,7 +1118,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    }
 
    params.index      = 2;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Version Golden";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1123,7 +1130,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    }
 
    params.index      = 0x10;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "Version Audio Data";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1137,7 +1145,8 @@ void ctrlm_obj_network_rf4ce_t::controller_import(ctrlm_controller_id_t controll
    params.identifier = CTRLM_HAL_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE_STATUS;
    params.index      = 0;
    params.length     = CTRLM_HAL_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS;
-   memset(params.data, 0, params.length);
+   safec_rc = memset_s(params.data, sizeof(params.data), 0 , params.length);
+   ERR_CHK(safec_rc);
    attribute_name = "IR RF Database Status";
    if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_import_)(&params)) {
       LOG_ERROR("%s: Unable to import <%s>\n", __FUNCTION__, attribute_name);
@@ -1376,7 +1385,8 @@ void ctrlm_obj_network_rf4ce_t::rf_channel_info_get(ctrlm_rf4ce_rf_channel_info_
     }
 
    if(result != CTRLM_HAL_RESULT_SUCCESS) {
-      memset(rf_channel_info, 0, sizeof(ctrlm_rf4ce_rf_channel_info_t));
+      errno_t safec_rc = memset_s(rf_channel_info, sizeof(ctrlm_rf4ce_rf_channel_info_t), 0 , sizeof(ctrlm_rf4ce_rf_channel_info_t));
+      ERR_CHK(safec_rc);
    } else {
       rf_channel_info->rf_channel_number  = network_stats.rf_channel;
       rf_channel_info->rf_channel_quality = network_stats.rf_quality;
@@ -1739,8 +1749,8 @@ void ctrlm_obj_network_rf4ce_t::req_process_controller_product_name(void *data, 
    g_assert(dqm->product_name);
 
    if(controller_exists(dqm->controller_id)) {
-      strncpy(dqm->product_name, controllers_[dqm->controller_id]->product_name_get(), CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-      dqm->product_name[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+      errno_t safec_rc = strcpy_s(dqm->product_name, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME, controllers_[dqm->controller_id]->product_name_get());
+      ERR_CHK(safec_rc);
       *dqm->cmd_result = CTRLM_MAIN_STATUS_REQUEST_SUCCESS;
    } else {
       LOG_WARN("%s: controller doesn't exist\n", __FUNCTION__);
@@ -1758,7 +1768,7 @@ void ctrlm_obj_network_rf4ce_t::req_process_controller_link_key(void *data, int 
    g_assert(size == sizeof(ctrlm_main_queue_msg_controller_link_key_t));
    g_assert(dqm->cmd_result);
 
-   ctrlm_hal_network_property_encryption_key_t property;
+   ctrlm_hal_network_property_encryption_key_t property = {0};
 
    if(!controller_exists(dqm->controller_id)) {
       LOG_WARN("%s: Controller %u NOT present.\n", __FUNCTION__, dqm->controller_id);
@@ -1770,7 +1780,6 @@ void ctrlm_obj_network_rf4ce_t::req_process_controller_link_key(void *data, int 
    LOG_INFO("%s: Getting Link Key for Controller %u\n", __FUNCTION__, dqm->controller_id);
 
    // Get Link key
-   memset(&property, 0, sizeof(property));
    property.controller_id = dqm->controller_id;
    if(CTRLM_HAL_RESULT_SUCCESS != property_get(CTRLM_HAL_NETWORK_PROPERTY_ENCRYPTION_KEY, (void **)&property)) {
       LOG_ERROR("%s: Failed to get Link Key from HAL\n", __FUNCTION__);
@@ -1779,7 +1788,8 @@ void ctrlm_obj_network_rf4ce_t::req_process_controller_link_key(void *data, int 
       return;
    }
 
-   memcpy(dqm->link_key, property.aes128_key, CTRLM_HAL_NETWORK_AES128_KEY_SIZE);
+   errno_t safec_rc = memcpy_s(dqm->link_key, CTRLM_HAL_NETWORK_AES128_KEY_SIZE, property.aes128_key, CTRLM_HAL_NETWORK_AES128_KEY_SIZE);
+   ERR_CHK(safec_rc);
    *dqm->cmd_result = CTRLM_CONTROLLER_STATUS_REQUEST_SUCCESS;
    ctrlm_obj_network_t::req_process_controller_link_key(data, size);
 }
@@ -1787,7 +1797,7 @@ void ctrlm_obj_network_rf4ce_t::req_process_controller_link_key(void *data, int 
 ctrlm_rib_request_cmd_result_t ctrlm_obj_network_rf4ce_t::req_process_rib_export(ctrlm_controller_id_t controller_id, ctrlm_hal_rf4ce_rib_attr_id_t identifier, unsigned char index, unsigned char length, unsigned char *data) {
    THREAD_ID_VALIDATE();
    ctrlm_rib_request_cmd_result_t     ret = CTRLM_RIB_REQUEST_SUCCESS;
-   ctrlm_hal_rf4ce_rib_data_export_params_t params;
+   ctrlm_hal_rf4ce_rib_data_export_params_t params = {0};
 
    if(NULL == hal_api_rib_data_export_) {
       LOG_WARN("%s: data export api is null\n", __FUNCTION__);
@@ -1797,13 +1807,12 @@ ctrlm_rib_request_cmd_result_t ctrlm_obj_network_rf4ce_t::req_process_rib_export
       LOG_INFO("%s: Currently importing a controller from HAL, do not export\n", __FUNCTION__);
    }
    else {
-      memset(&params, 0, sizeof(ctrlm_hal_rf4ce_rib_data_export_params_t));
-   
       params.controller_id = controller_id;
       params.identifier    = identifier;
       params.index         = index;
       params.length        = length;
-      memcpy(&params.data, data, length);
+      errno_t safec_rc = memcpy_s(&params.data, sizeof(params.data), data, length);
+      ERR_CHK(safec_rc);
 
       if(CTRLM_HAL_RESULT_SUCCESS != (*hal_api_rib_data_export_)(&params)) {
          ret = CTRLM_RIB_REQUEST_ERROR;
@@ -2008,6 +2017,8 @@ gboolean ctrlm_obj_network_rf4ce_t::blackout_settings_get_rfc() {
    gsize       len       = 0;
    GError     *err       = NULL;
    gchar      *result    = NULL;
+   errno_t safec_rc = -1;
+   int ind = -1;
 
    if(FALSE == g_file_get_contents(CTRLM_RF4CE_BLACKOUT_RFC_FILE, &contents, &len, &err)) {
       LOG_INFO("%s: Failed to open RFC file <%s>\n", __FUNCTION__, err->message);
@@ -2017,9 +2028,15 @@ gboolean ctrlm_obj_network_rf4ce_t::blackout_settings_get_rfc() {
 
    result = ctrlm_do_regex((char *)CTRLM_RF4CE_REGEX_BLACKOUT_ENABLE, contents);
    if(NULL != result) {
-      if(0 == strcmp("false", result)) {
+      safec_rc = strcmp_s("false", strlen("false"), result, &ind);
+      ERR_CHK(safec_rc);
+
+      if((safec_rc == EOK) && (!ind)) {
          blackout_.is_blackout_enabled = false;
       } else {
+         if(safec_rc != EOK) {
+            LOG_WARN("%s: Defaulting to Blackout Enabled due to error in safec %s\n,", __FUNCTION__, strerror(safec_rc));
+         }
          blackout_.is_blackout_enabled = true;
       }
       LOG_INFO("%s: Blackout Enabled <%s> from RFC\n", __FUNCTION__, blackout_.is_blackout_enabled ? "YES" : "NO");
@@ -2073,6 +2090,7 @@ json_t *ctrlm_obj_network_rf4ce_t::xconf_export_controllers() {
    char dsp_version_str[CTRLM_RCU_VERSION_LENGTH];
    char keyword_model_version_str[CTRLM_RCU_VERSION_LENGTH];
    char arm_version_str[CTRLM_RCU_VERSION_LENGTH];
+   errno_t safec_rc = -1;
 
    // map to get unique types and versions.  Probably should be full full controller instead
    // of just version so more checks could be done
@@ -2107,22 +2125,28 @@ json_t *ctrlm_obj_network_rf4ce_t::xconf_export_controllers() {
       // for use with device update
       switch(obj_controller_rf4ce->controller_type_get()) {
          case  RF4CE_CONTROLLER_TYPE_XR11:
-            strncpy(product_name,RF4CE_PRODUCT_NAME_XR11,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR11);
+            ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR15:
-            strncpy(product_name,RF4CE_PRODUCT_NAME_XR15,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR15);
+            ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR15V2:
-            strncpy(product_name,RF4CE_PRODUCT_NAME_XR15V2,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR15V2);
+            ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR16:
-            strncpy(product_name,RF4CE_PRODUCT_NAME_XR16,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR16);
+            ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR19:
-            strncpy(product_name,RF4CE_PRODUCT_NAME_XR19,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-            break;   
+            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR19);
+            ERR_CHK(safec_rc);
+            break;
          case  RF4CE_CONTROLLER_TYPE_XRA:
-            strncpy(product_name,RF4CE_PRODUCT_NAME_XRA,CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
+            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XRA);
+            ERR_CHK(safec_rc);
             break;
          default:
             // currently no other remotes are downloadable so dont include them in xconf export
@@ -2199,23 +2223,41 @@ json_t *ctrlm_obj_network_rf4ce_t::xconf_export_controllers() {
    for (type_it = controller_types.begin(); type_it != controller_types.end(); type_it++) {
       json_t *temp = json_object();
 
-      snprintf(fw_version_str, sizeof(fw_version_str), "%u.%u.%u.%u", type_it->second->software_version.major,
+      safec_rc = sprintf_s(fw_version_str, sizeof(fw_version_str), "%u.%u.%u.%u", type_it->second->software_version.major,
             type_it->second->software_version.minor, type_it->second->software_version.revision, type_it->second->software_version.patch);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
 
-      snprintf(audio_version_str, sizeof(audio_version_str), "%u.%u.%u.%u", type_it->second->audio_version.major, type_it->second->audio_version.minor,
+      safec_rc = sprintf_s(audio_version_str, sizeof(audio_version_str), "%u.%u.%u.%u", type_it->second->audio_version.major, type_it->second->audio_version.minor,
             type_it->second->audio_version.revision, type_it->second->audio_version.patch);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
 
-      snprintf(hw_version_str, sizeof(hw_version_str), "%u.%u.%u.%u", type_it->second->hw_version.manufacturer, type_it->second->hw_version.model,
+      safec_rc = sprintf_s(hw_version_str, sizeof(hw_version_str), "%u.%u.%u.%u", type_it->second->hw_version.manufacturer, type_it->second->hw_version.model,
             type_it->second->hw_version.hw_revision, type_it->second->hw_version.lot_code);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
 
-      snprintf(dsp_version_str, sizeof(dsp_version_str), "%u.%u.%u.%u", type_it->second->dsp_version.major, type_it->second->dsp_version.minor,
+      safec_rc = sprintf_s(dsp_version_str, sizeof(dsp_version_str), "%u.%u.%u.%u", type_it->second->dsp_version.major, type_it->second->dsp_version.minor,
             type_it->second->dsp_version.revision, type_it->second->dsp_version.patch);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
 
-      snprintf(keyword_model_version_str, sizeof(keyword_model_version_str), "%u.%u.%u.%u", type_it->second->keyword_model_version.major, type_it->second->keyword_model_version.minor,
+      safec_rc = sprintf_s(keyword_model_version_str, sizeof(keyword_model_version_str), "%u.%u.%u.%u", type_it->second->keyword_model_version.major, type_it->second->keyword_model_version.minor,
             type_it->second->keyword_model_version.revision, type_it->second->keyword_model_version.patch);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
 
-      snprintf(arm_version_str, sizeof(arm_version_str), "%u.%u.%u.%u", type_it->second->arm_version.major, type_it->second->arm_version.minor,
+      safec_rc = sprintf_s(arm_version_str, sizeof(arm_version_str), "%u.%u.%u.%u", type_it->second->arm_version.major, type_it->second->arm_version.minor,
             type_it->second->arm_version.revision, type_it->second->arm_version.patch);
+      if(safec_rc < EOK) {
+         ERR_CHK(safec_rc);
+      }
 
       // we are done with this element so delete the malloc'd memory
       g_free(type_it->second);
@@ -2354,7 +2396,7 @@ guchar ctrlm_obj_network_rf4ce_t::property_read_ir_rf_database(guchar index, guc
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   
+
    // Load the data from the controller object
    if(ir_rf_database_.count(index) == 0) { // No entry for this key
       LOG_INFO("%s: NO ENTRY FOUND for key <%s>. Use default.\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
@@ -2364,11 +2406,12 @@ guchar ctrlm_obj_network_rf4ce_t::property_read_ir_rf_database(guchar index, guc
       LOG_ERROR("%s: NOT ENOUGH SPACE for key <%s> (%u, %u)\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), length, ir_rf_database_[index]->size());
       return(0);
    } else {
-      memcpy(data, ir_rf_database_[index]->data(), ir_rf_database_[index]->size());
+      errno_t safec_rc = memcpy_s(data, length, ir_rf_database_[index]->data(), ir_rf_database_[index]->size());
+      ERR_CHK(safec_rc);
    }
    LOG_INFO("%s: Returning IR/RF code for key <%s> length %u\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index), ir_rf_database_[index]->size());
    ctrlm_print_data_hex(__FUNCTION__, data, ir_rf_database_[index]->size(), 32);
-   
+
    return(ir_rf_database_[index]->size());
 }
 
@@ -2425,7 +2468,8 @@ guchar ctrlm_obj_network_rf4ce_t::write_target_irdb_status(guchar *data, guchar 
       data[10] = data[11];
       data[11] = data[12];
       data[12] = 0;
-      memcpy(target_irdb_status, data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
+      errno_t safec_rc = memcpy_s(target_irdb_status, sizeof(target_irdb_status), data,CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
+      ERR_CHK(safec_rc);
       ctrlm_db_target_irdb_status_write(target_irdb_status, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
    }
 
@@ -2461,16 +2505,27 @@ guchar ctrlm_obj_network_rf4ce_t::write_target_irdb_status(guchar *data, guchar 
 }
 
 void ctrlm_obj_network_rf4ce_t::push_ir_codes_to_voice_assistants_from_target_irdb_status() {
+   errno_t safec_rc = -1;
+   int ind =-1;
+
    for(auto itr = controllers_.begin(); itr != controllers_.end(); itr++) {
       if(itr->second->controller_type_get() == RF4CE_CONTROLLER_TYPE_XR19) {
          controller_irdb_status_t irdb_status = itr->second->controller_irdb_status_get();
 
          if(irdb_status.flags & CONTROLLER_IRDB_STATUS_FLAGS_NO_IR_PROGRAMMED) {
             itr->second->push_ir_codes();
-         } else if(target_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV  && strcmp(irdb_status.irdb_string_tv,  target_irdb_status_.irdb_string_tv)) {
-            itr->second->push_ir_codes();
-         } else if(target_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR && strcmp(irdb_status.irdb_string_avr, target_irdb_status_.irdb_string_avr)) {
-            itr->second->push_ir_codes();
+         } else if(target_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV) {
+           safec_rc = strcmp_s(irdb_status.irdb_string_tv, strlen(irdb_status.irdb_string_tv), target_irdb_status_.irdb_string_tv, &ind);
+           ERR_CHK(safec_rc);
+           if((safec_rc == EOK) && (ind)) {
+             itr->second->push_ir_codes();
+           }
+         } else if(target_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR) {
+           safec_rc = strcmp_s(irdb_status.irdb_string_avr, strlen(irdb_status.irdb_string_avr), target_irdb_status_.irdb_string_avr, &ind);
+           ERR_CHK(safec_rc);
+           if((safec_rc == EOK) && (ind)) {
+             itr->second->push_ir_codes();
+           }
          } else if(target_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_RF_DB) {
             itr->second->push_ir_codes();
          }
@@ -2524,8 +2579,7 @@ gboolean ctrlm_obj_network_rf4ce_t::target_irdb_status_read_from_db() {
 
 void ctrlm_obj_network_rf4ce_t::target_irdb_status_set(controller_irdb_status_t controller_irdb_status) {
    THREAD_ID_VALIDATE();
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS];
-   memset(data, 0, sizeof(data));
+   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS] = {0};
 
    if(controller_irdb_status.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_RF_DB) {
       target_irdb_status_.flags = CONTROLLER_IRDB_STATUS_FLAGS_IR_RF_DB;
@@ -2626,9 +2680,8 @@ void ctrlm_obj_network_rf4ce_t::req_process_polling_action_push(void *data, int 
       controller_id = controller_id_get_last_recently_used();
    }
 
-   guchar attr_data[CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS];
+   guchar attr_data[CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS] = {0};
    guint32 attr_len = CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS;
-   memset(attr_data, 0, sizeof(attr_data));
 
    if ( RF4CE_POLLING_ACTION_IRRF_STATUS == dqm->action ) {
       controller_irdb_status_t most_recent_controller_irdb_status = most_recent_controller_irdb_status_get();
@@ -2749,8 +2802,7 @@ void ctrlm_obj_network_rf4ce_t::voice_command_status_set(void *data, int size){
       LOG_WARN("%s: Controller %u NOT present.\n", __FUNCTION__, dqm->controller_id);
       return;
    }
-   guchar status_data[CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS];
-   memset(&status_data, 0, sizeof(status_data));
+   guchar status_data[CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS] = {0};
    status_data[0] = dqm->status; // Voice Command Status
 #ifdef USE_VOICE_SDK
    if(dqm->status == VOICE_COMMAND_STATUS_TV_AVR_CMD) {
@@ -2772,9 +2824,12 @@ gboolean ctrlm_obj_network_rf4ce_t::mfg_test_enabled() {
 void ctrlm_obj_network_rf4ce_t::default_polling_configuration() {
 
   // Clear memory
-  memset(controller_polling_methods_,                 0, sizeof(controller_polling_methods_));
-  memset(controller_polling_configuration_heartbeat_, 0, sizeof(controller_polling_configuration_heartbeat_));
-  memset(controller_polling_configuration_mac_,       0, sizeof(controller_polling_configuration_mac_));
+  errno_t safec_rc = memset_s(controller_polling_methods_, sizeof(controller_polling_methods_), 0, sizeof(controller_polling_methods_));
+  ERR_CHK(safec_rc);
+  safec_rc = memset_s(controller_polling_configuration_heartbeat_, sizeof(controller_polling_configuration_heartbeat_), 0, sizeof(controller_polling_configuration_heartbeat_));
+  ERR_CHK(safec_rc);
+  safec_rc = memset_s(controller_polling_configuration_mac_, sizeof(controller_polling_configuration_mac_), 0, sizeof(controller_polling_configuration_mac_));
+  ERR_CHK(safec_rc);
 
   // Generic polling configuration
   controller_generic_polling_configuration_.uptime_multiplier = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_HB_GENERIC_CONFIG_UPTIME_MULTIPLIER;
@@ -2881,8 +2936,7 @@ void ctrlm_obj_network_rf4ce_t::default_polling_configuration() {
 
 void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
    guint8 default_polling_methods = 0;
-   ctrlm_rf4ce_polling_configuration_t default_polling_config_hb;
-   memset(&default_polling_config_hb, 0, sizeof(ctrlm_rf4ce_polling_configuration_t));
+   ctrlm_rf4ce_polling_configuration_t default_polling_config_hb = {0};
 
    ctrlm_rf4ce_polling_configuration_t default_polling_config_mac;
    default_polling_config_mac.trigger = POLLING_TRIGGER_FLAG_TIME;
@@ -2890,8 +2944,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
 
    bool b_has_default_config = false;
 
-   char tr181_buf[1024];
-   memset(tr181_buf, 0, sizeof(tr181_buf));
+   char tr181_buf[1024] = {0};
    if(CTRLM_TR181_RESULT_SUCCESS == ctrlm_tr181_string_get(CTRLM_RF4CE_TR181_POLLING_CONFIGURATION_DEFAULT, tr181_buf, sizeof(tr181_buf))) {
      if(4 == sscanf(tr181_buf, "%hhu:%hu:%hhu:%u:", &default_polling_methods, &default_polling_config_hb.trigger, &default_polling_config_hb.kp_counter, &default_polling_config_hb.time_interval)) {
         LOG_INFO("%s: Default HB Polling Configuration from TR181\n", __FUNCTION__);
@@ -2900,6 +2953,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
    }
 
    bool b_has_default_mac_config = false;
+   errno_t safec_rc = -1;
 #ifdef MAC_POLLING
    bool mac_polling_enabled = false;
    if(CTRLM_TR181_RESULT_SUCCESS == ctrlm_tr181_bool_get(CTRLM_RF4CE_TR181_MAC_POLLING_CONFIGURATION_ENABLE, &mac_polling_enabled)) {
@@ -2954,7 +3008,8 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
            controller_polling_methods_[i] = default_polling_methods;
            controller_polling_configuration_heartbeat_[i] = default_polling_config_hb;
         }
-        memset(tr181_buf, 0, sizeof(tr181_buf));
+	safec_rc = memset_s(tr181_buf, sizeof(tr181_buf), 0, sizeof(tr181_buf));
+        ERR_CHK(safec_rc);
         if(CTRLM_TR181_RESULT_SUCCESS == ctrlm_tr181_string_get(controller_tr181_str, tr181_buf, sizeof(tr181_buf))) {
            if(4 == sscanf(tr181_buf, "%hhu:%hu:%hhu:%u:", &controller_polling_methods_[i],
                  &controller_polling_configuration_heartbeat_[i].trigger,
@@ -2978,8 +3033,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_read(json_config *conf) {
    }
 
    guint8 default_polling_methods = 0;
-   ctrlm_rf4ce_polling_configuration_t default_polling_config_hb;
-   memset(&default_polling_config_hb, 0, sizeof(ctrlm_rf4ce_polling_configuration_t));
+   ctrlm_rf4ce_polling_configuration_t default_polling_config_hb = {0};
 
    ctrlm_rf4ce_polling_configuration_t default_polling_config_mac;
    default_polling_config_mac.trigger = POLLING_TRIGGER_FLAG_TIME;
@@ -3046,6 +3100,8 @@ void ctrlm_obj_network_rf4ce_t::polling_config_read(json_config *conf) {
 
 gboolean ctrlm_obj_network_rf4ce_t::polling_configuration_by_controller_type(ctrlm_rf4ce_controller_type_t controller_type, guint8 *polling_methods, ctrlm_rf4ce_polling_configuration_t *configurations) {
    gboolean changed = false;
+   errno_t safec_rc = -1;
+   int ind = -1;
    if(polling_methods == NULL || configurations == NULL || controller_type == RF4CE_CONTROLLER_TYPE_INVALID) {
       LOG_ERROR("%s: Invalid Parameters!\n", __FUNCTION__);
       return(false);
@@ -3061,15 +3117,25 @@ gboolean ctrlm_obj_network_rf4ce_t::polling_configuration_by_controller_type(ctr
    }
 
    // Heartbeat Configuration
-   if(&configurations[RF4CE_POLLING_METHOD_HEARTBEAT] && 0 != memcmp(&configurations[RF4CE_POLLING_METHOD_HEARTBEAT], &controller_polling_configuration_heartbeat_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION)) {
-      memcpy(&configurations[RF4CE_POLLING_METHOD_HEARTBEAT], &controller_polling_configuration_heartbeat_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
-      changed = true;
+   if(&configurations[RF4CE_POLLING_METHOD_HEARTBEAT]) {
+     safec_rc = memcmp_s(&configurations[RF4CE_POLLING_METHOD_HEARTBEAT], sizeof(ctrlm_rf4ce_polling_configuration_t), &controller_polling_configuration_heartbeat_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION, &ind);
+     ERR_CHK(safec_rc);
+     if((safec_rc == EOK) && (ind != 0)) {
+        safec_rc = memcpy_s(&configurations[RF4CE_POLLING_METHOD_HEARTBEAT], sizeof(ctrlm_rf4ce_polling_configuration_t), &controller_polling_configuration_heartbeat_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+        ERR_CHK(safec_rc);
+        changed = true;
+     }
    }
 
    // Mac Configuration
-   if(&configurations[RF4CE_POLLING_METHOD_MAC] && 0 != memcmp(&configurations[RF4CE_POLLING_METHOD_MAC], &controller_polling_configuration_mac_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION)) {
-      memcpy(&configurations[RF4CE_POLLING_METHOD_MAC], &controller_polling_configuration_mac_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
-      changed = true;
+   if(&configurations[RF4CE_POLLING_METHOD_MAC]) {
+     safec_rc = memcmp_s(&configurations[RF4CE_POLLING_METHOD_MAC], sizeof(ctrlm_rf4ce_polling_configuration_t), &controller_polling_configuration_mac_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION, &ind);
+     ERR_CHK(safec_rc);
+     if((safec_rc == EOK) && (ind != 0)) {
+       safec_rc = memcpy_s(&configurations[RF4CE_POLLING_METHOD_MAC], sizeof(ctrlm_rf4ce_polling_configuration_t), &controller_polling_configuration_mac_[controller_type], CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+       ERR_CHK(safec_rc);
+       changed = true;
+     }
    }
 
    return(changed);
@@ -3171,8 +3237,8 @@ ctrlm_controller_status_cmd_result_t  ctrlm_obj_network_rf4ce_t::req_process_rev
       return CTRLM_CONTROLLER_STATUS_REQUEST_ERROR;
    }
 
-   char data[POLLING_RESPONSE_DATA_LEN];
-   memset(&data, 0, sizeof (data));
+   char data[POLLING_RESPONSE_DATA_LEN] = {0};
+   errno_t safec_rc = -1;
 
    // setting up parameters for polling action. They might be in any order in IARM command
    for (int i = 0; i < reverse_command.num_params; ++i) {
@@ -3187,7 +3253,8 @@ ctrlm_controller_status_cmd_result_t  ctrlm_obj_network_rf4ce_t::req_process_rev
             break;
          }
       }
-      memcpy(&data[data_index], &reverse_command.param_data[i], reverse_command.params_desc[i].size);
+      safec_rc = memcpy_s(&data[data_index], sizeof(data), &reverse_command.param_data[i], reverse_command.params_desc[i].size);
+      ERR_CHK(safec_rc);
    }
 
    reverse_cmd_end_event_pending_.clear();
@@ -3294,6 +3361,7 @@ bool ctrlm_obj_network_rf4ce_t::is_fmr_supported() const {
 void ctrlm_obj_network_rf4ce_t::polling_action_push(void *data, int size) {
    ctrlm_main_queue_msg_rf4ce_polling_action_t *dqm = (ctrlm_main_queue_msg_rf4ce_polling_action_t *)data;
    chime_timeout_ = 0;
+   errno_t safec_rc = -1;
 
    g_assert(dqm);
    g_assert(size == sizeof(ctrlm_main_queue_msg_rf4ce_polling_action_t));
@@ -3309,18 +3377,19 @@ void ctrlm_obj_network_rf4ce_t::polling_action_push(void *data, int size) {
             return;
          }
          msg->action = action;
-         memcpy(msg->data, action_data, sizeof(msg->data));
+         safec_rc = memcpy_s(msg->data, sizeof(msg->data), action_data, sizeof(msg->data));
+         ERR_CHK(safec_rc);
          kv.second->polling_action_push(msg);
          if (action == RF4CE_POLLING_ACTION_ALERT) {
             if (chime_timeout_ == 0) {
-               memcpy(&chime_timeout_, &msg->data[1],  2);
+               safec_rc = memcpy_s(&chime_timeout_, sizeof(unsigned short), &msg->data[1],  2);
+               ERR_CHK(safec_rc);
             }
             ctrlm_timestamp_t timestamp;
             ctrlm_timestamp_get(&timestamp);
 //            ctrlm_timestamp_add_ms(&timestamp, CTRLM_RF4CE_CONST_RESPONSE_IDLE_TIME);
             // Add Data to response
-            guint8 response[3 + POLLING_RESPONSE_DATA_LEN];
-            memset(response, 0, sizeof(response));
+            guint8 response[3 + POLLING_RESPONSE_DATA_LEN] = {0};
             response[0] = 0x55; // value is for debugging purpose only. RCU doesn't read it, it checks size only
             ctrlm_hal_result_t result = req_data(CTRLM_RF4CE_PROFILE_ID_COMCAST_RCU, kv.first, timestamp, 1, response, NULL, NULL, true);
             if (result != CTRLM_HAL_RESULT_SUCCESS) {
@@ -3606,8 +3675,15 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
    hw_version_obj = controllers_[dqm->controller_id]->version_hardware_get();
    battery_status = controllers_[dqm->controller_id]->battery_status_get();
 
-   snprintf(sw_version, sizeof(sw_version), "%u.%u.%u.%u", sw_version_obj.major, sw_version_obj.minor, sw_version_obj.revision, sw_version_obj.patch);
-   snprintf(hw_version, sizeof(hw_version), "%u.%u.%u.%u", hw_version_obj.manufacturer, hw_version_obj.model, hw_version_obj.hw_revision, hw_version_obj.lot_code);
+   errno_t safec_rc = sprintf_s(sw_version, sizeof(sw_version), "%u.%u.%u.%u", sw_version_obj.major, sw_version_obj.minor, sw_version_obj.revision, sw_version_obj.patch);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
+
+   safec_rc = sprintf_s(hw_version, sizeof(hw_version), "%u.%u.%u.%u", hw_version_obj.manufacturer, hw_version_obj.model, hw_version_obj.hw_revision, hw_version_obj.lot_code);
+   if(safec_rc < EOK) {
+     ERR_CHK(safec_rc);
+   }
 
    ctrlm_rf4ce_controller_type_t controller_type = controllers_[dqm->controller_id]->controller_type_get();
    if(controller_type == RF4CE_CONTROLLER_TYPE_XR19) { // TODO Remove this after XR19 supports type in session request
@@ -3750,7 +3826,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
       voice_session_rsp_params_.timestamp_begin = dqm->timestamp;
       voice_session_rsp_params_.timestamp_end   = dqm->timestamp;
       ctrlm_timestamp_add_ms(&voice_session_rsp_params_.timestamp_end, CTRLM_RF4CE_CONST_RESPONSE_WAIT_TIME);
-      memcpy(&voice_session_rsp_params_.response, response, response_len);
+      safec_rc = memcpy_s(&voice_session_rsp_params_.response, sizeof(voice_session_rsp_params_.response),response, response_len);
+      ERR_CHK(safec_rc);
    }
 
    req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, dqm->controller_id, dqm->timestamp, response_len, response, NULL, NULL, false, false, cb_confirm_rf4ce, cb_confirm_param);
@@ -3785,7 +3862,8 @@ void ctrlm_network_rf4ce_cfm_voice_session_rsp(ctrlm_hal_rf4ce_result_t result, 
    }
    ctrlm_network_id_t network_id = *(ctrlm_network_id_t *)user_data;
    ctrlm_main_queue_msg_voice_session_response_confirm_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
    msg.result = result;
    rdkx_timestamp_get_realtime(&msg.timestamp);
 
@@ -3864,7 +3942,8 @@ guchar ctrlm_obj_network_rf4ce_t::property_read_far_field_configuration(guchar *
       return(0);
    }
 
-   memset(data, 0, length);
+   errno_t safec_rc = memset_s(data, length, 0, length);
+   ERR_CHK(safec_rc);
 
    data[0] = ff_configuration_.flags;
    data[1] = ff_configuration_.chime_volume;
@@ -3881,7 +3960,8 @@ guchar ctrlm_obj_network_rf4ce_t::property_write_far_field_configuration(guchar 
       return(0);
    }
 
-   memset(&ff_configuration_, 0, sizeof(ff_configuration_));
+   errno_t safec_rc = memset_s(&ff_configuration_, sizeof(ff_configuration_), 0, sizeof(ff_configuration_));
+   ERR_CHK(safec_rc);
 
    ff_configuration_.flags             = data[0];
    ff_configuration_.chime_volume      = data[1];
@@ -3899,7 +3979,8 @@ guchar ctrlm_obj_network_rf4ce_t::property_read_dsp_configuration(guchar *data, 
       return(0);
    }
 
-   memset(data, 0, length);
+   errno_t safec_rc = memset_s(data, length, 0, length);
+   ERR_CHK(safec_rc);
 
    data[0] = dsp_configuration_.flags;
    data[1] = dsp_configuration_.vad_threshold;
@@ -3936,7 +4017,8 @@ guchar ctrlm_obj_network_rf4ce_t::property_write_dsp_configuration(guchar *data,
       return(0);
    }
 
-   memset(&dsp_configuration_, 0, sizeof(dsp_configuration_));
+   errno_t safec_rc = memset_s(&dsp_configuration_, sizeof(dsp_configuration_), 0, sizeof(dsp_configuration_));
+   ERR_CHK(safec_rc);
 
    dsp_configuration_.flags                         = data[0];
    dsp_configuration_.vad_threshold                 = data[1];
@@ -4100,7 +4182,8 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_cfm_init(ctrlm_network_id_t network_id, ctrlm
    sem_init(&semaphore, 0, 0);
 
    ctrlm_main_queue_msg_hal_cfm_init_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    msg.params.rf4ce = params;
    msg.semaphore    = &semaphore;
@@ -4137,10 +4220,13 @@ void ctrlm_obj_network_rf4ce_t::req_process_network_status(void *data, int size)
    g_assert(dqm->cmd_result);
 
    ctrlm_network_status_rf4ce_t *status_rf4ce  = &dqm->status->status.rf4ce;
-   strncpy(status_rf4ce->version_hal, version_get(), CTRLM_MAIN_VERSION_LENGTH);
+    errno_t safec_rc = strncpy_s(status_rf4ce->version_hal, sizeof(status_rf4ce->version_hal), version_get(), CTRLM_MAIN_VERSION_LENGTH-1);
+   ERR_CHK(safec_rc);
    status_rf4ce->version_hal[CTRLM_MAIN_VERSION_LENGTH - 1] = '\0';
-   strncpy(status_rf4ce->chipset, chipset_get(), CTRLM_MAIN_MAX_CHIPSET_LENGTH);
+   safec_rc = strncpy_s(status_rf4ce->chipset, sizeof(status_rf4ce->chipset), chipset_get(), CTRLM_MAIN_MAX_CHIPSET_LENGTH-1);
+   ERR_CHK(safec_rc);
    status_rf4ce->chipset[CTRLM_MAIN_MAX_CHIPSET_LENGTH - 1] = '\0';
+
    int index = 0;
    for(auto const &itr : controllers_) {
       //If the validation result is not success, then this remote has not finished pairing.  Do not send it's status.
@@ -4329,19 +4415,19 @@ void ctrlm_obj_network_rf4ce_t::req_process_ir_clear_codes(void *data, int size)
       if(dqm->success) *dqm->success = false;
    }
 
-   // post the semaphore 
+   // post the semaphore
    if(dqm->semaphore) {
       sem_post(dqm->semaphore);
    }
 }
 
 void ctrlm_rf4ce_polling_action_push(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 action, char* data, size_t len) {
-   ctrlm_main_queue_msg_rf4ce_polling_action_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_rf4ce_polling_action_t msg = {0};
    msg.controller_id     = controller_id;
    msg.action            = action;
    if(data) {
-      memcpy(msg.data, data, (len > sizeof(msg.data) ? sizeof(msg.data) : len));
+      errno_t safec_rc = memcpy_s(msg.data, sizeof(msg.data), data, (len > sizeof(msg.data) ? sizeof(msg.data) : len));
+      ERR_CHK(safec_rc);
    }
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_rf4ce_t::polling_action_push, &msg, sizeof(msg), NULL, network_id);
 }
@@ -4467,9 +4553,9 @@ void ctrlm_obj_network_rf4ce_t::power_state_change(ctrlm_main_queue_power_state_
    if((dqm->old_state != CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) ||
       (dqm->old_state == CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP)) {
       ctrlm_main_queue_msg_network_property_set_t msg;
-      ctrlm_hal_network_property_dpi_control_t dpi;
-      memset(&msg, 0, sizeof(msg));
-      memset(&dpi, 0, sizeof(dpi));
+      ctrlm_hal_network_property_dpi_control_t dpi = {0};
+      errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+      ERR_CHK(safec_rc);
 
       dpi.dpi_enable = (dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP ? 1 : 0);
 #ifndef CTRLM_HAL_DPI_DEFAULT

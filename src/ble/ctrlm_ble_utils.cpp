@@ -28,13 +28,16 @@ using namespace std;
 string ctrlm_ble_utils_BuildDBusDeviceObjectPath(const char *path_base, unsigned long long ieee_address)
 {
     char objectPath[CTRLM_MAX_PARAM_STR_LEN];
-    snprintf(objectPath, sizeof(objectPath), "%s/device_%02X_%02X_%02X_%02X_%02X_%02X", path_base,
+    errno_t safec_rc = sprintf_s(objectPath, sizeof(objectPath), "%s/device_%02X_%02X_%02X_%02X_%02X_%02X", path_base,
                                                             0xFF & (unsigned int)(ieee_address >> 40),
                                                             0xFF & (unsigned int)(ieee_address >> 32),
                                                             0xFF & (unsigned int)(ieee_address >> 24),
                                                             0xFF & (unsigned int)(ieee_address >> 16),
                                                             0xFF & (unsigned int)(ieee_address >> 8),
                                                             0xFF & (unsigned int)(ieee_address));
+    if(safec_rc < EOK) {
+       ERR_CHK(safec_rc);
+    }
 
     LOG_DEBUG("%s: device_path: <%s>\n", __FUNCTION__, objectPath);
     return string(objectPath);

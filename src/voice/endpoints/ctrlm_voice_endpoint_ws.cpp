@@ -119,9 +119,9 @@ bool ctrlm_voice_endpoint_ws_t::get_handlers(xrsr_handlers_t *handlers) {
         return(false);
     }
 
-    xrsv_ws_handlers_t handlers_xrsv;
-    memset(handlers, 0, sizeof(xrsr_handlers_t));
-    memset(&handlers_xrsv, 0, sizeof(handlers_xrsv));
+    xrsv_ws_handlers_t handlers_xrsv = {0};
+    errno_t safec_rc = memset_s(handlers, sizeof(xrsr_handlers_t), 0, sizeof(xrsr_handlers_t));
+    ERR_CHK(safec_rc);
 
     // Set up handlers
     handlers_xrsv.session_begin     = &ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_session_begin;
@@ -218,6 +218,11 @@ void ctrlm_voice_endpoint_ws_t::voice_session_begin_callback_ws(void *data, int 
 
     if(sat != "") {
         LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
+	/* LIMITATION :
+        * Following strncpy() can't modified to safec strncpy_s() api
+        * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
+        * And here, we have destination buffer size more than 4K i.e 5120.
+        */
         strncpy(ws->sat_token, sat.c_str(), sizeof(ws->sat_token));
     } else {
         ws->sat_token[0] = '\0';
@@ -362,9 +367,8 @@ void ctrlm_voice_endpoint_ws_t::voice_session_recv_msg_ws(const char *transcript
 
 void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, xrsv_ws_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
     ctrlm_voice_endpoint_ws_t *endpoint = (ctrlm_voice_endpoint_ws_t *)user_data;
-    ctrlm_voice_session_begin_cb_ws_t msg;
+    ctrlm_voice_session_begin_cb_ws_t msg = {0};
     sem_t semaphore;
-    memset(&msg, 0, sizeof(msg));
     sem_init(&semaphore, 0, 0);
 
     if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {

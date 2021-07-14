@@ -34,6 +34,9 @@
 #include "irMgr.h"
 #include "plat_ir.h"
 #include "sysMgr.h"
+#ifdef BREAKPAD_SUPPORT
+#include "client/linux/handler/exception_handler.h"
+#endif
 #include "comcastIrKeyCodes.h"
 #include "ctrlm_version.h"
 #include "ctrlm_hal_rf4ce.h"
@@ -60,9 +63,6 @@
 #include "ctrlm_voice_session.h"
 #include "ctrlm_device_update.h"
 #include "ctrlm_vendor_network_factory.h"
-#ifdef BREAKPAD_SUPPORT
-#include "client/linux/handler/exception_handler.h"
-#endif
 #include "dsMgr.h"
 #include "dsRpc.h"
 #include "dsDisplay.h"
@@ -440,8 +440,7 @@ int main(int argc, char *argv[]) {
    ctrlm_dsmgr_init();
 
 #ifdef USE_VOICE_SDK
-   vsdk_version_info_t version_info[VSDK_VERSION_QTY_MAX];
-   memset(version_info, 0, sizeof(version_info));
+   vsdk_version_info_t version_info[VSDK_VERSION_QTY_MAX] = {0};
 
    uint32_t qty_vsdk = VSDK_VERSION_QTY_MAX;
    vsdk_version(version_info, &qty_vsdk);
@@ -521,8 +520,8 @@ int main(int argc, char *argv[]) {
    g_ctrlm.last_key_info.last_ir_remote_type  = CTRLM_IR_REMOTE_TYPE_UNKNOWN;
    g_ctrlm.last_key_info.is_screen_bind_mode  = false;
    g_ctrlm.last_key_info.remote_keypad_config = CTRLM_REMOTE_KEYPAD_CONFIG_INVALID;
-   strncpy(g_ctrlm.last_key_info.source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
-   g_ctrlm.last_key_info.source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME-1] = '\0';
+   errno_t safec_rc = strcpy_s(g_ctrlm.last_key_info.source_name, sizeof(g_ctrlm.last_key_info.source_name), ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type));
+   ERR_CHK(safec_rc);
 
    g_ctrlm.discovery_remote_type[0] = '\0';
 
@@ -1981,11 +1980,9 @@ gboolean ctrlm_controller_id_is_valid(ctrlm_network_id_t network_id, ctrlm_contr
          LOG_DEBUG("%s: main thread\n", __FUNCTION__);
          ret = g_ctrlm.networks[network_id]->controller_exists(controller_id);
       } else {
-         ctrlm_main_queue_msg_controller_exists_t dqm;
+         ctrlm_main_queue_msg_controller_exists_t dqm = {0};
          sem_t semaphore;
          sem_init(&semaphore, 0, 0);
-
-         memset(&dqm, 0, sizeof(dqm));
 
          dqm.controller_id     = controller_id;
          dqm.semaphore         = &semaphore;
@@ -2226,7 +2223,8 @@ gpointer ctrlm_main_thread(gpointer param) {
             if(dqm->result == CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS) {
                obj_net->ctrlm_controller_status_get(dqm->controller_id, &status);
             } else {
-               memset(&status, 0, sizeof(ctrlm_controller_status_t));
+               errno_t safec_rc = memset_s(&status, sizeof(ctrlm_controller_status_t), 0, sizeof(ctrlm_controller_status_t));
+               ERR_CHK(safec_rc);
             }
 
             ctrlm_configuration_complete(hdr->network_id, dqm->controller_id, obj_net->ctrlm_controller_type_get(dqm->controller_id), obj_net->ctrlm_binding_type_get(dqm->controller_id), &status, dqm->result);
@@ -2853,6 +2851,7 @@ gboolean ctrlm_main_iarm_call_status_get(ctrlm_main_iarm_call_status_t *status) 
 
 void ctrlm_main_iarm_call_status_get_(ctrlm_main_iarm_call_status_t *status) {
    unsigned long index = 0;
+   errno_t safec_rc = -1;
 
    if(g_ctrlm.networks.size() > CTRLM_MAIN_MAX_NETWORKS) {
       status->network_qty = CTRLM_MAIN_MAX_NETWORKS;
@@ -2867,16 +2866,18 @@ void ctrlm_main_iarm_call_status_get_(ctrlm_main_iarm_call_status_t *status) {
 
    status->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
 
-   strncpy(status->ctrlm_version, CTRLM_MAIN_VERSION, CTRLM_MAIN_VERSION_LENGTH);
-   status->ctrlm_version[CTRLM_MAIN_VERSION_LENGTH - 1] = '\0';
+   safec_rc = strcpy_s(status->ctrlm_version, sizeof(status->ctrlm_version), CTRLM_VERSION);
+   ERR_CHK(safec_rc);
 
-   strncpy(status->ctrlm_commit_id, CTRLM_MAIN_COMMIT_ID, CTRLM_MAIN_COMMIT_ID_MAX_LENGTH);
-   status->ctrlm_commit_id[CTRLM_MAIN_COMMIT_ID_MAX_LENGTH - 1] = '\0';
+   safec_rc = strcpy_s(status->ctrlm_commit_id, sizeof(status->ctrlm_commit_id), CTRLM_MAIN_COMMIT_ID);
+   ERR_CHK(safec_rc);
 
-   strncpy(status->stb_device_id, g_ctrlm.device_id.c_str(), CTRLM_MAIN_DEVICE_ID_MAX_LENGTH);
+   safec_rc = strncpy_s(status->stb_device_id, sizeof(status->stb_device_id), g_ctrlm.device_id.c_str(), CTRLM_MAIN_DEVICE_ID_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    status->stb_device_id[CTRLM_MAIN_DEVICE_ID_MAX_LENGTH - 1] = '\0';
 
-   strncpy(status->stb_receiver_id, g_ctrlm.receiver_id.c_str(), CTRLM_MAIN_RECEIVER_ID_MAX_LENGTH);
+   safec_rc = strncpy_s(status->stb_receiver_id, sizeof(status->stb_receiver_id), g_ctrlm.receiver_id.c_str(), CTRLM_MAIN_RECEIVER_ID_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    status->stb_receiver_id[CTRLM_MAIN_RECEIVER_ID_MAX_LENGTH - 1] = '\0';
 }
 
@@ -2982,6 +2983,7 @@ gboolean ctrlm_main_iarm_call_pairing_metrics_get(ctrlm_main_iarm_call_pairing_m
 }
 
 void ctrlm_main_iarm_call_pairing_metrics_get_(ctrlm_main_iarm_call_pairing_metrics_t *pairing_metrics) {
+   errno_t safec_rc                                        = -1;
    pairing_metrics->result                                 = CTRLM_IARM_CALL_RESULT_SUCCESS;
    pairing_metrics->num_screenbind_failures                = g_ctrlm.pairing_metrics.num_screenbind_failures;
    pairing_metrics->last_screenbind_error_timestamp        = g_ctrlm.pairing_metrics.last_screenbind_error_timestamp;
@@ -2991,10 +2993,12 @@ void ctrlm_main_iarm_call_pairing_metrics_get_(ctrlm_main_iarm_call_pairing_metr
    pairing_metrics->last_non_screenbind_error_code         = g_ctrlm.pairing_metrics.last_non_screenbind_error_code;
    pairing_metrics->last_non_screenbind_error_binding_type = g_ctrlm.pairing_metrics.last_non_screenbind_error_binding_type;
 
-   strncpy(pairing_metrics->last_screenbind_remote_type, g_ctrlm.pairing_metrics.last_screenbind_remote_type, CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH);
+   safec_rc = strncpy_s(pairing_metrics->last_screenbind_remote_type, sizeof(pairing_metrics->last_screenbind_remote_type), g_ctrlm.pairing_metrics.last_screenbind_remote_type, CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    pairing_metrics->last_screenbind_remote_type[CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1] = '\0';
 
-   strncpy(pairing_metrics->last_non_screenbind_remote_type, g_ctrlm.pairing_metrics.last_non_screenbind_remote_type, CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH);
+   safec_rc = strncpy_s(pairing_metrics->last_non_screenbind_remote_type, sizeof(pairing_metrics->last_non_screenbind_remote_type), g_ctrlm.pairing_metrics.last_non_screenbind_remote_type, CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1);
+   ERR_CHK(safec_rc);
    pairing_metrics->last_non_screenbind_remote_type[CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1] = '\0';
    LOG_INFO("%s: num_screenbind_failures <%lu>  last_screenbind_error_timestamp <%lums> last_screenbind_error_code <%s> last_screenbind_remote_type <%s>\n", 
       __FUNCTION__, pairing_metrics->num_screenbind_failures, pairing_metrics->last_screenbind_error_timestamp, 
@@ -3062,8 +3066,8 @@ void ctrlm_main_iarm_call_last_key_info_get_(ctrlm_main_iarm_call_last_key_info_
       last_key_info->remote_keypad_config = g_ctrlm.last_key_info.remote_keypad_config;
    }
 
-   strncpy(last_key_info->source_name, g_ctrlm.last_key_info.source_name, CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH);
-   last_key_info->source_name[CTRLM_MAIN_SOURCE_NAME_MAX_LENGTH - 1] = '\0';
+   errno_t safec_rc = strcpy_s(last_key_info->source_name, sizeof(last_key_info->source_name), g_ctrlm.last_key_info.source_name);
+   ERR_CHK(safec_rc);
 
    if(ctrlm_is_key_code_mask_enabled()) {
       LOG_INFO("%s: controller_id <%d>, key_code <*>, key_src <%d>, timestamp <%lldms>, is_screen_bind_mode <%d>, remote_keypad_config <%d>, sourceName <%s>\n",
@@ -3086,8 +3090,7 @@ gboolean ctrlm_main_iarm_call_network_status_get(ctrlm_main_iarm_call_network_st
    ctrlm_main_status_cmd_result_t cmd_result = CTRLM_MAIN_STATUS_REQUEST_PENDING;
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_main_network_status_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_main_network_status_t msg = {0};
 
    sem_init(&semaphore, 0, 0);
 
@@ -3800,8 +3803,7 @@ gboolean ctrlm_main_iarm_call_chip_status_get(ctrlm_main_iarm_call_chip_status_t
    sem_t semaphore;
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_main_chip_status_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_main_chip_status_t msg = {0};
 
    sem_init(&semaphore, 0, 0);
 
@@ -3904,9 +3906,11 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
       ctrlm_remote_keypad_config remote_keypad_config;
       string type;
       string data;
+      errno_t safec_rc = -1;
+      int ind = -1;
 
-      strncpy(last_source_name, g_ctrlm.last_key_info.source_name, CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
-      last_source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+      safec_rc = strcpy_s(last_source_name, sizeof(last_source_name), g_ctrlm.last_key_info.source_name);
+      ERR_CHK(safec_rc);
 
       if ((key_src != IARM_BUS_IRMGR_KEYSRC_IR) && (key_src != IARM_BUS_IRMGR_KEYSRC_RF)) {
          // NOTE: For now, we are explicitly ignoring keypresses from IP or FP sources!
@@ -3935,7 +3939,8 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
             data                                       = std::to_string(g_ctrlm.last_key_info.remote_keypad_config);
             send_on_control_event                      = true;
             need_to_update_last_key_info               = true;
-            strncpy(source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+            safec_rc = strncpy_s(source_name, sizeof(source_name), ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1);
+            ERR_CHK(safec_rc);
             source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
             switch(key_code) {
                case KED_XR2V3:
@@ -4019,7 +4024,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          default:
             break;
       }
-	  
+
       if(key_src == IARM_BUS_IRMGR_KEYSRC_RF) {
          ctrlm_controller_product_name_get(controller_id, source_name);
          remote_keypad_config = ctrlm_get_remote_keypad_config(source_name);
@@ -4028,8 +4033,8 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          controller_id = -1;
          //Check to see if the tag was included.  If so, use it.
          ctrlm_check_for_key_tag(key_tag);
-         strncpy(source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
-         source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+         safec_rc = strcpy_s(source_name, sizeof(source_name), ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type));
+         ERR_CHK(safec_rc);
       }
 
       LOG_INFO("%s: Got IARM_BUS_IRMGR_EVENT_CONTROL event, controller_id <%d>, controlCode <0x%02X>, src <%d>.\n",
@@ -4037,8 +4042,12 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
 
       //Only save the last key info to the db if the source type (IR or RF) or the source name (XR11, XR15) have changed
       //It's not worth the writes to the db for every key.  It is important to know if we are IR/RF and XR11/XR15
-      if((last_source_type != key_src) || (strcmp(last_source_name, source_name) != 0)) {
-         write_last_key_info = true;
+      bool isValid = false;
+      (last_source_type != key_src) ? isValid = true : (safec_rc = strcmp_s(last_source_name, sizeof(last_source_name), source_name, &ind));
+      if((isValid) || ((safec_rc == EOK) && (ind != 0))) {
+          write_last_key_info = true;
+      } else if(safec_rc != EOK) {
+        ERR_CHK(safec_rc);
       }
 
       if(send_on_control_event) {
@@ -4067,8 +4076,11 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
       char last_source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME];
       char source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME];
 
-      strncpy(last_source_name, g_ctrlm.last_key_info.source_name, CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
-      last_source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+      errno_t safec_rc = -1;
+      int ind = -1;
+
+      safec_rc = strcpy_s(last_source_name, sizeof(last_source_name), g_ctrlm.last_key_info.source_name);
+      ERR_CHK(safec_rc);
 
       if ((ir_event_data->data.irkey.keyType == KET_KEYUP) || (ir_event_data->data.irkey.keyType == KET_KEYREPEAT)) {
          // Don't remember keyup or repeat events - only use keydown.
@@ -4088,10 +4100,10 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          ctrlm_controller_product_name_get(controller_id, source_name);
       } else {
          controller_id = -1;
-         //Check to see if the tag was included.  If so, use it.
+	 //Check to see if the tag was included.  If so, use it.
          ctrlm_check_for_key_tag(key_tag);
-         strncpy(source_name, ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type), CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
-         source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
+         safec_rc = strcpy_s(source_name, sizeof(source_name), ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type));
+         ERR_CHK(safec_rc);
       }
 
       if (len != sizeof(IARM_Bus_IRMgr_EventData_t)) {
@@ -4102,8 +4114,12 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
 
       //Only save the last key info to the db if the source type (IR or RF) or the source name (XR11, XR15) have changed
       //It's not worth the writes to the db for every key.  It is important to know if we are IR/RF and XR11/XR15
-      if((last_source_type != key_src) || (strcmp(last_source_name, source_name) != 0)) {
-         write_last_key_info = true;
+      bool isValid = false;
+      (last_source_type != key_src) ? isValid = true : (safec_rc = strcmp_s(last_source_name, sizeof(last_source_name), source_name, &ind));
+      if((isValid) || ((safec_rc == EOK) && (ind != 0))) {
+          write_last_key_info = true;
+      } else if(safec_rc != EOK) {
+        ERR_CHK(safec_rc);
       }
 
       ctrlm_update_last_key_info(controller_id, key_src, key_code, source_name, g_ctrlm.last_key_info.is_screen_bind_mode, write_last_key_info);
@@ -4372,8 +4388,8 @@ void ctrlm_discovery_remote_type_set(const char *remote_type_str) {
    }
 
    msg->type            = CTRLM_MAIN_QUEUE_MSG_TYPE_MAIN_DISCOVERY_REMOTE_TYPE_SET;
-   strncpy(msg->remote_type_str, remote_type_str, CTRLM_HAL_RF4CE_USER_STRING_SIZE);
-   msg->remote_type_str[CTRLM_HAL_RF4CE_USER_STRING_SIZE-1] = '\0';
+   errno_t safec_rc = strcpy_s(msg->remote_type_str, sizeof(msg->remote_type_str), remote_type_str);
+   ERR_CHK(safec_rc);
 
    ctrlm_main_queue_msg_push(msg);
 }
@@ -4592,7 +4608,8 @@ void ctrlm_property_read_ir_remote_usage(void) {
 
 void ctrlm_property_write_pairing_metrics(void) {
    guchar data[CTRLM_RF4CE_LEN_PAIRING_METRICS];
-   memcpy(data, &g_ctrlm.pairing_metrics, CTRLM_RF4CE_LEN_PAIRING_METRICS);
+   errno_t safec_rc = memcpy_s(data, sizeof(data), &g_ctrlm.pairing_metrics, CTRLM_RF4CE_LEN_PAIRING_METRICS);
+   ERR_CHK(safec_rc);
 
    LOG_INFO("%s: num_screenbind_failures <%lu>, last_screenbind_error_timestamp <%lums>, last_screenbind_error_code <%d>, last_screenbind_remote_type <%s>\n",
       __FUNCTION__, g_ctrlm.pairing_metrics.num_screenbind_failures, g_ctrlm.pairing_metrics.last_screenbind_error_timestamp, g_ctrlm.pairing_metrics.last_screenbind_error_code, g_ctrlm.pairing_metrics.last_screenbind_remote_type);
@@ -4604,15 +4621,21 @@ void ctrlm_property_write_pairing_metrics(void) {
 }
 
 guchar ctrlm_property_write_pairing_metrics(guchar *data, guchar length) {
+   errno_t safec_rc = -1;
+   int ind = -1;
    if(data == NULL || length != CTRLM_RF4CE_LEN_PAIRING_METRICS) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
    ctrlm_pairing_metrics_t pairing_metrics;
-   memcpy(&pairing_metrics, data, CTRLM_RF4CE_LEN_PAIRING_METRICS);
+   safec_rc = memcpy_s(&pairing_metrics, sizeof(ctrlm_pairing_metrics_t), data, CTRLM_RF4CE_LEN_PAIRING_METRICS);
+   ERR_CHK(safec_rc);
 
-   if(memcmp(&g_ctrlm.pairing_metrics, &pairing_metrics, CTRLM_RF4CE_LEN_PAIRING_METRICS) != 0) {
-      memcpy(&g_ctrlm.pairing_metrics, &pairing_metrics, CTRLM_RF4CE_LEN_PAIRING_METRICS);
+   safec_rc = memcmp_s(&g_ctrlm.pairing_metrics, sizeof(ctrlm_pairing_metrics_t), &pairing_metrics, CTRLM_RF4CE_LEN_PAIRING_METRICS, &ind);
+   ERR_CHK(safec_rc);
+   if((safec_rc == EOK) && (ind != 0)) {
+      safec_rc = memcpy_s(&g_ctrlm.pairing_metrics, sizeof(ctrlm_pairing_metrics_t), &pairing_metrics, CTRLM_RF4CE_LEN_PAIRING_METRICS);
+      ERR_CHK(safec_rc);
    }
 
    if(!g_ctrlm.loading_db) {
@@ -4642,7 +4665,8 @@ void ctrlm_property_read_pairing_metrics(void) {
 }
 void ctrlm_property_write_last_key_info(void) {
    guchar data[CTRLM_RF4CE_LEN_LAST_KEY_INFO];
-   memcpy(data, &g_ctrlm.last_key_info, CTRLM_RF4CE_LEN_LAST_KEY_INFO);
+   errno_t safec_rc = memcpy_s(data, sizeof(data), &g_ctrlm.last_key_info, CTRLM_RF4CE_LEN_LAST_KEY_INFO);
+   ERR_CHK(safec_rc);
 
    if(ctrlm_is_key_code_mask_enabled()) {
       LOG_INFO("%s: controller_id <%d>, key_code <*>, key_src <%d>, timestamp <%lldms>, is_screen_bind_mode <%d>, remote_keypad_config <%d>, sourceName <%s>\n",
@@ -4656,15 +4680,21 @@ void ctrlm_property_write_last_key_info(void) {
 }
 
 guchar ctrlm_property_write_last_key_info(guchar *data, guchar length) {
+   errno_t safec_rc = -1;
+   int ind = -1;
    if(data == NULL || length != CTRLM_RF4CE_LEN_LAST_KEY_INFO) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
    ctrlm_last_key_info last_key_info;
-   memcpy(&last_key_info, data, CTRLM_RF4CE_LEN_LAST_KEY_INFO);
+   safec_rc = memcpy_s(&last_key_info, sizeof(ctrlm_last_key_info), data, CTRLM_RF4CE_LEN_LAST_KEY_INFO);
+   ERR_CHK(safec_rc);
 
-   if(memcmp(&g_ctrlm.last_key_info, &last_key_info, CTRLM_RF4CE_LEN_LAST_KEY_INFO) != 0) {
-      memcpy(&g_ctrlm.last_key_info, &last_key_info, CTRLM_RF4CE_LEN_LAST_KEY_INFO);
+   safec_rc = memcmp_s(&g_ctrlm.last_key_info, sizeof(ctrlm_last_key_info), &last_key_info, CTRLM_RF4CE_LEN_LAST_KEY_INFO, &ind);
+   ERR_CHK(safec_rc);
+   if((safec_rc == EOK) && (ind != 0)) {
+      safec_rc = memcpy_s(&g_ctrlm.last_key_info, sizeof(ctrlm_last_key_info), &last_key_info, CTRLM_RF4CE_LEN_LAST_KEY_INFO);
+      ERR_CHK(safec_rc);
    }
 
    if(!g_ctrlm.loading_db) {
@@ -4702,6 +4732,7 @@ void ctrlm_update_last_key_info(int controller_id, guchar source_type, guint32 s
    // Get a epoch-based millisecond timestamp for this event
    long long key_time = time(NULL) * 1000LL;
    ctrlm_remote_keypad_config remote_keypad_config;
+   errno_t safec_rc = -1;
 
    // Update the LastKeyInfo
    g_ctrlm.last_key_info.controller_id       = controller_id;
@@ -4710,14 +4741,16 @@ void ctrlm_update_last_key_info(int controller_id, guchar source_type, guint32 s
    g_ctrlm.last_key_info.timestamp           = key_time;
    g_ctrlm.last_key_info.is_screen_bind_mode = is_screen_bind_mode;
    if(source_name != NULL) {
-      strncpy(g_ctrlm.last_key_info.source_name, source_name, CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+      safec_rc = strcpy_s(g_ctrlm.last_key_info.source_name, sizeof(g_ctrlm.last_key_info.source_name), source_name);
+      ERR_CHK(safec_rc);
    } else {
-      strncpy(g_ctrlm.last_key_info.source_name, "Invalid", CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME);
+      safec_rc = strcpy_s(g_ctrlm.last_key_info.source_name, sizeof(g_ctrlm.last_key_info.source_name), "Invalid");
+      ERR_CHK(safec_rc);
    }
    g_ctrlm.last_key_info.source_name[CTRLM_RCU_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
-#if 0 
+#if 0
    //Do not update remote_keypad_config here as we want to keep what it was set to by an IR remote
-   //and not clear it when a remote is paired.  We will override this to N/A for paired remotes 
+   //and not clear it when a remote is paired.  We will override this to N/A for paired remotes
    //when the iarm call to get the last_key_info is called
    g_ctrlm.last_key_info.remote_keypad_config = remote_keypad_config;
 #else
@@ -5094,6 +5127,7 @@ void ctrlm_stop_one_touch_autobind_(ctrlm_network_id_t network_id) {
 }
 
 void ctrlm_close_pairing_window_(ctrlm_network_id_t network_id, ctrlm_close_pairing_window_reason reason) {
+   errno_t safec_rc = -1;
    if(g_ctrlm.pairing_window.active) {
       g_ctrlm.pairing_window.active             = false;
       g_ctrlm.pairing_window.restrict_by_remote = CTRLM_PAIRING_RESTRICT_NONE;
@@ -5129,8 +5163,8 @@ void ctrlm_close_pairing_window_(ctrlm_network_id_t network_id, ctrlm_close_pair
          g_ctrlm.pairing_metrics.last_non_screenbind_error_code = g_ctrlm.pairing_window.bind_status;
          g_ctrlm.pairing_metrics.last_non_screenbind_error_binding_type = CTRLM_RCU_BINDING_TYPE_BUTTON;
          if(g_ctrlm.pairing_window.bind_status != CTRLM_BIND_STATUS_NO_DISCOVERY_REQUEST) {
-            strncpy(g_ctrlm.pairing_metrics.last_non_screenbind_remote_type, g_ctrlm.discovery_remote_type, CTRLM_HAL_RF4CE_USER_STRING_SIZE);
-            g_ctrlm.pairing_metrics.last_non_screenbind_remote_type[CTRLM_HAL_RF4CE_USER_STRING_SIZE-1] = '\0';
+            safec_rc = strcpy_s(g_ctrlm.pairing_metrics.last_non_screenbind_remote_type, sizeof(g_ctrlm.pairing_metrics.last_non_screenbind_remote_type), g_ctrlm.discovery_remote_type);
+            ERR_CHK(safec_rc);
          } else {
             g_ctrlm.pairing_metrics.last_non_screenbind_remote_type[0] = '\0';
          }
@@ -5146,8 +5180,8 @@ void ctrlm_close_pairing_window_(ctrlm_network_id_t network_id, ctrlm_close_pair
          g_ctrlm.pairing_metrics.last_screenbind_error_timestamp = time(NULL);
          g_ctrlm.pairing_metrics.last_screenbind_error_code = g_ctrlm.pairing_window.bind_status;
          if(g_ctrlm.pairing_window.bind_status != CTRLM_BIND_STATUS_NO_DISCOVERY_REQUEST) {
-            strncpy(g_ctrlm.pairing_metrics.last_screenbind_remote_type, g_ctrlm.discovery_remote_type, CTRLM_HAL_RF4CE_USER_STRING_SIZE);
-            g_ctrlm.pairing_metrics.last_screenbind_remote_type[CTRLM_HAL_RF4CE_USER_STRING_SIZE-1] = '\0';
+            safec_rc = strcpy_s(g_ctrlm.pairing_metrics.last_screenbind_remote_type, sizeof(g_ctrlm.pairing_metrics.last_screenbind_remote_type), g_ctrlm.discovery_remote_type);
+            ERR_CHK(safec_rc);
          } else {
             g_ctrlm.pairing_metrics.last_screenbind_remote_type[0] = '\0';
          }
@@ -5163,8 +5197,8 @@ void ctrlm_close_pairing_window_(ctrlm_network_id_t network_id, ctrlm_close_pair
          g_ctrlm.pairing_metrics.last_non_screenbind_error_code = g_ctrlm.pairing_window.bind_status;
          g_ctrlm.pairing_metrics.last_non_screenbind_error_binding_type = CTRLM_RCU_BINDING_TYPE_AUTOMATIC;
          if(g_ctrlm.pairing_window.bind_status != CTRLM_BIND_STATUS_NO_DISCOVERY_REQUEST) {
-            strncpy(g_ctrlm.pairing_metrics.last_non_screenbind_remote_type, g_ctrlm.discovery_remote_type, CTRLM_HAL_RF4CE_USER_STRING_SIZE);
-            g_ctrlm.pairing_metrics.last_non_screenbind_remote_type[CTRLM_HAL_RF4CE_USER_STRING_SIZE-1] = '\0';
+            safec_rc = strcpy_s(g_ctrlm.pairing_metrics.last_non_screenbind_remote_type, sizeof(g_ctrlm.pairing_metrics.last_non_screenbind_remote_type), g_ctrlm.discovery_remote_type);
+            ERR_CHK(safec_rc);
          } else {
             g_ctrlm.pairing_metrics.last_non_screenbind_remote_type[0] = '\0';
          }
@@ -5210,7 +5244,8 @@ void ctrlm_discovery_remote_type_set_(const char *remote_type_str) {
       LOG_ERROR("%s: remote_type_str is NULL.\n", __FUNCTION__);
       return;
    }
-   strncpy(g_ctrlm.discovery_remote_type, remote_type_str, CTRLM_HAL_RF4CE_USER_STRING_SIZE);
+   errno_t safec_rc = strcpy_s(g_ctrlm.discovery_remote_type, sizeof(g_ctrlm.discovery_remote_type), remote_type_str);
+   ERR_CHK(safec_rc);
    g_ctrlm.discovery_remote_type[CTRLM_HAL_RF4CE_USER_STRING_SIZE-1] = '\0';
    LOG_INFO("%s: discovery_remote_type <%s>.\n", __FUNCTION__, g_ctrlm.discovery_remote_type);
 }
@@ -5483,7 +5518,8 @@ void ctrlm_controller_product_name_get(ctrlm_controller_id_t controller_id, char
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_product_name_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
    msg.controller_id   = controller_id;

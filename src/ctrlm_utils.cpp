@@ -238,21 +238,25 @@ void ctrlm_print_controller_status(const char *prefix, ctrlm_controller_status_t
    char time_binding_str[20];
    char time_last_key_str[20];
    char time_battery_update_str[20];
+   errno_t safec_rc = -1;
 
    if(status->time_binding == 0) {
-      strncpy(time_binding_str, "NEVER", 20);
+      safec_rc = strcpy_s(time_binding_str, sizeof(time_binding_str), "NEVER");
+      ERR_CHK(safec_rc);
    } else {
       time_binding_str[0]        = '\0';
       strftime(time_binding_str,        20, "%F %T", localtime((time_t *)&status->time_binding));
    }
    if(status->time_last_key == 0) {
-      strncpy(time_last_key_str, "NEVER", 20);
+      safec_rc = strcpy_s(time_last_key_str, sizeof(time_last_key_str), "NEVER");
+      ERR_CHK(safec_rc);
    } else {
       time_last_key_str[0]       = '\0';
       strftime(time_last_key_str,       20, "%F %T", localtime((time_t *)&status->time_last_key));
    }
    if(status->time_battery_update == 0) {
-      strncpy(time_battery_update_str, "NEVER", 20);
+      safec_rc = strcpy_s(time_battery_update_str, sizeof(time_battery_update_str), "NEVER");
+      ERR_CHK(safec_rc);
    } else {
       time_battery_update_str[0] = '\0';
       strftime(time_battery_update_str, 20, "%F %T", localtime((time_t *)&status->time_battery_update));
@@ -275,8 +279,10 @@ void ctrlm_print_controller_status(const char *prefix, ctrlm_controller_status_t
 }
 
 const char *ctrlm_invalid_return(int value) {
-   snprintf(ctrlm_invalid_str, CTRLM_INVALID_STR_LEN, "INVALID(%d)", value);
-   ctrlm_invalid_str[CTRLM_INVALID_STR_LEN - 1] = '\0';
+   errno_t safec_rc = sprintf_s(ctrlm_invalid_str, CTRLM_INVALID_STR_LEN, "INVALID(%d)", value);
+   if(safec_rc < EOK) {
+       ERR_CHK(safec_rc);
+   }
    return(ctrlm_invalid_str);
 }
 
@@ -1460,13 +1466,16 @@ unsigned long long ctrlm_convert_mac_string_to_long ( const char* apcDeviceMac) 
 
 std::string ctrlm_convert_mac_long_to_string ( const unsigned long long ieee_address) {
    // MAC Address Format Supported: "AA:BB:CC:DD:EE:FF\0"
-   char ascii_mac[18];
-   snprintf(ascii_mac, 18, "%02X:%02X:%02X:%02X:%02X:%02X", (unsigned int)((ieee_address & 0xFF0000000000)>>40), 
-                                                            (unsigned int)((ieee_address & 0x00FF00000000)>>32), 
+   char ascii_mac[18]={0};
+   errno_t safec_rc = sprintf_s(ascii_mac, sizeof(ascii_mac), "%02X:%02X:%02X:%02X:%02X:%02X", (unsigned int)((ieee_address & 0xFF0000000000)>>40),
+                                                            (unsigned int)((ieee_address & 0x00FF00000000)>>32),
                                                             (unsigned int)((ieee_address & 0x0000FF000000)>>24),
                                                             (unsigned int)((ieee_address & 0x000000FF0000)>>16),
                                                             (unsigned int)((ieee_address & 0x00000000FF00)>>8),
                                                             (unsigned int)(ieee_address & 0x0000000000FF));
+   if(safec_rc < EOK) {
+       ERR_CHK(safec_rc);
+   }
    // LOG_DEBUG ("%s: ieee_address = <0x%llX>, converted to ASCII: <%s>\n", __FUNCTION__, ieee_address, ascii_mac);
    return string(ascii_mac);
 }

@@ -27,13 +27,49 @@
 #include "ctrlm_rf4ce_utils.h"
 
 #define CTRLM_INVALID_STR_LEN (24)
+#define NUM_OF_USER_STRINGS (sizeof(ctrlm_rf4ce_user_strings)/sizeof(ctrlm_rf4ce_user_strings[0]))
 
 static char ctrlm_invalid_str[CTRLM_INVALID_STR_LEN];
 
 static const char *ctrlm_invalid_return(int value);
 
+//user strings
+const char *ctrlm_rf4ce_user_strings[] = {
+"XR11-20",
+"XR15-10",
+"XR15-20",
+"XR16-10"
+};
+
+
+/* Below helper function used for better optinamization of multiple if- else cases */
+bool ctrlm_rf4ce_is_voice_remote_from_user_string(const char *name) {
+
+   errno_t safec_rc = -1;
+   int ind = -1;
+   unsigned int i = 0;
+   int strsize = 0;
+
+   if(name == NULL)
+      return false;
+
+   strsize = strlen(name);
+
+   for (i = 0 ; i < NUM_OF_USER_STRINGS ; ++i) {
+      safec_rc = strcmp_s(name, strsize, ctrlm_rf4ce_user_strings[i], &ind);
+      ERR_CHK(safec_rc);
+      if((safec_rc == EOK) && (!ind)) {
+         return true;
+       }
+   }
+   return false;
+}
+
 const char *ctrlm_invalid_return(int value) {
-   snprintf(ctrlm_invalid_str, CTRLM_INVALID_STR_LEN, "INVALID(%d)", value);
+   errno_t safec_rc = sprintf_s(ctrlm_invalid_str, CTRLM_INVALID_STR_LEN, "INVALID(%d)", value);
+   if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+   }
    ctrlm_invalid_str[CTRLM_INVALID_STR_LEN - 1] = '\0';
    return(ctrlm_invalid_str);
 }
@@ -286,11 +322,7 @@ gboolean ctrlm_rf4ce_is_voice_remote(const char * user_string) {
       return(false);
    }
 
-   if((strcmp("XR11-20", user_string)==0) ||
-      (strcmp("XR15-10", user_string)==0) ||
-      (strcmp("XR15-20", user_string)==0) ||
-      (strcmp("XR16-10", user_string)==0) ||
-      (strcmp("XRA-10", user_string) ==0)) {
+   if(ctrlm_rf4ce_is_voice_remote_from_user_string(user_string)) {
          return(true);
      }
    return(false);
@@ -302,7 +334,11 @@ gboolean ctrlm_rf4ce_is_voice_assistant(const char * user_string) {
       return(false);
    }
 
-   if(strcmp("XR19-10", user_string)==0) {
+   int ind = -1;
+
+   errno_t safec_rc = strcmp_s("XR19-10", strlen("XR19-10"), user_string, &ind);
+   ERR_CHK(safec_rc);
+   if((safec_rc == EOK) && (ind == 0)) {
          return(true);
      }
    return(false);

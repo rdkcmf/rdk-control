@@ -57,7 +57,8 @@ static gboolean init = false;
 
 // Private Function Implementations
 void rfc_struct_default(ctrlm_rfc_t *rfc) {
-   memset(rfc, 0, sizeof(ctrlm_rfc_t));
+   errno_t safec_rc = memset_s(rfc,  sizeof(ctrlm_rfc_t), 0, sizeof(ctrlm_rfc_t));
+   ERR_CHK(safec_rc);
    rfc->stored   = false; // Just incase glib doesn't use 0 as false
 }
 
@@ -65,6 +66,8 @@ gboolean rf4ce_blackout_rfc_get() {
    char                       *result   = NULL;
    char                       *contents = NULL;
    ctrlm_rfc_rf4ce_blackout_t *rf4ce_blackout = NULL;
+   errno_t                     safec_rc = -1;
+   int                         ind      = -1;
 
    if(NULL == g_ctrlm_rfc_rf4ce_blackout) {
       return false;
@@ -83,7 +86,8 @@ gboolean rf4ce_blackout_rfc_get() {
    g_ctrlm_rfc_rf4ce_blackout->attempts++;
    rf4ce_blackout = &g_ctrlm_rfc_rf4ce_blackout->rfc.rf4ce_blackout;
 
-   memset(rf4ce_blackout, 0, sizeof(ctrlm_rfc_rf4ce_blackout_t));
+   safec_rc = memset_s(rf4ce_blackout, sizeof(ctrlm_rfc_rf4ce_blackout_t), 0, sizeof(ctrlm_rfc_rf4ce_blackout_t));
+   ERR_CHK(safec_rc);
 
    contents = ctrlm_get_file_contents(CTRLM_RF4CE_BLACKOUT_RFC_FILE);
    if(NULL == contents) {
@@ -93,7 +97,9 @@ gboolean rf4ce_blackout_rfc_get() {
 
    result = ctrlm_do_regex((char *)CTRLM_RF4CE_REGEX_BLACKOUT_ENABLE, contents);
    if(NULL != result) {
-      if(0 == strcmp("false", result)) {
+      safec_rc = strcmp_s("false", strlen("false"), result, &ind);
+      ERR_CHK(safec_rc);
+      if((safec_rc == EOK) && (!ind)) {
          rf4ce_blackout->enabled = false;
       } else {
          rf4ce_blackout->enabled = true;
@@ -151,6 +157,8 @@ gboolean ip_rfc_get() {
    gsize           decoded_buf_len = 0;
    json_error_t    json_error;
    ctrlm_rfc_ip_t *ip = NULL;
+   errno_t         safec_rc = -1;
+   int             ind      = -1;
 
    if(NULL == g_ctrlm_rfc_ip) {
       return false;
@@ -177,7 +185,9 @@ gboolean ip_rfc_get() {
 
    result = ctrlm_do_regex((char *)CTRLM_IP_REGEX_ENABLE, contents);
    if(NULL != result) {
-      if(0 == strcmp("false", result)) {
+      safec_rc = strcmp_s("false", strlen("false"), result, &ind);
+      ERR_CHK(safec_rc);
+      if((safec_rc == EOK) && (!ind)) {
          ip->enabled = false;
       } else {
          ip->enabled = true;

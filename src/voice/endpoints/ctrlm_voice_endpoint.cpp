@@ -29,7 +29,10 @@ bool ctrlm_voice_endpoint_t::add_query_string(const char *key, const char *value
         LOG_ERROR("%s: Too many query strings\n", __FUNCTION__);
         return(false);
     }
-    snprintf(this->query_str[this->query_str_qty], sizeof(this->query_str[this->query_str_qty]), "%s=%s", key, value);
+    errno_t safec_rc = sprintf_s(this->query_str[this->query_str_qty], sizeof(this->query_str[this->query_str_qty]), "%s=%s", key, value);
+    if(safec_rc < EOK) {
+      ERR_CHK(safec_rc);
+    }
     this->query_strs[this->query_str_qty] = this->query_str[this->query_str_qty];
     this->query_str_qty++;
     return(true);
@@ -37,8 +40,10 @@ bool ctrlm_voice_endpoint_t::add_query_string(const char *key, const char *value
 
 void ctrlm_voice_endpoint_t::clear_query_strings() {
     this->query_str_qty = 0;
-    memset(&this->query_strs, 0, sizeof (this->query_strs));
-    memset(&this->query_str, 0, sizeof (this->query_str));
+    errno_t safec_rc = memset_s(&this->query_strs, sizeof (this->query_strs), 0, sizeof (this->query_strs));
+    ERR_CHK(safec_rc);
+    safec_rc = memset_s(&this->query_str, sizeof (this->query_str), 0, sizeof (this->query_str));
+    ERR_CHK(safec_rc);
 }
 
 bool ctrlm_voice_endpoint_t::voice_init_set(const char *blob) const {

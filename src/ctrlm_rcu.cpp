@@ -91,8 +91,7 @@ gboolean ctrlm_rcu_controller_status(ctrlm_rcu_iarm_call_controller_status_t *pa
    ctrlm_controller_status_cmd_result_t cmd_result = CTRLM_CONTROLLER_STATUS_REQUEST_PENDING;
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_controller_status_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_controller_status_t msg = {0};
 
    sem_init(&semaphore, 0, 0);
 
@@ -132,7 +131,8 @@ gboolean ctrlm_rcu_rib_request_get(ctrlm_rcu_iarm_call_rib_request_t *params) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_rib_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -181,7 +181,8 @@ gboolean ctrlm_rcu_rib_request_set(ctrlm_rcu_iarm_call_rib_request_t *params) {
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_rib_t msg;
-   memset(&msg, 0, sizeof(msg));
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -220,8 +221,7 @@ gboolean ctrlm_rcu_controller_link_key(ctrlm_rcu_iarm_call_controller_link_key_t
    ctrlm_controller_status_cmd_result_t cmd_result = CTRLM_CONTROLLER_STATUS_REQUEST_PENDING;
 
    // Allocate a message and send it to Control Manager's queue
-   ctrlm_main_queue_msg_controller_link_key_t msg;
-   memset(&msg, 0, sizeof(msg));
+   ctrlm_main_queue_msg_controller_link_key_t msg = {0};
 
    sem_init(&semaphore, 0, 0);
 
@@ -256,7 +256,8 @@ gboolean ctrlm_rcu_reverse_cmd(ctrlm_main_iarm_call_rcu_reverse_cmd_t *params) {
    ctrlm_controller_status_cmd_result_t cmd_result = CTRLM_CONTROLLER_STATUS_REQUEST_PENDING;
 
    // Allocate a message and send it to Control Manager's queue
-   unsigned int msg_size = sizeof(ctrlm_main_queue_msg_rcu_reverse_cmd_t) + params->total_size - sizeof(ctrlm_main_iarm_call_rcu_reverse_cmd_t);
+   unsigned int extra_data = params->total_size - sizeof(ctrlm_main_iarm_call_rcu_reverse_cmd_t);
+   unsigned int msg_size = sizeof(ctrlm_main_queue_msg_rcu_reverse_cmd_t) + extra_data;
    ctrlm_main_queue_msg_rcu_reverse_cmd_t *msg = (ctrlm_main_queue_msg_rcu_reverse_cmd_t *)g_malloc(msg_size);
 
    if(NULL == msg) {
@@ -273,7 +274,8 @@ gboolean ctrlm_rcu_reverse_cmd(ctrlm_main_iarm_call_rcu_reverse_cmd_t *params) {
    msg->semaphore         = &semaphore;
    msg->cmd_result        = &cmd_result;
 
-   memcpy(&msg->reverse_command, params, params->total_size);
+   errno_t safec_rc = memcpy_s(&msg->reverse_command, sizeof(msg->reverse_command) + extra_data, params, params->total_size);
+   ERR_CHK(safec_rc);
 
    ctrlm_main_queue_msg_push(msg);
 
@@ -338,12 +340,14 @@ gboolean ctrlm_rcu_controller_type_get(ctrlm_network_id_t network_id, ctrlm_cont
 gboolean ctrlm_rcu_rf4ce_polling_action(ctrlm_rcu_iarm_call_rf4ce_polling_action_t *params) {
    LOG_INFO("%s: (%u, %u)\n", __FUNCTION__, params->network_id, params->controller_id);
 
+   errno_t safec_rc = -1;
    sem_t semaphore;
    ctrlm_controller_status_cmd_result_t cmd_result = CTRLM_CONTROLLER_STATUS_REQUEST_PENDING;
 
    // Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_msg_rcu_polling_action_t msg;
-   memset(&msg, 0, sizeof(msg));
+   safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
 
    sem_init(&semaphore, 0, 0);
 
@@ -353,7 +357,8 @@ gboolean ctrlm_rcu_rf4ce_polling_action(ctrlm_rcu_iarm_call_rf4ce_polling_action
    msg.action             = params->action;
    msg.semaphore          = &semaphore;
    msg.cmd_result         = &cmd_result;
-   memcpy(msg.data, params->data, sizeof(msg.data));
+   safec_rc = memcpy_s(msg.data, sizeof(msg.data), params->data, sizeof(msg.data));
+   ERR_CHK(safec_rc);
 
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_polling_action_push, &msg, sizeof(msg), NULL, params->network_id);
 
