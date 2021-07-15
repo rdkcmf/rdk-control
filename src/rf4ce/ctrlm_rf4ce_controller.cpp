@@ -1373,6 +1373,7 @@ void ctrlm_obj_controller_rf4ce_t::validation_result_set(ctrlm_rcu_binding_type_
       uptime_privacy_info_.privacy_time_seconds = 0;
       time_since_last_saved_                    = 0;
       time_last_heartbeat_                      = uptime_privacy_info_.time_uptime_start;
+      battery_first_write_                      = true;
 
       binding_type_     = binding_type;
       validation_type_  = validation_type;
@@ -1918,7 +1919,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_status(guchar *data,
             update_milestones = false;
             battery_voltage_large_jump_counter_++;
             ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(network_id_get(), controller_id_get(), battery_voltage_large_jump_counter_);
-         } else if((battery_status_.voltage_unloaded > battery_last_good_unloaded_voltage_) || (battery_status_.voltage_loaded > battery_last_good_loaded_voltage_)) {
+         } else if(((voltage_unloaded < battery_status_.voltage_unloaded) && (battery_status_.voltage_unloaded > battery_last_good_unloaded_voltage_)) ||
+                   ((voltage_loaded < battery_status_.voltage_loaded) && (battery_status_.voltage_loaded > battery_last_good_loaded_voltage_))) {
             LOG_WARN("%s: The battery voltage went up previously, has now gone down, but not to it's lowest point.  Milestones not updated.\n", __FUNCTION__);
             update_milestones = false;
          } else {
@@ -4818,7 +4820,7 @@ void ctrlm_obj_controller_rf4ce_t::get_last_battery_event(ctrlm_rcu_battery_even
       battery_event           = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
       battery_event_timestamp = battery_milestones_.battery_0_percent_timestamp;
    } else if (battery_milestones_.battery_5_percent_timestamp != 0) {
-      battery_event          = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
       battery_event_timestamp = battery_milestones_.battery_5_percent_timestamp;
    } else if (battery_milestones_.battery_25_percent_timestamp != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_25_PERCENT;
@@ -4830,8 +4832,11 @@ void ctrlm_obj_controller_rf4ce_t::get_last_battery_event(ctrlm_rcu_battery_even
       battery_event           = CTRLM_RCU_BATTERY_EVENT_75_PERCENT;
       battery_event_timestamp = battery_milestones_.battery_75_percent_timestamp;
    } else if (battery_milestones_.battery_changed_timestamp != 0) {
-      battery_event          = CTRLM_RCU_BATTERY_EVENT_REPLACED;
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_REPLACED;
       battery_event_timestamp = battery_milestones_.battery_changed_timestamp;
+   } else {
+      battery_event           = CTRLM_RCU_BATTERY_EVENT_NONE;
+      battery_event_timestamp = battery_last_good_timestamp_;
    }
 }
 
