@@ -27,6 +27,7 @@ using namespace std;
 ctrlm_obj_controller_t::ctrlm_obj_controller_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_t &network) :
    controller_id_(controller_id),
    obj_network_(&network),
+   par_voice_supported_(false),
    irdb_entry_id_name_tv_("0"),
    irdb_entry_id_name_avr_("0")
 {
@@ -37,6 +38,7 @@ ctrlm_obj_controller_t::ctrlm_obj_controller_t(ctrlm_controller_id_t controller_
 ctrlm_obj_controller_t::ctrlm_obj_controller_t() {
    controller_id_ = CTRLM_MAIN_CONTROLLER_ID_INVALID;
    obj_network_ = NULL;  //CID:82352 - Uninit_ctor
+   par_voice_supported_ = false;
    LOG_INFO("ctrlm_obj_controller_t constructor - default\n");
 }
 
@@ -118,3 +120,6 @@ ctrlm_irdb_ir_entry_id_t ctrlm_obj_controller_t::get_irdb_entry_id_name_avr() {
    return irdb_entry_id_name_avr_;
 }
 
+bool ctrlm_obj_controller_t::is_par_voice_supported() const {
+   return par_voice_supported_;
+}

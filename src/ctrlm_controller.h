@@ -144,6 +144,7 @@ public:
    void irdb_entry_id_name_set(ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t irdb_ir_entry_id);
    ctrlm_irdb_ir_entry_id_t get_irdb_entry_id_name_tv();
    ctrlm_irdb_ir_entry_id_t get_irdb_entry_id_name_avr();
+   bool is_par_voice_supported() const;
 
    // Internal methods
    ctrlm_controller_id_t controller_id_get() const;
@@ -165,6 +166,7 @@ private:
    virtual guchar property_read_irdb_entry_id_name_avr(guchar *data, guchar length);
 
 protected:
+   bool                     par_voice_supported_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_tv_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_avr_;
 };

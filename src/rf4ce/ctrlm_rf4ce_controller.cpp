@@ -4518,9 +4518,11 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_controller_capabilities(cons
       return(0);
    }
 
-   fmr_supported_ = (data[0] & CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR);
+   fmr_supported_       = (data[0] & CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR);
+   par_voice_supported_ = (data[0] & CONTROLLER_CAPABILITIES_BYTE0_FLAGS_PAR);
 
-   LOG_INFO("%s: Controller Capabilities. FMR <%s>\n", __FUNCTION__, (fmr_supported_ ? "SUPPORTED" : "NOT SUPPORTED"));
+   LOG_INFO("%s: Controller Capabilities. FMR <%s> PAR <%s>\n", __FUNCTION__, (fmr_supported_       ? "SUPPORTED" : "NOT SUPPORTED"), 
+                                                                              (par_voice_supported_ ? "SUPPORTED" : "NOT SUPPORTED"));
 
    if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
       ctrlm_db_rf4ce_write_controller_capabilities(network_id_get(), controller_id_get(), data, length);
@@ -4536,9 +4538,11 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_controller_capabilities(gucha
 
    errno_t safec_rc = memset_s(data, length , 0, length);
    ERR_CHK(safec_rc);
-   data[0] = (fmr_supported_? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR:0);
+   data[0] = (fmr_supported_       ? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR:0);
+   data[1] = (par_voice_supported_ ? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_PAR:0);
 
-   LOG_INFO("%s: Controller Capabilities. FMR <%s>\n", __FUNCTION__, (fmr_supported_ ? "ENABLED" : "DISABLED"));
+   LOG_INFO("%s: Controller Capabilities. FMR <%s> PAR <%s>\n", __FUNCTION__, (fmr_supported_       ? "ENABLED" : "DISABLED"),
+                                                                              (par_voice_supported_ ? "ENABLED" : "DISABLED"));
 
    return(CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES);
 }
@@ -5412,4 +5416,3 @@ gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar ne
    //If the new voltage goes up by 0.2v or more but less than 0.3v, don't set the new voltage but report as a large jump.
    return(new_voltage >= (battery_status_.voltage_unloaded + battery_increase));
 }
-

@@ -102,6 +102,9 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->prefs.keyword_sensitivity       = JSON_INT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY;
     this->prefs.vrex_test_flag            = JSON_BOOL_VALUE_VOICE_VREX_TEST_FLAG;
     this->prefs.force_toggle_fallback     = JSON_BOOL_VALUE_VOICE_FORCE_TOGGLE_FALLBACK;
+    this->prefs.par_voice_enabled         = false;
+    this->prefs.par_voice_eos_method      = JSON_INT_VALUE_VOICE_PAR_VOICE_EOS_METHOD;
+    this->prefs.par_voice_eos_timeout     = JSON_INT_VALUE_VOICE_PAR_VOICE_EOS_TIMEOUT;
     this->voice_params_opus_encoder_default();
     this->xrsr_opened                     = false;
     this->voice_ipc                       = NULL;
@@ -294,6 +297,8 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_BOOL_NAME_VOICE_VREX_TEST_FLAG,              this->prefs.vrex_test_flag);
         conf.config_value_get(JSON_BOOL_NAME_VOICE_FORCE_TOGGLE_FALLBACK,       this->prefs.force_toggle_fallback);
         conf.config_value_get(JSON_STR_NAME_VOICE_OPUS_ENCODER_PARAMS,          this->prefs.opus_encoder_params_str);
+        conf.config_value_get(JSON_INT_NAME_VOICE_PAR_VOICE_EOS_METHOD,         this->prefs.par_voice_eos_method);
+        conf.config_value_get(JSON_INT_NAME_VOICE_PAR_VOICE_EOS_TIMEOUT,        this->prefs.par_voice_eos_timeout);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_MODE,                   audio_settings.mode);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_TIMING,                 audio_settings.timing);
         conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, audio_settings.confidence_threshold, 0.0, 1.0);
@@ -355,6 +360,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         ctrlm_db_voice_read_init_blob(init);
         ctrlm_db_voice_read_audio_ducking_beep_enable(this->audio_ducking_beep_enabled);
         audio_settings.ducking_beep = this->audio_ducking_beep_enabled;
+        ctrlm_db_voice_read_par_voice_status(this->prefs.par_voice_enabled);
     } else {
         LOG_WARN("%s: Reading voice settings from old style DB\n", __FUNCTION__);
         ctrlm_db_voice_settings_read((guchar **)&voice_settings, &voice_settings_len);
@@ -538,6 +544,7 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
 
     if(conf.config_object_set(settings)) {
         bool enable;
+        bool prv_enabled;
         std::string url;
         json_config device_config;
 
@@ -564,6 +571,13 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
         if(conf.config_value_get("urlHf", url)) {
             this->prefs.server_url_vrex_src_ff  = url;
             update_routes = true;
+        }
+        if(conf.config_value_get("prv", prv_enabled)) {
+            this->prefs.par_voice_enabled = prv_enabled;
+            LOG_INFO("%s: Press and Release Voice is <%s>\n", __FUNCTION__, this->prefs.par_voice_enabled ? "ENABLED" : "DISABLED");
+            if(db_write) {
+               ctrlm_db_voice_write_par_voice_status(this->prefs.par_voice_enabled);
+            }
         }
         if(conf.config_object_get("ptt", device_config)) {
             if(device_config.config_value_get("enable", enable)) {
@@ -632,6 +646,20 @@ bool ctrlm_voice_t::voice_message(const char *message) {
 
 bool ctrlm_voice_t::voice_status(ctrlm_voice_status_t *status) {
     bool ret = false;
+    /* TODO 
+     * Defaulted Press and Release voice to true/supported
+     * Will make this dynamic once PAR EoS is implemented and 
+     * by some criteria timeout is not adequate
+     */
+    ctrlm_voice_status_capabilities_t capabilities = {
+       .prv = true,
+    #ifdef BEEP_ON_KWD_ENABLED
+       .wwFeedback = true,
+    #else
+       .wwFeedback = false,
+    #endif
+    };
+
     if(!this->xrsr_opened) {
         LOG_ERROR("%s: xrsr not opened yet\n", __FUNCTION__);
     } else if(NULL == status) {
@@ -643,7 +671,9 @@ bool ctrlm_voice_t::voice_status(ctrlm_voice_status_t *status) {
         for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
             status->status[i] = this->device_status[i];
         }
-        status->wwFeedback = this->audio_ducking_beep_enabled;
+        status->wwFeedback   = this->audio_ducking_beep_enabled;
+        status->prv_enabled  = this->prefs.par_voice_enabled;
+        status->capabilities = capabilities;
         sem_post(&this->device_status_semaphore);
         ret = true;
     }
@@ -769,6 +799,17 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
       }
    }
 
+   int value = 0;
+   result = ctrlm_tr181_int_get(CTRLM_RF4CE_TR181_PRESS_AND_RELEASE_EOS_TIMEOUT, &value, 0, UINT16_MAX);
+   if(result == CTRLM_TR181_RESULT_SUCCESS) {
+      this->prefs.par_voice_eos_timeout = value;
+   }
+
+   result = ctrlm_tr181_int_get(CTRLM_RF4CE_TR181_PRESS_AND_RELEASE_EOS_METHOD, &value, 0, UINT8_MAX);
+   if(result == CTRLM_TR181_RESULT_SUCCESS) {
+      this->prefs.par_voice_eos_method = value;
+   }
+
    if(changed) {
        this->set_audio_mode(&audio_settings);
    }
@@ -796,6 +837,16 @@ void ctrlm_voice_t::voice_params_opus_encoder_get(voice_params_opus_encoder_t *p
    }
    errno_t safec_rc = memcpy_s(params->data, sizeof(params->data), this->prefs.opus_encoder_params, CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
    ERR_CHK(safec_rc);
+}
+
+void ctrlm_voice_t::voice_params_par_get(voice_params_par_t *params) {
+   if(params == NULL) {
+      LOG_ERROR("%s: NULL param\n", __FUNCTION__);
+      return;
+   }
+   params->par_voice_enabled     = this->prefs.par_voice_enabled;
+   params->par_voice_eos_method  = this->prefs.par_voice_eos_method;
+   params->par_voice_eos_timeout = this->prefs.par_voice_eos_timeout;
 }
 
 void ctrlm_voice_t::voice_params_opus_encoder_default(void) {
@@ -1119,7 +1170,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     sem_post(&this->vsr_semaphore);
 
     LOG_DEBUG("%s: Voice session acquired <%d, %d, %s> pipe wr <%d> rd <%d>\n", __FUNCTION__, network_id, controller_id, ctrlm_voice_format_str(format), this->audio_pipe[PIPE_WRITE], this->audio_pipe[PIPE_READ]);
-    return(VOICE_SESSION_RESPONSE_AVAILABLE);
+    return (this->prefs.par_voice_enabled) ? VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE : VOICE_SESSION_RESPONSE_AVAILABLE;
 }
 
 void ctrlm_voice_t::voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp) {

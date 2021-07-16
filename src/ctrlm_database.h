@@ -252,6 +252,7 @@ void ctrlm_db_voice_read_query_string_ptt(unsigned int index, std::string &key, 
 void ctrlm_db_voice_read_init_blob(std::string &init);
 void ctrlm_db_voice_read_device_status(int device, int *status); // Use int * because it's technically an enum, which causes an issue when using int &
 void ctrlm_db_voice_read_audio_ducking_beep_enable(bool &enable);
+void ctrlm_db_voice_read_par_voice_status(bool &status);
 
 void ctrlm_db_voice_write_url_ptt(std::string ptt);
 void ctrlm_db_voice_write_url_ff(std::string ff);
@@ -264,6 +265,7 @@ void ctrlm_db_voice_write_query_string_ptt(unsigned int index, std::string key, 
 void ctrlm_db_voice_write_init_blob(std::string init);
 void ctrlm_db_voice_write_device_status(int device, int status);
 void ctrlm_db_voice_write_audio_ducking_beep_enable(bool enable);
+void ctrlm_db_voice_write_par_voice_status(bool status);
 
 void ctrlm_db_rf4ce_read_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &battery_last_good_timestamp);
 void ctrlm_db_rf4ce_read_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_percent);

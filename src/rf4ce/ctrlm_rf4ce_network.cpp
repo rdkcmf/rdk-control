@@ -3748,9 +3748,18 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
                                                           sw_version,               hw_version, 
                                                           (((double)battery_status.voltage_loaded) *  4.0 / 255), command_status,
                                                           &dqm->timestamp, &cb_confirm_voice_obj, &cb_confirm_param);
+   if(session == VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
+      if(controllers_[dqm->controller_id]->is_par_voice_supported()) {
+         session = VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE;
+      } else {
+         session = VOICE_SESSION_RESPONSE_AVAILABLE;
+      }
+   }
    if(session == VOICE_SESSION_RESPONSE_AVAILABLE) {
       session = VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK;
    }
+
+   LOG_INFO("%s: Voice Session Response Status <%#x>\n", __FUNCTION__, session);
 
    // Send the response back to the HAL device
    guchar response[5];
@@ -3766,6 +3775,17 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
       response_len = 5;
    }
 
+   if(session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE) {
+      voice_params_par_t params;
+      ctrlm_get_voice_obj()->voice_params_par_get(&params);
+
+      LOG_INFO("%s: PAR Voice EOS data bytes timeout <%d> method <%d>\n", __FUNCTION__, params.par_voice_eos_timeout, params.par_voice_eos_method);
+      response[2] = params.par_voice_eos_method;
+      response[3] = (params.par_voice_eos_timeout & 0xFF);
+      response[4] = (params.par_voice_eos_timeout >> 8);
+      response_len = 5;
+   }
+
    // Determine when to send the response (50 ms after receipt)
    if(controller_type_get(dqm->controller_id) == RF4CE_CONTROLLER_TYPE_XR19) {
       ctrlm_timestamp_add_ms(&dqm->timestamp, response_idle_time_ff_);
@@ -3774,7 +3794,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
    }
    
 
-   if(cb_confirm_voice_obj != NULL && session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK) { // Only confirm response for accepted session so there is only ever one response stored
+   if(cb_confirm_voice_obj != NULL && (session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK ||
+                                       session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE)) { // Only confirm response for accepted session so there is only ever one response stored
       voice_session_rsp_confirm_       = cb_confirm_voice_obj;
       voice_session_rsp_confirm_param_ = cb_confirm_param;
 
@@ -3795,7 +3816,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
 
    LOG_INFO("%s: session response delivered\n", __FUNCTION__);
 
-   if(session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK || session == VOICE_SESSION_RESPONSE_AVAILABLE) {
+   if(session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK           || session == VOICE_SESSION_RESPONSE_AVAILABLE ||
+      session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE || session == VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
       ctrlm_hal_network_property_frequency_agility_t property;
       property.state = CTRLM_HAL_FREQUENCY_AGILITY_DISABLE;
       ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));

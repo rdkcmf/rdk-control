@@ -241,6 +241,7 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
     }
     xrsr_session_configuration_ws_t *ws = &dqm->configuration->ws;
     ctrlm_voice_session_info_t info;
+    voice_params_par_t params;
     std::string sat;
     bool keyword_verification = false;
 
@@ -250,6 +251,7 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
 
     this->voice_obj->voice_session_info(&info);
     sat = this->voice_obj->voice_stb_data_sat_get();
+    this->voice_obj->voice_params_par_get(&params);
 
     if(sat != "") {
         LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
@@ -318,6 +320,7 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
               keyword_verification = true;
           }
        }
+       stream_params->par_eos_timeout = params.par_voice_enabled ? params.par_voice_eos_timeout : 0;
        ws->keyword_begin = stream_params->keyword_sample_begin;
        ws->keyword_duration = stream_params->keyword_sample_end - stream_params->keyword_sample_begin;
        LOG_INFO("%s: session begin - ptt <%s> keyword begin <%u> end <%u> doa <%u> gain <%4.1f> db\n", __FUNCTION__, (stream_params->push_to_talk ? "TRUE" : "FALSE"), stream_params->keyword_sample_begin, stream_params->keyword_sample_end, stream_params->keyword_doa, stream_params->dynamic_gain);

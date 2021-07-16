@@ -43,6 +43,8 @@
 #define JSON_URL_PTT                                  "urlPtt"
 #define JSON_URL_HF                                   "urlHf"
 #define JSON_WW_FEEDBACK                              "wwFeedback"
+#define JSON_PRV                                      "prv"
+#define JSON_CAPABILITIES                             "capabilities"
 #define JSON_MESSAGE                                  "message"
 #define JSON_STREAM_END_REASON                        "reason"
 #define JSON_SESSION_END_RESULT                       "result"
@@ -384,9 +386,10 @@ void ctrlm_voice_ipc_iarm_thunder_t::deregister_ipc() const {
 }
 
 IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::status(void *data) {
-    IARM_Result_t ret = IARM_RESULT_SUCCESS;
-    bool result       = false;
-    json_t *obj       = NULL;
+    IARM_Result_t ret        = IARM_RESULT_SUCCESS;
+    bool result              = false;
+    json_t *obj              = NULL;
+    json_t *obj_capabilities = NULL;
     ctrlm_voice_iarm_call_json_t *call_data = (ctrlm_voice_iarm_call_json_t *)data;
 
     if(call_data == NULL || CTRLM_VOICE_IARM_BUS_API_REVISION != call_data->api_revision) {
@@ -397,6 +400,7 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::status(void *data) {
         result = ctrlm_get_voice_obj()->voice_status(&status);
         if(result) {
             obj = json_object();
+            obj_capabilities = json_array();
             int rc = 0;
 
             for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
@@ -408,7 +412,16 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::status(void *data) {
             rc |= json_object_set_new_nocheck(obj, JSON_URL_PTT, json_string(status.urlPtt.c_str()));
             rc |= json_object_set_new_nocheck(obj, JSON_URL_HF, json_string(status.urlHf.c_str()));
             rc |= json_object_set_new_nocheck(obj, JSON_WW_FEEDBACK, status.wwFeedback ? json_true() : json_false());
+            rc |= json_object_set_new_nocheck(obj, JSON_PRV, status.prv_enabled ? json_true() : json_false());
             rc |= json_object_set_new_nocheck(obj, JSON_THUNDER_RESULT, json_true());
+
+            if (status.capabilities.prv) {
+               rc |= json_array_append_new(obj_capabilities, json_string("PRV"));
+            }
+            if (status.capabilities.wwFeedback) {
+               rc |= json_array_append_new(obj_capabilities, json_string("WWFEEDBACK"));
+            }
+            rc |= json_object_set_new_nocheck(obj, JSON_CAPABILITIES, obj_capabilities);
 
             if(rc) {
                 LOG_WARN("%s: JSON error..\n", __FUNCTION__);

@@ -249,7 +249,9 @@
       "standby_timeout_inactivity"       :     15000,
       "standby_timeout_session"          :     15000,
       "standby_ipv4_fallback"            :      true,
-      "standby_backoff_delay"            :       100
+      "standby_backoff_delay"            :       100,
+      "par_voice_eos_method"             :         1,
+      "par_voice_eos_timeout"            :      2500
    },
    "device_update" : {
       "dir_root"                         : "/srv/device_update/",

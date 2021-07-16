@@ -105,6 +105,7 @@ class ctrlm_obj_network_rf4ce_t;
 
 #define PRIVACY_FLAGS_ENABLED                            (0x01)
 #define CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR          (0x01)
+#define CONTROLLER_CAPABILITIES_BYTE0_FLAGS_PAR          (0x02)
 
 // Polling Defines
 #define POLLING_METHODS_FLAG_HEARTBEAT                   (0x01)

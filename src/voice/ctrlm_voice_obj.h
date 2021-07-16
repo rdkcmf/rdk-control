@@ -92,12 +92,14 @@ typedef enum {
 } ctrlm_voice_command_status_t;
 
 typedef enum {
-   VOICE_SESSION_RESPONSE_AVAILABLE                 = 0x00,
-   VOICE_SESSION_RESPONSE_BUSY                      = 0x01,
-   VOICE_SESSION_RESPONSE_SERVER_NOT_READY          = 0x02,
-   VOICE_SESSION_RESPONSE_UNSUPPORTED_AUDIO_FORMAT  = 0x03,
-   VOICE_SESSION_RESPONSE_FAILURE                   = 0x04,
-   VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK = 0x05
+   VOICE_SESSION_RESPONSE_AVAILABLE                           = 0x00,
+   VOICE_SESSION_RESPONSE_BUSY                                = 0x01,
+   VOICE_SESSION_RESPONSE_SERVER_NOT_READY                    = 0x02,
+   VOICE_SESSION_RESPONSE_UNSUPPORTED_AUDIO_FORMAT            = 0x03,
+   VOICE_SESSION_RESPONSE_FAILURE                             = 0x04,
+   VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK           = 0x05,
+   VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE                 = 0x10,
+   VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE = 0x11,
 } ctrlm_voice_session_response_status_t;
 
 typedef enum {
@@ -274,6 +276,9 @@ typedef struct {
    #ifdef ENABLE_DEEP_SLEEP
    xrsr_dst_params_t           standby_params;
    #endif
+   bool                        par_voice_enabled;
+   uint8_t                     par_voice_eos_method;
+   uint16_t                    par_voice_eos_timeout;
 } voice_session_prefss_t;
 
 typedef struct {
@@ -286,6 +291,12 @@ typedef struct {
 typedef struct {
    guchar data[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS];
 } voice_params_opus_encoder_t;
+
+typedef struct {
+   bool     par_voice_enabled;
+   uint8_t  par_voice_eos_method;
+   uint16_t par_voice_eos_timeout;
+} voice_params_par_t;
 
 typedef struct {
    bool             available;
@@ -322,10 +333,17 @@ typedef struct {
 } ctrlm_voice_session_info_t;
 
 typedef struct {
-   std::string urlPtt;
-   std::string urlHf;
-   ctrlm_voice_device_status_t status[CTRLM_VOICE_DEVICE_INVALID];
+   bool prv;
    bool wwFeedback;
+} ctrlm_voice_status_capabilities_t;
+
+typedef struct {
+   std::string                       urlPtt;
+   std::string                       urlHf;
+   ctrlm_voice_device_status_t       status[CTRLM_VOICE_DEVICE_INVALID];
+   bool                              prv_enabled;
+   bool                              wwFeedback;
+   ctrlm_voice_status_capabilities_t capabilities;
 } ctrlm_voice_status_t;
 
 typedef void (*ctrlm_voice_session_rsp_confirm_t)(bool result, ctrlm_timestamp_t *timestamp, void *user_data);
@@ -378,9 +396,9 @@ class ctrlm_voice_t {
     virtual bool                          server_message(const char *message, unsigned long length);
     void                                  voice_params_qos_get(voice_params_qos_t *params);
     void                                  voice_params_opus_encoder_get(voice_params_opus_encoder_t *params);
+    void                                  voice_params_par_get(voice_params_par_t *params);
     virtual void                          process_xconf(json_t **json_obj_vsdk);
     virtual void                          query_strings_updated();
-
 
     bool                                  voice_device_streaming(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
     void                                  voice_controller_command_status_read(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);

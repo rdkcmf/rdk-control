@@ -466,7 +466,6 @@ bool ctrlm_is_key_adjacent(ctrlm_network_id_t network_id, ctrlm_controller_id_t 
 ctrlm_voice_t *ctrlm_get_voice_obj();
 #endif
 
-
 template <typename T>
 void ctrlm_main_queue_handler_push(ctrlm_handler_type_t type, T handler, void *data, int size, void *obj = NULL, ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_INVALID) {
    LOG_DEBUG("%s\n", __FUNCTION__);

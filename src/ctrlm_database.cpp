@@ -3443,3 +3443,15 @@ void ctrlm_db_voice_write_audio_ducking_beep_enable(bool enable) {
    ctrlm_db_write_uint64(CTRLM_DB_TABLE_VOICE, "audio_ducking_beep_enable", (guint64) (enable ? 1 : 0));
 }
 
+void ctrlm_db_voice_read_par_voice_status(bool &status) {
+   sqlite_uint64 data;
+   if (0 > ctrlm_db_read_uint64(CTRLM_DB_TABLE_VOICE, "par_voice_status", &data)) {
+      LOG_WARN("%s: Failed to load par_voice_status from db\n", __FUNCTION__);
+   } else {
+      status = (data ? true : false);
+   }
+}
+
+void ctrlm_db_voice_write_par_voice_status(bool status) {
+   ctrlm_db_write_uint64(CTRLM_DB_TABLE_VOICE, "par_voice_status", (guint64) (status ? 1 : 0));
+}
