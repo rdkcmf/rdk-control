@@ -87,8 +87,8 @@ void ctrlm_obj_network_rf4ce_t::bind_validation_end(ctrlm_main_queue_msg_bind_va
          timeout->timer_id = g_timeout_add_seconds(interval, bind_validation_failed, timeout);
          bind_validation_failed_timeout_.push_back(timeout);
          LOG_DEBUG("%s: timer id=%u (%u,%u)\n", __FUNCTION__, timeout->timer_id, timeout->network_id, timeout->controller_id);
-      } else if((dqm->result == CTRLM_RCU_VALIDATION_RESULT_TIMEOUT) || (dqm->result == CTRLM_RCU_VALIDATION_RESULT_CTRLM_RESTART)) { // If the controller is bound and the validation timesout or was interrupted by a restart of ctrlm, it is duplicate pairing and needs to be restored
-         LOG_INFO("%s: Controller %u validation timed out or was interrupted by a restart of ctrlm and is already bound.. Restore previous pairing..\n", __FUNCTION__, dqm->controller_id);
+      } else if(dqm->result == CTRLM_RCU_VALIDATION_RESULT_CTRLM_RESTART) { // If the controller is bound and was interrupted by a restart of ctrlm, it is duplicate pairing and needs to be restored
+         LOG_INFO("%s: Controller %u was interrupted by a restart of ctrlm and is already bound.. Restore previous pairing..\n", __FUNCTION__, dqm->controller_id);
          controller_restore(dqm->controller_id);
       }
       // Indicate failed bind
