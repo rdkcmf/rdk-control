@@ -1264,7 +1264,10 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     this->end_reason = reason;
     LOG_DEBUG("%s,%d: session_active_server = <%d>, session_active_controller = <%d>\n", __FUNCTION__, __LINE__, session_active_server, session_active_controller);
 
-    // TODO clear session_active_controller for controllers that don't support voice command status
+    // clear session_active_controller for controllers that don't support voice command status
+    if(!this->controller_command_status) {
+       this->session_active_controller = false;
+    }
 
     // Update source state
     if(!this->session_active_server && !this->session_active_controller) {
