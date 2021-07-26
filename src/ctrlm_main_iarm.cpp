@@ -469,6 +469,8 @@ IARM_Result_t ctrlm_main_iarm_call_audio_capture_start(void *arg) {
    msg->container         = capture_start->container;
    errno_t safec_rc = strcpy_s(msg->file_path, sizeof(msg->file_path), capture_start->file_path);
    ERR_CHK(safec_rc);
+   msg->raw_mic_enable    = (capture_start->raw_mic_enable) ? true : false;
+   ctrlm_main_queue_msg_push(msg);
 
    capture_start->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
 
