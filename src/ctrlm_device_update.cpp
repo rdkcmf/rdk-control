@@ -1067,8 +1067,10 @@ guint32 ctrlm_device_update_request_timeout_get(void) {
 gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_image_type_t image_type, ctrlm_rf4ce_controller_type_t type, version_hardware_t version_hardware, version_software_t version_bootloader, version_software_t version_software, ctrlm_rf4ce_device_update_audio_theme_t audio_theme, rf4ce_device_update_image_info_t *image_info) {
    gboolean           found   = false;
    rf4ce_device_update_image_info_t upgrade;
-   upgrade.version = version_software;
    errno_t safec_rc = -1;
+   safec_rc = memset_s(&upgrade, sizeof(upgrade), 0, sizeof(upgrade));
+   ERR_CHK(safec_rc);
+   upgrade.version = version_software;
 
 #ifdef CTRLM_NETWORK_RF4CE
    LOG_INFO("%s: Controller type <%s> Current  image type <%s> theme <%s> hw ver <%u.%u.%u.%u> bldr ver <%u.%u.%u.%u> sw ver <%u.%u.%u.%u>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(type), ctrlm_rf4ce_device_update_image_type_str(image_type), ctrlm_rf4ce_device_update_audio_theme_str(audio_theme), version_hardware.manufacturer, version_hardware.model, version_hardware.hw_revision, version_hardware.lot_code,
@@ -1088,8 +1090,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                                                                         && ctrlm_device_update_rf4ce_is_software_version_min_met(version_bootloader, it->version_bootloader_min)) {
             // Image is for this device.  Check for force update or newer image
             if(it->audio_theme == audio_theme) {
-               upgrade.version      = it->version_software;
                upgrade.id           = it->id;
+               upgrade.version      = it->version_software;
                upgrade.size         = it->size;
                upgrade.crc          = it->crc;
                upgrade.force_update = true; // Themes are always force updates
@@ -1123,8 +1125,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
          if(it->force_update && ctrlm_device_update_rf4ce_is_software_version_not_equal(version_software, it->version_software)) {
             // Now check to make sure we haven't already found a higher version than the remote software version
             if(!ctrlm_device_update_rf4ce_is_software_version_higher(version_software, upgrade.version)) {
-               upgrade.version      = it->version_software;
                upgrade.id           = it->id;
+               upgrade.version      = it->version_software;
                upgrade.size         = it->size;
                upgrade.crc          = it->crc;
                upgrade.force_update = true;
@@ -1139,8 +1141,8 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
          } else if(ctrlm_device_update_rf4ce_is_software_version_higher(version_software, it->version_software)) {
             // Now check to make sure the version is higher than any previous versions found
             if(ctrlm_device_update_rf4ce_is_software_version_higher(upgrade.version, it->version_software)) {
-               upgrade.version      = it->version_software;
                upgrade.id           = it->id;
+               upgrade.version      = it->version_software;
                upgrade.size         = it->size;
                upgrade.crc          = it->crc;
                upgrade.force_update = false;

@@ -327,6 +327,8 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
          rf4ce_device_update_session_resume_state_t state;
          state.session_id          = session_id;
          state.image_id            = image_info.id;
+         safec_rc = memset_s(&state.expiration, sizeof(state.expiration), 0, sizeof(state.expiration));
+         ERR_CHK(safec_rc);
          state.image_type          = image_type;
          state.manual_poll         = manual_poll;
          state.when                = begin_info.when;

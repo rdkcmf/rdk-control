@@ -59,9 +59,7 @@ typedef struct {
 class voice_session_t
 {
 public:
-   voice_session_t();
-
-   voice_session_t(const string& route, const string& aspect_ratio, const string& language, const string& stb_name, unsigned long vrex_response_timeout, ctrlm_voice_query_strings_t query_strings, string app_id=JSON_STR_VALUE_VOICE_APP_ID_HTTP);
+   voice_session_t(const string& route, const string& aspect_ratio, const string& language, const string& stb_name, unsigned long vrex_response_timeout, const ctrlm_voice_query_strings_t& query_strings, const string& app_id=JSON_STR_VALUE_VOICE_APP_ID_HTTP);
 
    virtual ~voice_session_t();
 

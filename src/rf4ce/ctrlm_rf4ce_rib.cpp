@@ -35,6 +35,8 @@ typedef enum {
 
 void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_get_target(ctrlm_rf4ce_rib_attr_id_t identifier, guchar index, guchar length, guchar *data_len, guchar *data) {
    ctrlm_timestamp_t timestamp;
+   errno_t safec_rc = memset_s(&timestamp, sizeof(timestamp), 0, sizeof(timestamp));
+   ERR_CHK(safec_rc);
    rf4ce_rib_get(true, timestamp, identifier, index, length, data_len, data);
 }
 
@@ -662,6 +664,8 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_get(gboolean target, ctrlm_timestam
 
 void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set_target(ctrlm_rf4ce_rib_attr_id_t identifier, guchar index, guint8 length, guchar *data) {
    ctrlm_timestamp_t timestamp;
+   errno_t safec_rc = memset_s(&timestamp, sizeof(timestamp), 0, sizeof(timestamp));
+   ERR_CHK(safec_rc);
    rf4ce_rib_set(true, timestamp, identifier, index, length, data);
 }
 

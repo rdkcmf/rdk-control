@@ -164,7 +164,7 @@ static void ctrlm_voice_session_fragment(ctrlm_controller_id_t controller_id, gu
 static void ctrlm_voice_iarm_event_session_begin(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long session_id);
 static void ctrlm_voice_iarm_event_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long session_id, ctrlm_voice_session_end_reason_t reason);
 
-static gboolean ctrlm_req_voice_settings_update(const char *server_url_vrex, const char *aspect_ratio, const char *guide_language, ctrlm_voice_query_strings_t query_strings, const char *server_url_vrex_src_ff);
+static gboolean ctrlm_req_voice_settings_update(const char *server_url_vrex, const char *aspect_ratio, const char *guide_language, const ctrlm_voice_query_strings_t& query_strings, const char *server_url_vrex_src_ff);
 
 static gboolean is_session_stats_in_progress(void);
 static void ctrlm_voice_session_completed(void);
@@ -438,7 +438,7 @@ void ctrlm_voice_load_temp_voice_settings() {
 
 }
 
-gboolean ctrlm_req_voice_settings_update(const char *server_url_vrex, const char *aspect_ratio, const char *guide_language, ctrlm_voice_query_strings_t query_strings, const char *server_url_vrex_src_ff) {
+gboolean ctrlm_req_voice_settings_update(const char *server_url_vrex, const char *aspect_ratio, const char *guide_language, const ctrlm_voice_query_strings_t& query_strings, const char *server_url_vrex_src_ff) {
 
    if(strlen(server_url_vrex)        >= CTRLM_VOICE_SERVER_URL_MAX_LENGTH     ||
       strlen(aspect_ratio)           >= CTRLM_VOICE_ASPECT_RATIO_MAX_LENGTH   ||

@@ -1140,11 +1140,11 @@ void ctrlm_obj_network_rf4ce_t::controllers_load() {
    THREAD_ID_VALIDATE();
    vector<ctrlm_controller_id_t> controller_ids;
    ctrlm_network_id_t network_id = network_id_get();
-   
+
    ctrlm_db_rf4ce_controllers_list(network_id, &controller_ids);
 
    for(vector<ctrlm_controller_id_t>::iterator it = controller_ids.begin(); it < controller_ids.end(); it++) {
-      unsigned long long ieee_address;
+      unsigned long long ieee_address = 0;
       ctrlm_db_rf4ce_read_ieee_address(network_id, *it, &ieee_address);
       controller_insert(*it, ieee_address, false);
    }
@@ -2894,6 +2894,8 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
    ctrlm_rf4ce_polling_configuration_t default_polling_config_hb = {0};
 
    ctrlm_rf4ce_polling_configuration_t default_polling_config_mac;
+   errno_t safec_rc = memset_s(&default_polling_config_mac, sizeof(ctrlm_rf4ce_polling_configuration_t), 0, sizeof(ctrlm_rf4ce_polling_configuration_t));
+   ERR_CHK(safec_rc);
    default_polling_config_mac.trigger = POLLING_TRIGGER_FLAG_TIME;
    default_polling_config_mac.time_interval = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_DEFAULT_MAC_TIME_INTERVAL;
 
@@ -2908,7 +2910,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
    }
 
    bool b_has_default_mac_config = false;
-   errno_t safec_rc = -1;
+
 #ifdef MAC_POLLING
    bool mac_polling_enabled = false;
    if(CTRLM_TR181_RESULT_SUCCESS == ctrlm_tr181_bool_get(CTRLM_RF4CE_TR181_MAC_POLLING_CONFIGURATION_ENABLE, &mac_polling_enabled)) {
@@ -4175,7 +4177,7 @@ void ctrlm_obj_network_rf4ce_t::req_process_network_status(void *data, int size)
    g_assert(dqm->cmd_result);
 
    ctrlm_network_status_rf4ce_t *status_rf4ce  = &dqm->status->status.rf4ce;
-    errno_t safec_rc = strncpy_s(status_rf4ce->version_hal, sizeof(status_rf4ce->version_hal), version_get(), CTRLM_MAIN_VERSION_LENGTH-1);
+   errno_t safec_rc = strncpy_s(status_rf4ce->version_hal, sizeof(status_rf4ce->version_hal), version_get(), CTRLM_MAIN_VERSION_LENGTH-1);
    ERR_CHK(safec_rc);
    status_rf4ce->version_hal[CTRLM_MAIN_VERSION_LENGTH - 1] = '\0';
    safec_rc = strncpy_s(status_rf4ce->chipset, sizeof(status_rf4ce->chipset), chipset_get(), CTRLM_MAIN_MAX_CHIPSET_LENGTH-1);

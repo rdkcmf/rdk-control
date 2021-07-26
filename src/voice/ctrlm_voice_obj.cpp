@@ -117,6 +117,23 @@ ctrlm_voice_t::ctrlm_voice_t() {
 
     errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
     ERR_CHK(safec_rc);
+    this->last_cmd_id               = 0;
+    this->packets_processed         = 0;
+    this->packets_lost              = 0;
+    this->confidence                = .0;
+    this->session_active_server     = false;
+    this->session_active_controller = false;
+    this->sat_token_required        = false;
+    this->network_type              = CTRLM_NETWORK_TYPE_INVALID;
+    this->controller_voltage        = .0;
+    this->voice_device              = CTRLM_VOICE_DEVICE_INVALID;
+    this->server_ret_code           = 0;
+    this->has_stream_params         = false;
+
+    safec_rc =  memset_s(&this->session_timing, sizeof(this->session_timing), 0, sizeof(this->session_timing));
+    ERR_CHK(safec_rc);
+    safec_rc = memset_s(&this->stream_params, sizeof(this->stream_params), 0, sizeof(this->stream_params));
+    ERR_CHK(safec_rc);
     // These semaphores are used to make sure we have all the data before calling the session begin callback
     sem_init(&this->vsr_semaphore, 0, 0);
 

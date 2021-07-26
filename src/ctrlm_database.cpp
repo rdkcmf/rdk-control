@@ -525,7 +525,7 @@ bool ctrlm_db_table_exists(const char *table) {
    if(table == NULL) {
       LOG_WARN("%s: invalid parameters!\n", __FUNCTION__);
    } else {
-      sqlite3_stmt *p_stmt;
+      sqlite3_stmt *p_stmt = NULL;
       int rc;
       stringstream sql;
       sql << "SELECT * FROM " << table << ";";
@@ -683,7 +683,7 @@ bool ctrlm_db_key_exists(const char *table, const char *key) {
       return(-1);
    }
 
-   sqlite3_stmt *p_stmt;
+   sqlite3_stmt *p_stmt = NULL;
    int rc;
    errno_t safec_rc = -1;
    int ind = -1;
@@ -786,13 +786,16 @@ void ctrlm_db_write_uint64_(const char *table, const char *key, sqlite_uint64 va
 //}
 
 void ctrlm_db_write_str(const char *table, const char *key, const guchar *value) {
-   size_t length = strlen((const char *)value);
    errno_t safec_rc = -1;
-   ctrlm_db_queue_msg_write_string_t *msg = (ctrlm_db_queue_msg_write_string_t *)g_malloc(sizeof(ctrlm_db_queue_msg_write_string_t) + length + 1);
+   size_t length = strlen((const char *)value);
+   size_t msg_len = sizeof(ctrlm_db_queue_msg_write_string_t) + length + 1;
+   ctrlm_db_queue_msg_write_string_t *msg = (ctrlm_db_queue_msg_write_string_t *)g_malloc(msg_len);
    if(msg == NULL) {
       LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
       return;
    }
+   safec_rc = memset_s(msg, msg_len, 0, msg_len);
+   ERR_CHK(safec_rc);
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_STRING;
    safec_rc = strcpy_s(msg->table, sizeof(msg->table), table);
    ERR_CHK(safec_rc);
@@ -813,11 +816,14 @@ void ctrlm_db_write_str_(const char *table, const char *key, const guchar *value
 
 void ctrlm_db_write_blob(const char *table, const char *key, const guchar *value, guint32 length) {
    errno_t safec_rc = -1;
-   ctrlm_db_queue_msg_write_blob_t *msg = (ctrlm_db_queue_msg_write_blob_t *)g_malloc(sizeof(ctrlm_db_queue_msg_write_blob_t) + length);
+   size_t msg_len = sizeof(ctrlm_db_queue_msg_write_blob_t) + length;
+   ctrlm_db_queue_msg_write_blob_t *msg = (ctrlm_db_queue_msg_write_blob_t *)g_malloc(msg_len);
    if(msg == NULL) {
       LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
       return;
    }
+   safec_rc = memset_s(msg, msg_len, 0, msg_len);
+   ERR_CHK(safec_rc);
    msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_BLOB;
    safec_rc = strncpy_s(msg->table, sizeof(msg->table),table, CONTROLLER_TABLE_NAME_MAX_LEN - 1);
    ERR_CHK(safec_rc);
@@ -840,7 +846,7 @@ void ctrlm_db_write_blob_(const char *table, const char *key, const guchar *valu
 
 // Insert or update a key/value pair in the database
 int ctrlm_db_insert_or_update(const char *table, const char *key, const int *value_int, const sqlite3_int64 *value_int64, const guchar *value_str, guint32 blob_length) {
-   sqlite3_stmt *p_stmt;
+   sqlite3_stmt *p_stmt = NULL;
    int rc;
    stringstream sql;
    sql << "INSERT OR REPLACE INTO " << table << "(key,value) VALUES (?,?);";
@@ -901,7 +907,7 @@ int ctrlm_db_insert_or_update(const char *table, const char *key, const int *val
 #if 0
 // Insert a new key/value pair in the database
 int ctrlm_db_insert(const char *table, const char *key, const int *value_int, const char *value_str, guint32 blob_length) {
-   sqlite3_stmt *p_stmt;
+   sqlite3_stmt *p_stmt = NULL;
    int rc;
    stringstream sql;
    sql << "INSERT INTO " << table << "(key,value) VALUES (?,?);";
@@ -962,7 +968,7 @@ int ctrlm_db_insert(const char *table, const char *key, const int *value_int, co
 
 // Update an existing key/value pair in the database
 int ctrlm_db_update(const char *table, const char *key, const int *value_int, const char *value_str, guint32 blob_length) {
-   sqlite3_stmt *p_stmt;
+   sqlite3_stmt *p_stmt = NULL;
    int rc;
    stringstream sql;
    sql << "UPDATE " << table << " SET value=? WHERE key=?;";
@@ -1039,7 +1045,7 @@ int ctrlm_db_select_keys(const char *table, vector<char *> *keys_str, vector<ctr
    sql.append(table);
    sql.append(";");
 
-   sqlite3_stmt *p_stmt;
+   sqlite3_stmt *p_stmt = NULL;
    int rc =  sqlite3_prepare_v2(g_ctrlm_db.handle, sql.c_str(), sql.length(), &p_stmt, NULL);
    if(rc != SQLITE_OK) {
       LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.c_str());
@@ -1105,7 +1111,7 @@ int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_u
    sql.append(key);
    sql.append("';");
 
-   sqlite3_stmt *p_stmt;
+   sqlite3_stmt *p_stmt = NULL;
    int rc =  sqlite3_prepare_v2(g_ctrlm_db.handle, sql.c_str(), sql.length(), &p_stmt, NULL);
    if(rc != SQLITE_OK) {
       LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.c_str());
@@ -1179,7 +1185,7 @@ int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_u
 
 // Delete an existing key/value pair from the database
 int ctrlm_db_delete(const char *table, const char *key) {
-   char *err_msg;
+   char *err_msg = NULL;
    if(table == NULL || key == NULL) {
       LOG_WARN("%s: invalid parameters!\n", __FUNCTION__);
       return(-1);
@@ -1193,8 +1199,10 @@ int ctrlm_db_delete(const char *table, const char *key) {
 
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql.c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return(-1);
    }
 
@@ -1217,7 +1225,7 @@ gboolean ctrlm_db_created_default(void) {
 
 void ctrlm_db_voice_create() {
    if(!ctrlm_db_table_exists(CTRLM_DB_TABLE_VOICE)) {
-      char *err_msg;
+      char *err_msg = NULL;
       g_ctrlm_db.voice_is_valid = false; // This is needed to allow voice component to transfer to new DB structure
       // Create the voice table
       int rc = sqlite3_exec(g_ctrlm_db.handle, "CREATE TABLE " CTRLM_DB_TABLE_VOICE "(key TEXT PRIMARY KEY, value TEXT);", NULL, NULL, &err_msg);
@@ -1231,13 +1239,15 @@ void ctrlm_db_voice_create() {
 }
 
 void ctrlm_db_default() {
-   char *err_msg;
+   char *err_msg = NULL;
 
    // Create the global table
    int rc = sqlite3_exec(g_ctrlm_db.handle, "CREATE TABLE " CTRLM_DB_TABLE_CTRLMGR "(key TEXT PRIMARY KEY, value TEXT);", NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return;
    }
 
@@ -1388,18 +1398,21 @@ void ctrlm_db_print() {
          LOG_INFO("%s:       <No Controllers>\n", __FUNCTION__);
       }
       for(vector<ctrlm_controller_id_t>::iterator it_controller = controller_ids.begin(); it_controller < controller_ids.end(); it_controller++) {
-         unsigned long long          ieee_address;
-         ctrlm_rcu_binding_type_t    binding_type;
-         ctrlm_rcu_validation_type_t validation_type;
-         time_t                      time_binding;
-         char                        time_str[40];
+         unsigned long long          ieee_address = 0;
+         ctrlm_rcu_binding_type_t    binding_type = CTRLM_RCU_BINDING_TYPE_INVALID;
+         ctrlm_rcu_validation_type_t validation_type = CTRLM_RCU_VALIDATION_TYPE_INVALID;
+         time_t                      time_binding = 0;
+         char                        time_str[40] = "";
 
          ctrlm_db_rf4ce_read_ieee_address(*it_network, *it_controller, &ieee_address);
          ctrlm_db_rf4ce_read_binding_type(*it_network, *it_controller, &binding_type);
          ctrlm_db_rf4ce_read_validation_type(*it_network, *it_controller, &validation_type);
          ctrlm_db_rf4ce_read_time_binding(*it_network, *it_controller, &time_binding);
 
-         strftime(time_str, 40, "%x - %I:%M:%S %p", localtime(&time_binding));
+         const tm* loc_time = localtime(&time_binding);
+         if (loc_time != 0) {
+            strftime(time_str, 40, "%x - %I:%M:%S %p", localtime(&time_binding));
+         }
 
          LOG_INFO("%s:       Controller Id %u IEEE 0x%016llX Binding <%s> Validation <%s> Bound <%s>\n", __FUNCTION__, *it_controller, ieee_address, ctrlm_rcu_binding_type_str(binding_type), ctrlm_rcu_validation_type_str(validation_type), time_str);
 
@@ -1438,7 +1451,7 @@ void ctrlm_db_rf4ce_controllers_list(ctrlm_network_id_t network_id, vector<ctrlm
 void ctrlm_db_rf4ce_network_create(ctrlm_network_id_t network_id) {
    char table_name_controller_list[CONTROLLER_TABLE_NAME_MAX_LEN];
    char table_name_global[CONTROLLER_TABLE_NAME_MAX_LEN];
-   char *err_msg;
+   char *err_msg = NULL;
 
    ctrlm_db_rf4ce_global_table_name(network_id, table_name_global);
    ctrlm_db_rf4ce_controller_list_table_name(network_id, table_name_controller_list);
@@ -1448,8 +1461,10 @@ void ctrlm_db_rf4ce_network_create(ctrlm_network_id_t network_id) {
    sql_global << "CREATE TABLE IF NOT EXISTS " << table_name_global << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql_global.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return;
    }
 
@@ -1586,7 +1601,7 @@ void ctrlm_db_rf4ce_write_ieee_address(ctrlm_network_id_t network_id, ctrlm_cont
 void ctrlm_db_rf4ce_read_binding_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_type_t *binding_type) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "binding_type", &value);
    *binding_type = (ctrlm_rcu_binding_type_t) value;
 }
@@ -1601,7 +1616,7 @@ void ctrlm_db_rf4ce_write_binding_type(ctrlm_network_id_t network_id, ctrlm_cont
 void ctrlm_db_rf4ce_read_validation_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_validation_type_t *validation_type) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "validation_type", &value);
    *validation_type = (ctrlm_rcu_validation_type_t) value;
 }
@@ -1616,7 +1631,7 @@ void ctrlm_db_rf4ce_write_validation_type(ctrlm_network_id_t network_id, ctrlm_c
 void ctrlm_db_rf4ce_read_time_binding(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_binding) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_binding", &value);
    *time_binding = (time_t) value;
 }
@@ -1631,7 +1646,7 @@ void ctrlm_db_rf4ce_write_time_binding(ctrlm_network_id_t network_id, ctrlm_cont
 void ctrlm_db_rf4ce_read_time_last_key(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_last_key) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_last_key", &value);
    *time_last_key = (time_t) value;
 }
@@ -1646,7 +1661,7 @@ void ctrlm_db_rf4ce_write_time_last_key(ctrlm_network_id_t network_id, ctrlm_con
 void ctrlm_db_rf4ce_read_time_last_heartbeat(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_last_heartbeat) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_last_heartbeat", &value);
    *time_last_heartbeat = (time_t) value;
 }
@@ -1661,7 +1676,7 @@ void ctrlm_db_rf4ce_write_time_last_heartbeat(ctrlm_network_id_t network_id, ctr
 void ctrlm_db_rf4ce_read_time_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_battery_status) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_battery_status", &value);
    *time_battery_status = (time_t) value;
 }
@@ -2280,7 +2295,7 @@ void ctrlm_db_rf4ce_write_time_last_checkin_for_device_update(ctrlm_network_id_t
 
 void ctrlm_db_rf4ce_read_polling_methods(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 *polling_methods) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   guint64 temp_polling_methods;
+   guint64 temp_polling_methods = 0;
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
 
    ctrlm_db_read_uint64(table, "polling_methods", &temp_polling_methods);
@@ -2325,7 +2340,7 @@ void ctrlm_db_rf4ce_write_polling_configuration_heartbeat(ctrlm_network_id_t net
 void ctrlm_db_rf4ce_read_rib_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int *status) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "rib_configuration_complete", &value);
    *status = (int) value;
 }
@@ -2340,7 +2355,7 @@ void ctrlm_db_rf4ce_write_rib_configuration_complete(ctrlm_network_id_t network_
 void ctrlm_db_rf4ce_read_binding_security_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_security_type_t *type) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "binding_security_type", &value);
    *type = (ctrlm_rcu_binding_security_type_t) value;
 }
@@ -2356,7 +2371,7 @@ void ctrlm_db_rf4ce_write_binding_security_type(ctrlm_network_id_t network_id, c
 void ctrlm_db_rf4ce_read_asb_key_derivation_method(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned char *method) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "asb_key_derivation_method", &value);
    *method = (unsigned char) value;
 }
@@ -2428,7 +2443,7 @@ void ctrlm_db_rf4ce_write_dsp_metrics(ctrlm_network_id_t network_id, ctrlm_contr
 void ctrlm_db_rf4ce_read_time_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_metrics) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_metrics", &value);
    *time_metrics = (time_t) value;
 }
@@ -2575,12 +2590,14 @@ void ctrlm_db_controller_destroy(ctrlm_network_id_t network_id, ctrlm_controller
 
    // Delete the controller's table
    stringstream sql;
-   char *err_msg;
+   char *err_msg = NULL;
    sql << "DROP TABLE IF EXISTS " << table_name_controller_entry << ";";
    rc = sqlite3_exec(g_ctrlm_db.handle, sql.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return;
    }
 }
@@ -2628,13 +2645,15 @@ void ctrlm_db_controller_create(ctrlm_network_id_t network_id, ctrlm_controller_
    }
 
    // Create the controller's table
-   char *err_msg;
+   char *err_msg = NULL;
    stringstream sql;
    sql << "CREATE TABLE IF NOT EXISTS " << table_name_controller_entry << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return;
    }
 }
@@ -2655,7 +2674,7 @@ void ctrlm_db_ip_controllers_list(ctrlm_network_id_t network_id, vector<ctrlm_co
 void ctrlm_db_ip_network_create(ctrlm_network_id_t network_id) {
    char table_name_controller_list[CONTROLLER_TABLE_NAME_MAX_LEN];
    char table_name_global[CONTROLLER_TABLE_NAME_MAX_LEN];
-   char *err_msg;
+   char *err_msg = NULL;
 
    ctrlm_db_ip_global_table_name(network_id, table_name_global);
    ctrlm_db_ip_controller_list_table_name(network_id, table_name_controller_list);
@@ -2665,8 +2684,10 @@ void ctrlm_db_ip_network_create(ctrlm_network_id_t network_id) {
    sql_global << "CREATE TABLE IF NOT EXISTS " << table_name_global << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql_global.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return;
    }
 
@@ -2790,7 +2811,7 @@ void ctrlm_db_ip_write_authentication_token(ctrlm_network_id_t network_id, ctrlm
 void ctrlm_db_ip_read_time_binding(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_binding) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ip_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_binding", &value);
    *time_binding = (time_t) value;
 }
@@ -2805,7 +2826,7 @@ void ctrlm_db_ip_write_time_binding(ctrlm_network_id_t network_id, ctrlm_control
 void ctrlm_db_ip_read_time_last_key(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_last_key) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ip_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "time_last_key", &value);
    *time_last_key = (time_t) value;
 }
@@ -2820,7 +2841,7 @@ void ctrlm_db_ip_write_time_last_key(ctrlm_network_id_t network_id, ctrlm_contro
 void ctrlm_db_ip_read_permissions(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned char *permissions) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_ip_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value;
+   unsigned long long value = 0;
    ctrlm_db_read_uint64(table, "permissions", &value);
    *permissions = (unsigned char) value;
 }
@@ -2849,7 +2870,7 @@ void ctrlm_db_ble_controllers_list(ctrlm_network_id_t network_id, vector<ctrlm_c
 void ctrlm_db_ble_network_create(ctrlm_network_id_t network_id) {
    char table_name_controller_list[CONTROLLER_TABLE_NAME_MAX_LEN];
    char table_name_global[CONTROLLER_TABLE_NAME_MAX_LEN];
-   char *err_msg;
+   char *err_msg = NULL;
 
    ctrlm_db_ble_global_table_name(network_id, table_name_global);
    ctrlm_db_ble_controller_list_table_name(network_id, table_name_controller_list);
@@ -2859,8 +2880,10 @@ void ctrlm_db_ble_network_create(ctrlm_network_id_t network_id) {
    sql_global << "CREATE TABLE IF NOT EXISTS " << table_name_global << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql_global.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
-      sqlite3_free(err_msg);
+      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      if(err_msg) {
+         sqlite3_free(err_msg);
+      }
       return;
    }
 

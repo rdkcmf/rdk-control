@@ -3479,7 +3479,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_product_name(guchar *data, gu
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   
+
    // Load the data from the controller object
    errno_t safec_rc = strcpy_s((char *)data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, product_name_);
    ERR_CHK(safec_rc);

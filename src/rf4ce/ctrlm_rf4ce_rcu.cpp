@@ -449,6 +449,10 @@ void ctrlm_obj_network_rf4ce_t::ind_process_data_rcu(ctrlm_main_queue_msg_rf4ce_
 
                for(guint32 index = 0; index < length; index++) {
                   if(combo_keys_index > 0) {
+                    if (combo_keys_index == COMBO_KEYS_BUF_SIZE) {
+                       LOG_INFO("%s: Combo Keys index exceeded buffer size <%d>\n", __FUNCTION__, COMBO_KEYS_BUF_SIZE);
+                       break;
+                    }
                      combo_keys[combo_keys_index++] = ',';
                   }
                   if(combo_keys_index < COMBO_KEYS_BUF_SIZE) {

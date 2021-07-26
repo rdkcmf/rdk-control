@@ -77,7 +77,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair(void *data, int size) {
    }
 
    ctrlm_hal_rf4ce_result_t status = dqm->params.status;
-   
+
    ctrlm_hal_rf4ce_rsp_pair_params_t params;
    params.controller_id          = controller_id_get_by_ieee(dqm->params.src_ieee_addr); //Set controller id to prevent it being overwritten on a failed pairing
    params.dst_pan_id             = dqm->params.src_pan_id;
@@ -89,6 +89,9 @@ void ctrlm_obj_network_rf4ce_t::ind_process_pair(void *data, int size) {
    params.rec_profile_id_list[0] = CTRLM_RF4CE_PROFILE_ID_COMCAST_RCU;
    params.user_data              = dqm->params.user_data;
    params.result                 = CTRLM_HAL_RESULT_PAIR_REQUEST_IGNORE;
+#if (CTRLM_HAL_RF4CE_API_VERSION >= 12)
+   params.rec_user_string[0] = 0;
+#endif
    if(params.controller_id == 0){ // Remote didn't exist in pairing table
       params.controller_id = CTRLM_HAL_CONTROLLER_ID_INVALID;
    }

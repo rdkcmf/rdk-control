@@ -177,14 +177,7 @@ int vrex_request_progress(void *clientp, curl_off_t dltotal, curl_off_t dlnow, c
    }
 }
 
-voice_session_t::voice_session_t() :
-   m_curl_initialized(false),
-   m_base_route("uninit")
-{
-   //LOG_INFO("Warning... Empty voice_session_t constructor called");
-}
-
-voice_session_t::voice_session_t(const string& route, const string& aspect_ratio, const string&  language, const string& stb_name, unsigned long vrex_response_timeout, ctrlm_voice_query_strings_t query_strings, string app_id) :
+voice_session_t::voice_session_t(const string& route, const string& aspect_ratio, const string&  language, const string& stb_name, unsigned long vrex_response_timeout, const ctrlm_voice_query_strings_t& query_strings, const string& app_id) :
    m_app_id(app_id),
 //   m_receiver_id(receiver_id),
 //   m_device_id(device_id),
@@ -192,6 +185,8 @@ voice_session_t::voice_session_t(const string& route, const string& aspect_ratio
 //   m_conversation_id(""),
 //   m_service_account_id(service_account_id),
 //   m_partner_id(partner_id),
+   m_remote_battery_value(0),
+   m_remote_battery_percentage(0),
    m_base_route_contains_speech(false),
    m_curl_initialized(false),
    m_base_route(route),
@@ -202,8 +197,19 @@ voice_session_t::voice_session_t(const string& route, const string& aspect_ratio
    m_log_metrics(true),
    m_voice_data_pipe_read(-1),
    m_data_read_thread(NULL),
+   m_voice_data_qty_sent(0),
+   m_voice_rsp_qty_rxd(0),
+   m_utterance_too_short(0),
+   m_return_code_vrex(0),
+   m_return_code_curl(CURLE_OK),
+   m_return_code_http(0),
+   m_session_id_vrex_mgr(0),
    m_notified_results(true),
    m_notified_stats(true),
+   m_caught_exception(false),
+   m_thread_failed(false),
+   m_end_reason(CTRLM_VOICE_SESSION_END_REASON_MAX),
+   m_timeout_vrex_request(0),
    m_abort_vrex_request(false),
    m_vrex_response_timeout_tag(0),
    m_vrex_response_timeout(vrex_response_timeout),
@@ -236,6 +242,10 @@ voice_session_t::voice_session_t(const string& route, const string& aspect_ratio
    m_connect_time = 0.0;
 
    safec_rc = memcpy_s(&m_query_strings, sizeof(ctrlm_voice_query_strings_t), &query_strings, sizeof(ctrlm_voice_query_strings_t));
+   ERR_CHK(safec_rc);
+   safec_rc  = memset_s(&m_stats_session, sizeof(m_stats_session), 0, sizeof(m_stats_session));
+   ERR_CHK(safec_rc);
+   safec_rc = memset_s(&m_stats_reboot, sizeof(m_stats_reboot), 0, sizeof(m_stats_reboot));
    ERR_CHK(safec_rc);
 }
 
