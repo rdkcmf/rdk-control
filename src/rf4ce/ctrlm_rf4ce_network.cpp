@@ -639,7 +639,6 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
          }
       }
 #endif
-      polling_config_tr181_read();
       if(conf.config_object_get(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING, sub_conf)) {
          polling_config_read(&sub_conf);
       }
@@ -679,6 +678,8 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
          sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_DETECT, dsp_configuration_.ic_config_detect, 0x00, 0xFF);
       }
    }
+   //Read tr181 values here. tr181 values will override any config file values.
+   polling_config_tr181_read();
 
    LOG_INFO("%s: User String                   <%s>\n",     __FUNCTION__, user_string_.c_str());
    LOG_INFO("%s: Timeout Key Release           %u ms\n",    __FUNCTION__, timeout_key_release_);
@@ -2969,7 +2970,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
                  &controller_polling_configuration_heartbeat_[i].trigger,
                  &controller_polling_configuration_heartbeat_[i].kp_counter,
                  &controller_polling_configuration_heartbeat_[i].time_interval)) {
-              LOG_INFO("%s: Controller Polling Configuration from TR181\n", __FUNCTION__);
+              LOG_INFO("%s: Controller Polling Configuration Read from TR181 <%s><%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str((ctrlm_rf4ce_controller_type_t)i),ctrlm_rf4ce_controller_polling_methods_str(controller_polling_methods_[i]));
               continue;
            }
         }
@@ -3062,7 +3063,7 @@ gboolean ctrlm_obj_network_rf4ce_t::polling_configuration_by_controller_type(ctr
    }
 
    // Polling Methods
-   guint8 methods = (controller_polling_methods_[controller_type] & polling_methods_); // Bitwise AND of target methods and controller type's methods
+   guint8 methods = (controller_polling_methods_[controller_type]);
 
    LOG_DEBUG("%s: polling methods current <%s> new <%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_polling_methods_str(*polling_methods), ctrlm_rf4ce_controller_polling_methods_str(methods));
    if(*polling_methods != methods) {

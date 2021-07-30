@@ -4388,7 +4388,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_polling_methods(guchar *data
       ctrlm_db_rf4ce_write_polling_methods(network_id_get(), controller_id_get(), polling_methods_);
    }
 
-   LOG_INFO("%s: polling methods <%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_polling_methods_str(polling_methods_));
+   LOG_INFO("%s: polling methods <%s><%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_get()), ctrlm_rf4ce_controller_polling_methods_str(polling_methods_));
    return(length);
 }
 
@@ -4401,7 +4401,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_polling_methods(guchar *data,
    // Load the data from the controller object
    data[0]  = polling_methods_;
 
-   LOG_INFO("%s: polling methods <%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_polling_methods_str(polling_methods_));
+   LOG_INFO("%s: polling methods <%s><%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_get()), ctrlm_rf4ce_controller_polling_methods_str(polling_methods_));
    return(CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS);
 }
 
