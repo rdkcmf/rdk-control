@@ -40,8 +40,8 @@ bool ctrlm_irdb_ipc_iarm_thunder_t::register_ipc() const {
 
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_MANUFACTURERS, get_manufacturers)) ret = false;
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_MODELS, get_models)) ret = false;
-    if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_INFOFRAME, get_ir_codes_by_infoframe)) ret = false;
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_CODES, get_ir_codes_by_names)) ret = false;
+    if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_AUTO_LOOKUP, get_ir_codes_by_auto_lookup)) ret = false;
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_SET_CODE, set_ir_codes_by_name)) ret = false;
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_CLEAR_CODE, clear_ir_codes)) ret = false;
 
@@ -161,15 +161,15 @@ IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::get_models(void *arg) {
     return(IARM_RESULT_SUCCESS);
 }
 
-IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::get_ir_codes_by_infoframe(void *arg) {
+IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::get_ir_codes_by_auto_lookup(void *arg) {
     IRDB_LOG_INFO("%s\n", __FUNCTION__);
-    ctrlm_iarm_call_IRInfoFrame_params_t *params = (ctrlm_iarm_call_IRInfoFrame_params_t *)arg;
+    ctrlm_iarm_call_IRAutoLookup_params_t *params = (ctrlm_iarm_call_IRAutoLookup_params_t *)arg;
     json_t *ret = json_object();
     ctrlm_irdb_t *irdb = ctrlm_main_irdb_get();
 
     bool success                   = false;
-    ctrlm_irdb_dev_type_t dev_type = CTRLM_IRDB_DEV_TYPE_INVALID;
-    json_t *codes                  = NULL;
+    json_t *tv_codes               = NULL;
+    json_t *avr_codes              = NULL;
 
     if(params == NULL || params->api_revision != CTRLM_MAIN_IARM_BUS_API_REVISION) {
         IRDB_LOG_ERROR("%s: Invalid parameters\n", __FUNCTION__);
@@ -177,29 +177,26 @@ IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::get_ir_codes_by_infoframe(void *arg
     }
 
     if(irdb) {
-        std::string infoframe_base64(params->infoframe, strnlen(params->infoframe, CTRLM_MAX_PARAM_STR_LEN));
-        size_t infoframe_len = 0;
-        unsigned char *infoframe = g_base64_decode(infoframe_base64.c_str(), &infoframe_len);
-        codes = json_array();
-        if(infoframe) {
-            auto cds = irdb->get_ir_codes_by_infoframe(dev_type, infoframe, infoframe_len);
-            for(const auto &itr : cds) {
-                json_array_append_new(codes, json_string(itr.c_str()));
+        if(irdb->can_get_ir_codes_by_autolookup()) {
+            auto cd_map = irdb->get_ir_codes_by_autolookup();
+            if(cd_map.count(CTRLM_IRDB_DEV_TYPE_TV) > 0) {
+                tv_codes = json_array();
+                json_array_append_new(tv_codes, json_string(cd_map[CTRLM_IRDB_DEV_TYPE_TV].c_str()));
+                json_object_set_new(ret, "tvCodes", tv_codes);
             }
-            free(infoframe);
-            infoframe = NULL;
+            if(cd_map.count(CTRLM_IRDB_DEV_TYPE_AVR) > 0) {
+                avr_codes = json_array();
+                json_array_append_new(avr_codes, json_string(cd_map[CTRLM_IRDB_DEV_TYPE_AVR].c_str()));
+                json_object_set_new(ret, "avrCodes", avr_codes);
+            }
             success = true;
         } else {
-            IRDB_LOG_ERROR("%s: Failed to base64 decode infoframe\n", __FUNCTION__);
+            IRDB_LOG_WARN("%s: IRDB doesn't support get_ir_codes_by_autolookup\n", __FUNCTION__);
         }
     }
 
     // Assemble the return
     json_object_set_new(ret, "success", json_boolean(success));
-    if(success) {
-        json_object_set_new(ret, "avDevType", json_string(ctrlm_irdb_ipc_iarm_thunder_t::ctrlm_irdb_dev_type_str(dev_type)));
-        json_object_set_new(ret, "codes", (codes != NULL ? codes : json_null()));
-    }
     json_to_iarm_response(__FUNCTION__, &ret, params);
     return(IARM_RESULT_SUCCESS);
 }

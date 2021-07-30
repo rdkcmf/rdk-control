@@ -89,7 +89,13 @@ protected:
      * @param name Thunder Plugin name, mostly used for logging.
      * @param callsign The callsign for the plugin, which is used in every call.
      */
-    ctrlm_thunder_plugin_t(std::string name, std::string callsign);
+    ctrlm_thunder_plugin_t(std::string name, std::string callsign, int api_version);
+
+    /**
+     * This function returns the callsign string with the associated API version appended to it.
+     * @return <callsign>.<api_version>
+     */
+    std::string callsign_with_api();
 
     /**
      * This functions is used to call a Thunder Plugin method.
@@ -116,6 +122,11 @@ protected:
     virtual bool register_events();
 
     /**
+     * This function is called when the initial activation of the plugin occurs. Plugin classes should override this method.
+     */
+    virtual void on_initial_activation();
+
+    /**
      * This callback function is used to perform actions when the plugin is activated. This gets performed on a non-Thunder thread.
      * @return 0 if actions were performed successfully, or 1 if this function needs to be rerun.
      */
@@ -128,6 +139,7 @@ protected:
 private:
     Thunder::Controller::ctrlm_thunder_controller_t *controller;
     std::string callsign;
+    int         api_version;
     std::vector<std::pair<plugin_activation_handler_t, void *> > activation_callbacks;
     int  register_events_retry;
 };

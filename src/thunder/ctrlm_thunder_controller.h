@@ -29,7 +29,7 @@
 #endif
 
 #define SERVER_DETAILS            "127.0.0.1:9998"
-#define CALL_TIMEOUT              (1000)
+#define CALL_TIMEOUT              (2000)
 /* End Defines for Thunder */
 
 namespace Thunder {

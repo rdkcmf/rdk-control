@@ -21,6 +21,7 @@
 #include <WPEFramework/core/core.h>
 #include <WPEFramework/websocket/websocket.h>
 #include <WPEFramework/plugins/plugins.h>
+#include <sstream>
 #include <secure_wrapper.h>
 #include <glib.h>
 
@@ -48,11 +49,12 @@ static void _on_thunder_ready(void *data) {
     }
 }
 
-ctrlm_thunder_plugin_t::ctrlm_thunder_plugin_t(std::string name, std::string callsign) {
-    THUNDER_LOG_INFO("%s: Plugin <%s> Callsign <%s>\n", __FUNCTION__, name.c_str(), callsign.c_str());
+ctrlm_thunder_plugin_t::ctrlm_thunder_plugin_t(std::string name, std::string callsign, int api_version) {
+    THUNDER_LOG_INFO("%s: Plugin <%s> Callsign <%s> API Version <%d>\n", __FUNCTION__, name.c_str(), callsign.c_str(), api_version);
     std::string sToken;
     this->name     = name;
     this->callsign = callsign;
+    this->api_version = api_version;
     this->register_events_retry = 0;
     this->controller    = Thunder::Controller::ctrlm_thunder_controller_t::getInstance();
     this->plugin_client = NULL;
@@ -81,6 +83,12 @@ ctrlm_thunder_plugin_t::~ctrlm_thunder_plugin_t() {
     if(this->controller) {
         this->controller->remove_activation_handler(this->callsign, _on_activation_change);
     }
+}
+
+std::string ctrlm_thunder_plugin_t::callsign_with_api() {
+    std::stringstream ret;
+    ret << this->callsign << "." << this->api_version;
+    return(ret.str());
 }
 
 bool ctrlm_thunder_plugin_t::is_activated() {
@@ -141,6 +149,8 @@ int ctrlm_thunder_plugin_t::on_plugin_activated(void *data) {
                 THUNDER_LOG_FATAL("%s: Failed to register events %d times, no longer trying again...\n", __FUNCTION__, REGISTER_EVENTS_RETRY_MAX);
                 ret = 0;
             }
+        } else {
+            plugin->on_initial_activation();
         }
     } else {
         THUNDER_LOG_ERROR("%s: Plugin is NULL\n", __FUNCTION__);
@@ -158,8 +168,9 @@ void ctrlm_thunder_plugin_t::on_activation_change(plugin_state_t state) {
 }
 
 void ctrlm_thunder_plugin_t::on_thunder_ready(bool boot) {
-    THUNDER_LOG_INFO("%s: Thunder is now ready, create plugin client\n", __FUNCTION__);
-    auto pluginClient = new JSONRPC::LinkType<Core::JSON::IElement>(_T(this->callsign), _T(""), false, Thunder::Controller::ctrlm_thunder_controller_t::get_security_token());
+    std::string callsign_api = this->callsign_with_api();
+    THUNDER_LOG_INFO("%s: Thunder is now ready, create plugin client for %s\n", __FUNCTION__, callsign_api.c_str());
+    auto pluginClient = new JSONRPC::LinkType<Core::JSON::IElement>(_T(callsign_api), _T(""), false, Thunder::Controller::ctrlm_thunder_controller_t::get_security_token());
     if(pluginClient == NULL) {
         THUNDER_LOG_ERROR("%s: NULL pluginClient\n", __FUNCTION__);
     }
@@ -208,4 +219,8 @@ bool ctrlm_thunder_plugin_t::call_controller(std::string method, void *params, v
 bool ctrlm_thunder_plugin_t::register_events() {
     bool ret = true;
     return(ret);
+}
+
+void ctrlm_thunder_plugin_t::on_initial_activation() {
+    // Nothing needed here for now
 }

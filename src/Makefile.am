@@ -25,7 +25,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/                     \
               -I$(top_srcdir)/src/voice/           \
               -I$(top_srcdir)/src/voice/endpoints/ \
               -I$(top_srcdir)/src/voice/ipc/       \
-              -I$(top_srcdir)/src/thunder/
+              -I$(top_srcdir)/src/thunder/         \
+              -I$(top_srcdir)/src/thunder/plugins
 
 AM_LDFLAGS = -larchive
 
@@ -53,6 +54,13 @@ controlMgr_SOURCES = ctrlm_main.cpp                           \
                      irdb/ctrlm_irdb_stub.cpp                 \
                      irdb/ipc/ctrlm_irdb_ipc_iarm_thunder.cpp 
 
+if PLATFORM_STB
+AM_CPPFLAGS += -DPLATFORM_STB
+endif
+
+if PLATFORM_TV
+AM_CPPFLAGS += -DPLATFORM_TV
+endif
 
 if VOICE_SDK_ENABLED
 AM_CPPFLAGS += -DUSE_VOICE_SDK
@@ -106,8 +114,12 @@ AM_CPPFLAGS += -DCTRLM_NETWORK_IP -DCTRLM_IP_HAL_LOG_ENABLED
 endif
 
 if THUNDER_ENABLED
+AM_CPPFLAGS += -DCTRLM_THUNDER
 controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin.cpp    \
-                       thunder/ctrlm_thunder_controller.cpp
+                       thunder/ctrlm_thunder_controller.cpp \
+                       thunder/plugins/ctrlm_thunder_plugin_display_settings.cpp \
+                       thunder/plugins/ctrlm_thunder_plugin_hdmi_input.cpp \
+                       thunder/plugins/ctrlm_thunder_plugin_cec_sink.cpp
 endif
 
 if CPC_ENABLED

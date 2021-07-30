@@ -27,12 +27,17 @@ public:
     ctrlm_irdb_stub_t(ctrlm_irdb_mode_t mode);
     ~ctrlm_irdb_stub_t();
 
-    std::vector<ctrlm_irdb_manufacturer_t> get_manufacturers(ctrlm_irdb_dev_type_t type, std::string prefix = "");
-    std::vector<ctrlm_irdb_model_t>        get_models(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, std::string prefix = "");
-    std::vector<ctrlm_irdb_ir_entry_id_t>  get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len);
-    std::vector<ctrlm_irdb_ir_entry_id_t>  get_ir_codes_by_names(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, ctrlm_irdb_model_t model = "");
-    bool                                   set_ir_codes_by_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t name);
-    bool                                   clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
+    ctrlm_irdb_manufacturer_list_t       get_manufacturers(ctrlm_irdb_dev_type_t type, std::string prefix = "");
+    ctrlm_irdb_model_list_t              get_models(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, std::string prefix = "");
+    ctrlm_irdb_ir_entry_id_by_type_t     get_ir_codes_by_autolookup();
+    ctrlm_irdb_ir_entry_id_list_t        get_ir_codes_by_names(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, ctrlm_irdb_model_t model = "");
+    bool                                 set_ir_codes_by_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t name);
+    bool                                 clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
+
+protected:
+    ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len);
+    ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_edid(ctrlm_irdb_dev_type_t &type, unsigned char *edid, size_t edid_len);
+    ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_cec(ctrlm_irdb_dev_type_t &type, std::string osd, unsigned int vendor_id, unsigned int logical_address);
 };
 
 #endif

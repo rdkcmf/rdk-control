@@ -124,7 +124,7 @@
 #define CTRLM_MAIN_IARM_CALL_IR_CODES                            "Main_IRCodes"           ///< IARM Call to retrieve IR Codes based on type, manufacturer, and model
 #define CTRLM_MAIN_IARM_CALL_IR_MANUFACTURERS                    "Main_IRManufacturers"   ///< IARM Call to retrieve list of manufacturers, based on (partial) name
 #define CTRLM_MAIN_IARM_CALL_IR_MODELS                           "Main_IRModels"          ///< IARM Call to retrieve list of models, based on (partial) name
-#define CTRLM_MAIN_IARM_CALL_IR_INFOFRAME                        "Main_InfoFrame"         ///< IARM Call to retrieve IR Codes based on an HDMI InfoFrame 
+#define CTRLM_MAIN_IARM_CALL_IR_AUTO_LOOKUP                      "Main_IRAutoLookup"      ///< IARM Call to retrieve IR Codes based on EDID, Infoframe, and CEC
 #define CTRLM_MAIN_IARM_CALL_IR_SET_CODE                         "Main_IRSetCode"         ///< IARM Call to set an IR Code into a specified BLE remote
 #define CTRLM_MAIN_IARM_CALL_IR_CLEAR_CODE                       "Main_IRClear"           ///< IARM Call to clear all IR Codes from a specified BLE remote
 
@@ -774,10 +774,9 @@ typedef struct {
 typedef struct {
    unsigned char            api_revision;                               ///< Revision of this API
    ctrlm_network_id_t       network_id;                                 ///< IN - Identifier of network
-   char                     infoframe[CTRLM_MAX_PARAM_STR_LEN];         ///< IN - complete manufacturer name
-   char                     response[CTRLM_MAX_IRDB_RESPONSE_STR_LEN];  ///< OUT - list of IR codes matching input HDMI InfoFrame. Formatted in JSON
+   char                     response[CTRLM_MAX_IRDB_RESPONSE_STR_LEN];  ///< OUT - list of IR codes matching connected devices. Formatted in JSON
    ctrlm_iarm_call_result_t result;                                     ///< OUT - return code of the operation
-} ctrlm_iarm_call_IRInfoFrame_params_t;
+} ctrlm_iarm_call_IRAutoLookup_params_t;
 
 typedef struct {
    unsigned char            api_revision;                               ///< Revision of this API

@@ -20,6 +20,52 @@
 #include "ctrlm_irdb.h"
 #include "ctrlm_network.h"
 #include <algorithm>
+#include "ctrlm_utils.h"
+
+class ctrlm_irdb_code_rank_t {
+public:
+    std::string tv_code;
+    int         tv_rank;
+    std::string avr_code;
+    int         avr_rank;
+
+    ctrlm_irdb_code_rank_t() {
+        this->tv_code  = "";
+        this->tv_rank  = -1;
+        this->avr_code = "";
+        this->avr_rank = -1;
+    }
+
+    void update(ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t code, int rank) {
+        switch(type) {
+            case CTRLM_IRDB_DEV_TYPE_TV: {
+                if(rank > this->tv_rank) {
+                    this->tv_rank = rank;
+                    this->tv_code = code;
+                }
+                // Sanity log
+                if(code != this->tv_code) {
+                    IRDB_LOG_WARN("%s: Multiple TV codes! Keeping existing code.\n", __FUNCTION__);
+                }
+                break;
+            }
+            case CTRLM_IRDB_DEV_TYPE_AVR: {
+                if(rank > this->avr_rank) {
+                    this->avr_rank = rank;
+                    this->avr_code = code;
+                }
+                // Sanity log
+                if(code != this->avr_code) {
+                    IRDB_LOG_WARN("%s: Multiple AVR codes! Keeping existing code.\n", __FUNCTION__);
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+};
 
 ctrlm_irdb_ir_code_set_t::ctrlm_irdb_ir_code_set_t(ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t id) {
    type_ = type;
@@ -53,6 +99,98 @@ ctrlm_irdb_t::~ctrlm_irdb_t() {
         delete this->ipc;
         this->ipc = NULL;
     }
+}
+
+ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_t::get_ir_codes_by_autolookup() {
+    ctrlm_irdb_ir_entry_id_by_type_t ret; // std::map initialization handled by default constructor
+    ctrlm_irdb_code_rank_t final_codes;
+    LOG_INFO("%s\n", __FUNCTION__);
+
+#if   defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
+    // Check EDID data
+    std::vector<uint8_t> edid;
+    this->display_settings.get_edid(edid);
+    if(edid.size() > 0) {
+        ctrlm_irdb_dev_type_t type = CTRLM_IRDB_DEV_TYPE_INVALID;
+        auto ir_codes = this->get_ir_codes_by_edid(type, edid.data(), edid.size());
+        if(type != CTRLM_IRDB_DEV_TYPE_INVALID) {
+            if(ir_codes.size() > 0) {
+                for(const auto &itr : ir_codes) {
+                    final_codes.update(type, itr.first, itr.second);
+                }
+            } else {
+                IRDB_LOG_WARN("%s: 0 codes for edid data\n", __FUNCTION__);
+            }
+        } else {
+            IRDB_LOG_ERROR("%s: edid dev type invalid\n", __FUNCTION__);
+        }
+    } else {
+        IRDB_LOG_INFO("%s: No EDID data\n", __FUNCTION__);
+    }
+    // Check CEC data
+    // TODO when CEC Plugin is available
+
+
+#elif defined(PLATFORM_TV) && defined(CTRLM_THUNDER)
+    // Check Infoframe data
+    std::map<int, std::vector<uint8_t> > infoframes;
+    this->hdmi_input.get_infoframes(infoframes);
+    for(auto &itr : infoframes) {
+        if(itr.second.size() > 0) {
+            ctrlm_irdb_dev_type_t type = CTRLM_IRDB_DEV_TYPE_INVALID;
+            auto ir_codes = this->get_ir_codes_by_infoframe(type, itr.second.data(), itr.second.size());
+            if(type != CTRLM_IRDB_DEV_TYPE_INVALID) {
+                if(ir_codes.size() > 0) {
+                    for(const auto &itr : ir_codes) {
+                        final_codes.update(type, itr.first, itr.second);
+                    }
+                } else {
+                    IRDB_LOG_WARN("%s: no code for port %d infoframe\n", __FUNCTION__, itr.first);
+                }
+            } else {
+                IRDB_LOG_WARN("%s: port %d infoframe dev type invalid\n", __FUNCTION__, itr.first);
+            }
+        } else {
+            IRDB_LOG_INFO("%s: no infoframe for port %d\n", __FUNCTION__, itr.first);
+        }
+    }
+    // Check CEC data
+    std::vector<Thunder::CECSink::cec_device_t> cec_devices;
+    this->cec_sink.get_cec_devices(cec_devices);
+    if(cec_devices.size() > 0) {
+        for(auto &itr : cec_devices) {
+            ctrlm_irdb_dev_type_t type = CTRLM_IRDB_DEV_TYPE_INVALID;
+            auto ir_codes = this->get_ir_codes_by_cec(type, itr.osd, (unsigned int)itr.vendor_id, itr.logical_address);
+            if(type != CTRLM_IRDB_DEV_TYPE_INVALID) {
+                if(ir_codes.size() > 0) {
+                    for(const auto &itr : ir_codes) {
+                        final_codes.update(type, itr.first, itr.second);
+                    }
+                } else {
+                    IRDB_LOG_WARN("%s: no code for cec device\n", __FUNCTION__);
+                }
+            } else {
+                IRDB_LOG_WARN("%s: cec dev type invalid\n", __FUNCTION__);
+            }
+        }
+    } else {
+        IRDB_LOG_INFO("%s: No CEC device data\n", __FUNCTION__);
+    }
+
+
+#endif
+
+    if(!final_codes.tv_code.empty()) {
+        ret[CTRLM_IRDB_DEV_TYPE_TV]  = final_codes.tv_code;
+    }
+    if(!final_codes.avr_code.empty()) {
+        ret[CTRLM_IRDB_DEV_TYPE_AVR] = final_codes.avr_code;
+    }
+    return(ret);
+}
+
+bool ctrlm_irdb_t::can_get_ir_codes_by_autolookup() { 
+    return(false);
 }
 
 bool ctrlm_irdb_t::_set_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_ir_code_set_t &ir_codes) {

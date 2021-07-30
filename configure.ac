@@ -190,6 +190,16 @@ AM_CONDITIONAL([IRDB_MODE_HYBRID],  [test x$irdb_mode = xhybrid])
 AM_CONDITIONAL([IRDB_MODE_OFFLINE], [test x$irdb_mode = xoffline])
 AM_CONDITIONAL([IRDB_MODE_ONLINE],  [test x$irdb_mode = xonline])
 
+AC_ARG_ENABLE([platform],
+[  --enable-platform    Turn on platform support],
+[case "${enableval}" in
+  stb) platform=stb ;;
+  tv)  platform=tv ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-platform]) ;;
+esac],[platform=false])
+AM_CONDITIONAL([PLATFORM_STB], [test x$platform = xstb])
+AM_CONDITIONAL([PLATFORM_TV],  [test x$platform = xtv])
+
 AC_ARG_ENABLE([breakpad],
 [  --enable-breakpad    Turn on breakpad support],
 [case "${enableval}" in

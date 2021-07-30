@@ -38,8 +38,8 @@ protected:
 
     static IARM_Result_t get_manufacturers(void *arg);
     static IARM_Result_t get_models(void *arg);
-    static IARM_Result_t get_ir_codes_by_infoframe(void *arg);
     static IARM_Result_t get_ir_codes_by_names(void *arg);
+    static IARM_Result_t get_ir_codes_by_auto_lookup(void *arg);
     static IARM_Result_t set_ir_codes_by_name(void *arg);
     static IARM_Result_t clear_ir_codes(void *arg);
 };
