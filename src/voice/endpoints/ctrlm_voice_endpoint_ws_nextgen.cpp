@@ -23,12 +23,12 @@
 
 // Structures
 typedef struct {
-    sem_t                       *semaphore;
+    sem_t                        *semaphore;
     uuid_t                       uuid;
     xrsr_src_t                   src;
     xrsr_session_configuration_t *configuration;
     void                         *stream_params;
-    rdkx_timestamp_t              timestamp;
+    rdkx_timestamp_t             timestamp;
 } ctrlm_voice_session_begin_cb_ws_nextgen_t;
 
 // Timestamps and stats are not pointers to avoid corruption

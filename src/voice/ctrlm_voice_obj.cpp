@@ -102,6 +102,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->endpoint_current                = NULL;
     this->end_reason                      = CTRLM_VOICE_SESSION_END_REASON_DONE;
     this->keyword_verified                = false;
+    this->is_session_by_text              = false;
 
     voice_session_info_reset();
 
@@ -914,7 +915,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
                                                                        ctrlm_voice_device_t device_type, ctrlm_voice_format_t format,
                                                                        voice_session_req_stream_params *stream_params,
                                                                        const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status,
-                                                                       ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe) {
+                                                                       ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe, const char *transcription_in) {
     if(CTRLM_VOICE_STATE_SRC_INVALID == this->state_src) {
         LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
         this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_SERVER_NOT_READY);
@@ -948,6 +949,15 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
     }
 
+    bool l_session_by_text = (transcription_in != NULL);
+    if (l_session_by_text) {
+        LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, transcription_in);
+        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), transcription_in)) {
+            LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
+            return VOICE_SESSION_RESPONSE_BUSY;
+        }
+    }
+
     ctrlm_hal_input_params_t hal_input_params;
     hal_input_params.device                   = voice_device_to_hal(device_type);
     hal_input_params.fd                       = -1;
@@ -959,32 +969,36 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
 
     ctrlm_hal_input_object_t hal_input_object = NULL;
     int fds[2] = { -1, -1 };
-    if (false == use_external_data_pipe) {
-        errno = 0;
-        if(pipe(fds) < 0) {
-            int errsv = errno;
-            LOG_ERROR("%s: Failed to create pipe <%s>\n", __FUNCTION__, strerror(errsv));
-            this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_FAILURE);
-            return(VOICE_SESSION_RESPONSE_FAILURE);
-        } // set to non-blocking
-        hal_input_params.fd = fds[PIPE_READ];
-        
-        // request the xraudio session and begin
-        hal_input_object = ctrlm_xraudio_hal_input_open(&hal_input_params);
-    } else {
-        // only request the xraudio session, need to begin it later manually
-        hal_input_object = ctrlm_xraudio_hal_input_session_req(&hal_input_params);
-    }
-    if(hal_input_object == NULL) {
-        LOG_ERROR("%s: Failed to acquire voice session\n", __FUNCTION__);
-        this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_BUSY);
+
+    if (!l_session_by_text) {
         if (false == use_external_data_pipe) {
-            close(fds[PIPE_WRITE]);
-            close(fds[PIPE_READ]);
+            errno = 0;
+            if(pipe(fds) < 0) {
+                int errsv = errno;
+                LOG_ERROR("%s: Failed to create pipe <%s>\n", __FUNCTION__, strerror(errsv));
+                this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_FAILURE);
+                return(VOICE_SESSION_RESPONSE_FAILURE);
+            } // set to non-blocking
+            hal_input_params.fd = fds[PIPE_READ];
+
+            // request the xraudio session and begin
+            hal_input_object = ctrlm_xraudio_hal_input_open(&hal_input_params);
+        } else {
+            // only request the xraudio session, need to begin it later manually
+            hal_input_object = ctrlm_xraudio_hal_input_session_req(&hal_input_params);
         }
-        return(VOICE_SESSION_RESPONSE_BUSY);
+        if(hal_input_object == NULL) {
+            LOG_ERROR("%s: Failed to acquire voice session\n", __FUNCTION__);
+            this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_BUSY);
+            if (false == use_external_data_pipe) {
+                close(fds[PIPE_WRITE]);
+                close(fds[PIPE_READ]);
+            }
+            return(VOICE_SESSION_RESPONSE_BUSY);
+        }
     }
 
+    this->is_session_by_text        = l_session_by_text;
     this->hal_input_object          = hal_input_object;
     this->state_src                 = CTRLM_VOICE_STATE_SRC_STREAMING;
     this->state_dst                 = CTRLM_VOICE_STATE_DST_REQUESTED;
@@ -1022,11 +1036,13 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     this->voice_status_set();
     this->last_cmd_id           = 0;
 
-    // Start packet timeout
-    if(this->network_type == CTRLM_NETWORK_TYPE_IP) {
-        this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
-    } else {
-        this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_initial, ctrlm_voice_packet_timeout, NULL);
+    // Start packet timeout, but not if this is a voice session by text
+    if (!this->is_session_by_text) {
+        if(this->network_type == CTRLM_NETWORK_TYPE_IP) {
+            this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
+        } else {
+            this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_initial, ctrlm_voice_packet_timeout, NULL);
+        }
     }
     if(timestamp != NULL) {
        this->session_timing.ctrl_request = *timestamp;
@@ -1147,7 +1163,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
         LOG_ERROR("%s: Data from wrong controller, ignoring\n", __FUNCTION__);
         return(false); 
     }
-    if(this->hal_input_object != NULL) {
+    if(this->hal_input_object != NULL && !this->is_session_by_text) {
         if (false == ctrlm_xraudio_hal_input_set_ctrlm_data_read_cb(this->hal_input_object, ctrlm_voice_data_post_processing_cb, (void*)this)) {
             LOG_ERROR("%s: Failed setting post data read callback to ctrlm\n", __FUNCTION__);
             return(false); 
@@ -1279,12 +1295,13 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_end, &end, sizeof(end), NULL, this->network_id);
 
     this->end_reason = reason;
-    LOG_DEBUG("%s,%d: session_active_server = <%d>, session_active_controller = <%d>\n", __FUNCTION__, __LINE__, session_active_server, session_active_controller);
 
     // clear session_active_controller for controllers that don't support voice command status
     if(!this->controller_command_status) {
        this->session_active_controller = false;
     }
+
+    LOG_DEBUG("%s,%d: session_active_server = <%d>, session_active_controller = <%d>\n", __FUNCTION__, __LINE__, session_active_server, session_active_controller);
 
     // Update source state
     if(this->session_active_controller) {
@@ -1714,9 +1731,15 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
     }
 
     if(this->state_dst != CTRLM_VOICE_STATE_DST_REQUESTED) {
-       LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
+        LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
     }
     this->state_dst = CTRLM_VOICE_STATE_DST_OPENED;
+
+
+    if (this->is_session_by_text) {
+        LOG_WARN("%s: Ending voice session immediately because this is a text-only session\n", __FUNCTION__);
+        this->voice_session_end(this->network_id, this->controller_id, CTRLM_VOICE_SESSION_END_REASON_DONE);
+    }
 }
 
 void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *session_end) {
@@ -2139,6 +2162,29 @@ ctrlm_voice_device_t xrsr_to_voice_device(xrsr_src_t device) {
         }
         case XRSR_SRC_MICROPHONE: {
             ret = CTRLM_VOICE_DEVICE_MICROPHONE;
+            break;
+        }
+        default: {
+            LOG_ERROR("%s: unrecognized device type %d\n", __FUNCTION__, device);
+            break;
+        }
+    }
+    return(ret);
+}
+
+xrsr_src_t voice_device_to_xrsr(ctrlm_voice_device_t device) {
+    xrsr_src_t ret = XRSR_SRC_INVALID;
+    switch(device) {
+        case CTRLM_VOICE_DEVICE_PTT: {
+            ret = XRSR_SRC_RCU_PTT;
+            break;
+        }
+        case CTRLM_VOICE_DEVICE_FF: {
+            ret = XRSR_SRC_RCU_FF;
+            break;
+        }
+        case CTRLM_VOICE_DEVICE_MICROPHONE: {
+            ret = XRSR_SRC_MICROPHONE;
             break;
         }
         default: {

@@ -38,14 +38,15 @@
 /// @brief Constant Defintions
 /// @details The Control Manager provides definitions for constant values.
 
-#define CTRLM_VOICE_IARM_CALL_UPDATE_SETTINGS      "Voice_UpdateSettings" ///< IARM Call to update settings
-#define CTRLM_VOICE_IARM_CALL_SESSION_BEGIN        "Voice_SessionBegin"   ///< starts a voice streaming session
-#define CTRLM_VOICE_IARM_CALL_SESSION_END          "Voice_SessionEnd"     ///< ends a voice streaming session
+#define CTRLM_VOICE_IARM_CALL_UPDATE_SETTINGS      "Voice_UpdateSettings"     ///< IARM Call to update settings
+#define CTRLM_VOICE_IARM_CALL_SESSION_BEGIN        "Voice_SessionBegin"       ///< starts a voice streaming session
+#define CTRLM_VOICE_IARM_CALL_SESSION_END          "Voice_SessionEnd"         ///< ends a voice streaming session
 
-#define CTRLM_VOICE_IARM_CALL_STATUS               "Voice_Status"           ///< IARM Call to get status
-#define CTRLM_VOICE_IARM_CALL_CONFIGURE_VOICE      "Voice_ConfigureVoice"   ///< IARM Call to set up voice with JSON payload
-#define CTRLM_VOICE_IARM_CALL_SET_VOICE_INIT       "Voice_SetVoiceInit"     ///< IARM Call to set application data with JSON payload in the voice server init message
-#define CTRLM_VOICE_IARM_CALL_SEND_VOICE_MESSAGE   "Voice_SendVoiceMessage" ///< IARM Call to send JSON payload to voice server
+#define CTRLM_VOICE_IARM_CALL_STATUS               "Voice_Status"             ///< IARM Call to get status
+#define CTRLM_VOICE_IARM_CALL_CONFIGURE_VOICE      "Voice_ConfigureVoice"     ///< IARM Call to set up voice with JSON payload
+#define CTRLM_VOICE_IARM_CALL_SET_VOICE_INIT       "Voice_SetVoiceInit"       ///< IARM Call to set application data with JSON payload in the voice server init message
+#define CTRLM_VOICE_IARM_CALL_SEND_VOICE_MESSAGE   "Voice_SendVoiceMessage"   ///< IARM Call to send JSON payload to voice server
+#define CTRLM_VOICE_IARM_CALL_SESSION_BY_TEXT      "Voice_SessionByText"      ///< IARM Call to start a voice session with text input (no audio data will be streamed)
 
 #define CTRLM_VOICE_IARM_CALL_RESULT_LEN_MAX       (2048) ///< IARM Call result length
 

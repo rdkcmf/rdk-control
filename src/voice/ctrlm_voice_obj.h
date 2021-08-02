@@ -328,7 +328,7 @@ class ctrlm_voice_t {
     ctrlm_voice_t();
     virtual ~ctrlm_voice_t();
 
-    ctrlm_voice_session_response_status_t voice_session_req(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_device_t device_type, ctrlm_voice_format_t format, voice_session_req_stream_params *stream_params, const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status=false, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_rsp_confirm_t *cb_confirm=NULL, void **cb_confirm_param=NULL, bool use_external_data_pipe=false);
+    ctrlm_voice_session_response_status_t voice_session_req(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_device_t device_type, ctrlm_voice_format_t format, voice_session_req_stream_params *stream_params, const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status=false, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_rsp_confirm_t *cb_confirm=NULL, void **cb_confirm_param=NULL, bool use_external_data_pipe=false, const char *transcription_in=NULL);
     void                                  voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp=NULL);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd);
@@ -488,6 +488,7 @@ public:
     uuid_t                   uuid;
     std::string              message;
     std::string              transcription;
+
     ctrlm_main_queue_msg_voice_command_status_t status;
     uint8_t                  last_cmd_id; // Needed for ADPCM over RF4CE, since duplicate packets are possible
     uint32_t                 packets_processed;
@@ -499,6 +500,8 @@ public:
 
     bool                     session_active_server;
     bool                     session_active_controller;
+
+    bool                     is_session_by_text;
 
     ctrlm_voice_session_timing_t session_timing;
 
@@ -539,6 +542,7 @@ const char *ctrlm_voice_audio_timing_str(ctrlm_voice_audio_timing_t timing);
 ctrlm_hal_input_device_t voice_device_to_hal(ctrlm_voice_device_t device);
 xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format);
 ctrlm_voice_device_t xrsr_to_voice_device(xrsr_src_t device);
+xrsr_src_t voice_device_to_xrsr(ctrlm_voice_device_t device);
 void ctrlm_voice_xrsr_session_capture_start(ctrlm_main_queue_msg_audio_capture_start_t *capture_start);
 void ctrlm_voice_xrsr_session_capture_stop(void);
 
