@@ -34,9 +34,13 @@
 #include "ctrlm_voice_ipc.h"
 #include "xrsr.h"
 
+#ifdef BEEP_ON_KWD_ENABLED
+#include "ctrlm_thunder_plugin_system_audio_player.h"
+#endif
+
 #define VOICE_SESSION_REQ_DATA_LEN_MAX (33)
 
-#define CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER    {(ctrlm_voice_audio_mode_t)JSON_INT_VALUE_VOICE_AUDIO_MODE, (ctrlm_voice_audio_timing_t)JSON_INT_VALUE_VOICE_AUDIO_TIMING, JSON_FLOAT_VALUE_VOICE_AUDIO_CONFIDENCE_THRESHOLD, (ctrlm_voice_audio_ducking_type_t)JSON_INT_VALUE_VOICE_AUDIO_DUCKING_TYPE, JSON_FLOAT_VALUE_VOICE_AUDIO_DUCKING_LEVEL}
+#define CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER    {(ctrlm_voice_audio_mode_t)JSON_INT_VALUE_VOICE_AUDIO_MODE, (ctrlm_voice_audio_timing_t)JSON_INT_VALUE_VOICE_AUDIO_TIMING, JSON_FLOAT_VALUE_VOICE_AUDIO_CONFIDENCE_THRESHOLD, (ctrlm_voice_audio_ducking_type_t)JSON_INT_VALUE_VOICE_AUDIO_DUCKING_TYPE, JSON_FLOAT_VALUE_VOICE_AUDIO_DUCKING_LEVEL, JSON_BOOL_VALUE_VOICE_AUDIO_DUCKING_BEEP}
 typedef enum {
    CTRLM_VOICE_AUDIO_MODE_OFF             = 0,
    CTRLM_VOICE_AUDIO_MODE_MUTING          = 1,
@@ -64,6 +68,7 @@ typedef struct {
    ctrlm_voice_audio_confidence_threshold_t confidence_threshold;
    ctrlm_voice_audio_ducking_type_t         ducking_type;
    ctrlm_voice_audio_ducking_level_t        ducking_level;
+   bool                                     ducking_beep;
 } ctrlm_voice_audio_settings_t;
 
 typedef enum {
@@ -320,6 +325,7 @@ typedef struct {
    std::string urlPtt;
    std::string urlHf;
    ctrlm_voice_device_status_t status[CTRLM_VOICE_DEVICE_INVALID];
+   bool wwFeedback;
 } ctrlm_voice_status_t;
 
 typedef void (*ctrlm_voice_session_rsp_confirm_t)(bool result, ctrlm_timestamp_t *timestamp, void *user_data);
@@ -400,6 +406,9 @@ protected:
     // Static Callbacks
     static int ctrlm_voice_packet_timeout(void *data);
     static int ctrlm_voice_controller_command_status_read_timeout(void *data);
+    #ifdef BEEP_ON_KWD_ENABLED
+    static int ctrlm_voice_keyword_beep_end_timeout(void *data);
+    #endif
     // End Static Callbacks
 
     // Event Interface
@@ -422,6 +431,12 @@ public:
     virtual void                  voice_power_state_change(ctrlm_power_state_t power_state);
     #ifdef ENABLE_DEEP_SLEEP
     virtual void                  voice_standby_session_request(void);
+    #endif
+    virtual void                  voice_keyword_verified_action(void);
+    #ifdef BEEP_ON_KWD_ENABLED
+    virtual void                  voice_keyword_beep_completed_normal(void *data, int size);
+    virtual void                  voice_keyword_beep_completed_error(void *data, int size);
+    virtual void                  voice_keyword_beep_completed_callback(bool timeout, bool playback_error);
     #endif
     // End Event Interface
 
@@ -483,6 +498,12 @@ public:
     bool                     xrsr_opened;
     ctrlm_voice_ipc_t       *voice_ipc;
 
+    #ifdef BEEP_ON_KWD_ENABLED
+    Thunder::SystemAudioPlayer::ctrlm_thunder_plugin_system_audio_player_t obj_sap;
+    bool                                                                   sap_opened;
+    ctrlm_timestamp_t                                                      sap_play_timestamp;
+    #endif
+
     // Current Session Data
     ctrlm_hal_input_object_t hal_input_object;
     int                      audio_pipe[2];
@@ -516,6 +537,8 @@ public:
     ctrlm_voice_audio_ducking_type_t         audio_ducking_type;
     ctrlm_voice_audio_ducking_level_t        audio_ducking_level;
     ctrlm_voice_audio_confidence_threshold_t audio_confidence_threshold;
+    bool                                     audio_ducking_beep_enabled;
+    bool                                     audio_ducking_beep_in_progress;
 
     ctrlm_voice_ipc_event_common_t ipc_common_data;
 
@@ -523,6 +546,7 @@ public:
     // Timeout tags
     unsigned int             timeout_packet_tag;
     unsigned int             timeout_ctrl_cmd_status_read;
+    unsigned int             timeout_keyword_beep;
     // End Timeout tags
 
     ctrlm_voice_session_end_reason_t end_reason;

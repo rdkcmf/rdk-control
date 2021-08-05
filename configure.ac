@@ -168,6 +168,12 @@ AC_ARG_ENABLE([voice-nextgen-mac],
 [voice_nextgen_mac=false])
 AM_CONDITIONAL([VOICE_NEXTGEN_MAC], [test x$voice_nextgen_mac = xtrue])
 
+AC_ARG_ENABLE([voice-keyword-beep],
+[  --enable-voice-keyword-beep    Enable audible feedback on keyword detect/verification],
+[voice_keyword_beep=true],
+[voice_keyword_beep=false])
+AM_CONDITIONAL([VOICE_KEYWORD_BEEP], [test x$voice_keyword_beep = xtrue])
+
 AC_ARG_ENABLE([irdb],
 [  --enable-irdb    Turn on IRDB support],
 [case "${enableval}" in

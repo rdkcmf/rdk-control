@@ -42,6 +42,7 @@
 #define JSON_STATUS                                   "status"
 #define JSON_URL_PTT                                  "urlPtt"
 #define JSON_URL_HF                                   "urlHf"
+#define JSON_WW_FEEDBACK                              "wwFeedback"
 #define JSON_MESSAGE                                  "message"
 #define JSON_STREAM_END_REASON                        "reason"
 #define JSON_SESSION_END_RESULT                       "result"
@@ -406,6 +407,7 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::status(void *data) {
 
             rc |= json_object_set_new_nocheck(obj, JSON_URL_PTT, json_string(status.urlPtt.c_str()));
             rc |= json_object_set_new_nocheck(obj, JSON_URL_HF, json_string(status.urlHf.c_str()));
+            rc |= json_object_set_new_nocheck(obj, JSON_WW_FEEDBACK, status.wwFeedback ? json_true() : json_false());
             rc |= json_object_set_new_nocheck(obj, JSON_THUNDER_RESULT, json_true());
 
             if(rc) {

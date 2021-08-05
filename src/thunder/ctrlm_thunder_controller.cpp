@@ -191,7 +191,8 @@ void ctrlm_thunder_controller_t::remove_ready_handler(thunder_ready_handler_t ha
 }
 
 std::string ctrlm_thunder_controller_t::get_security_token() {
-    std::string sToken;
+    std::string sToken = "";
+#ifdef THUNDER_SECURITY
     FILE *pSecurity = v_secure_popen("r", "/usr/bin/WPEFrameworkSecurityUtility");
     if(pSecurity) {
         JsonObject pSecurityJson;
@@ -212,6 +213,7 @@ std::string ctrlm_thunder_controller_t::get_security_token() {
     } else {
         THUNDER_LOG_ERROR("%s: Failed to open security utility\n", __FUNCTION__);
     }
+#endif
    return sToken;
 }
 

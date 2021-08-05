@@ -3429,3 +3429,17 @@ void ctrlm_db_voice_write_device_status(int device, int status) {
    db_entry << "device_status_" << device;
    ctrlm_db_write_uint64(CTRLM_DB_TABLE_VOICE, db_entry.str().c_str(), status);
 }
+
+void ctrlm_db_voice_read_audio_ducking_beep_enable(bool &enable) {
+   sqlite_uint64 data;
+   if (0 > ctrlm_db_read_uint64(CTRLM_DB_TABLE_VOICE, "audio_ducking_beep_enable", &data)) {
+      LOG_WARN("%s: Failed to load audio_ducking_beep_enable from db\n", __FUNCTION__);
+   } else {
+      enable = (data ? true : false);
+   }
+}
+
+void ctrlm_db_voice_write_audio_ducking_beep_enable(bool enable) {
+   ctrlm_db_write_uint64(CTRLM_DB_TABLE_VOICE, "audio_ducking_beep_enable", (guint64) (enable ? 1 : 0));
+}
+

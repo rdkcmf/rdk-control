@@ -122,6 +122,11 @@ controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin.cpp    \
                        thunder/plugins/ctrlm_thunder_plugin_cec_sink.cpp
 endif
 
+if VOICE_KEYWORD_BEEP
+controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin_system_audio_player.cpp
+AM_CPPFLAGS += -DBEEP_ON_KWD_ENABLED
+endif
+
 if CPC_ENABLED
 AM_CPPFLAGS += -DCPC_ENABLED
 AM_CPPFLAGS += -I$(top_srcdir)/cpc/plugins

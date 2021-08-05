@@ -50,9 +50,14 @@
 #define CTRLM_VOICE_LANGUAGE        "eng"
 
 #define CTRLM_CONTROLLER_CMD_STATUS_READ_TIMEOUT (10000)
+#define CTRLM_VOICE_KEYWORD_BEEP_TIMEOUT         ( 1500)
 
 static void ctrlm_voice_session_response_confirm(bool result, ctrlm_timestamp_t *timestamp, void *user_data);
 static void ctrlm_voice_data_post_processing_cb (ctrlm_hal_data_cb_params_t *param);
+
+#ifdef BEEP_ON_KWD_ENABLED
+static void ctrlm_voice_system_audio_player_event_handler(system_audio_player_event_t event, void *user_data);
+#endif
 
 // Application Interface Implementation
 ctrlm_voice_t::ctrlm_voice_t() {
@@ -70,6 +75,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->audio_sent_samples              =  0;
     this->timeout_packet_tag              =  0;
     this->timeout_ctrl_cmd_status_read    =  0;
+    this->timeout_keyword_beep            =  0;
     this->session_id                      =  0;
     this->software_version                = "N/A";
     this->prefs.server_url_vrex_src_ptt   = JSON_STR_VALUE_VOICE_URL_SRC_PTT;
@@ -147,6 +153,14 @@ ctrlm_voice_t::ctrlm_voice_t() {
     // These semaphores are used to make sure we have all the data before calling the session begin callback
     sem_init(&this->vsr_semaphore, 0, 0);
 
+    #ifdef BEEP_ON_KWD_ENABLED
+    this->obj_sap.add_event_handler(ctrlm_voice_system_audio_player_event_handler, this);
+    this->sap_opened = this->obj_sap.open(SYSTEM_AUDIO_PLAYER_AUDIO_TYPE_WAV, SYSTEM_AUDIO_PLAYER_SOURCE_TYPE_FILE, SYSTEM_AUDIO_PLAYER_PLAY_MODE_SYSTEM);
+    if(!this->sap_opened) {
+       LOG_WARN("%s: unable to open system audio player\n", __FUNCTION__);
+    }
+    #endif
+
     // Set audio mode to default
     ctrlm_voice_audio_settings_t settings = CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER;
     this->set_audio_mode(&settings);
@@ -172,6 +186,16 @@ ctrlm_voice_t::~ctrlm_voice_t() {
         close(audio_pipe[PIPE_WRITE]);
         audio_pipe[PIPE_WRITE] = -1;
     }
+
+    #ifdef BEEP_ON_KWD_ENABLED
+    if(this->sap_opened) {
+        if(!this->obj_sap.close()) {
+            LOG_WARN("%s: unable to close system audio player\n", __FUNCTION__);
+        }
+        this->sap_opened = false;
+    }
+    #endif
+
     /* Close Voice SDK */
 }
 
@@ -241,9 +265,10 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
     std::string                       init;
 
     LOG_INFO("%s: Configuring voice\n", __FUNCTION__);
+    ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level, this->audio_ducking_beep_enabled};
+
     if (conf.config_object_set(obj_voice)){
         bool enabled = true;
-        ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level};
 
         conf.config_value_get(JSON_BOOL_NAME_VOICE_ENABLE,                      enabled);
         conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_vrex_src_ptt);
@@ -274,6 +299,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, audio_settings.confidence_threshold, 0.0, 1.0);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_DUCKING_TYPE,           audio_settings.ducking_type, CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE, CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE);
         conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_DUCKING_LEVEL,        audio_settings.ducking_level, 0.0, 1.0);
+        conf.config_value_get(JSON_BOOL_NAME_VOICE_AUDIO_DUCKING_BEEP,          audio_settings.ducking_beep);
 
         #ifdef ENABLE_DEEP_SLEEP
         conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.standby_params.connect_check_interval);
@@ -294,7 +320,6 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
             }
             sem_post(&this->device_status_semaphore);
         }
-        this->set_audio_mode(&audio_settings);
     }
 
     // Get voice settings
@@ -328,6 +353,8 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
             }
         }
         ctrlm_db_voice_read_init_blob(init);
+        ctrlm_db_voice_read_audio_ducking_beep_enable(this->audio_ducking_beep_enabled);
+        audio_settings.ducking_beep = this->audio_ducking_beep_enabled;
     } else {
         LOG_WARN("%s: Reading voice settings from old style DB\n", __FUNCTION__);
         ctrlm_db_voice_settings_read((guchar **)&voice_settings, &voice_settings_len);
@@ -339,7 +366,9 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
             this->voice_configure(voice_settings, true); // We want to write this to the database now, as this now writes to the new style DB
             free(voice_settings);
         }
-     }
+    }
+
+    this->set_audio_mode(&audio_settings);
 
     this->process_xconf(&json_obj_vsdk);
 
@@ -575,6 +604,14 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
                 sem_post(&this->device_status_semaphore);
             }
         }
+        if(conf.config_value_get("wwFeedback", enable)) { // This option will enable / disable the Wake Word feedback (typically an audible beep).
+           LOG_INFO("%s: Voice Control kwd feedback is <%s>\n", __FUNCTION__, enable ? "ENABLED" : "DISABLED");
+           this->audio_ducking_beep_enabled = enable;
+
+           if(db_write) {
+              ctrlm_db_voice_write_audio_ducking_beep_enable(enable);
+           }
+        }
         if(update_routes && this->xrsr_opened) {
             this->voice_sdk_update_routes();
             if(db_write) {
@@ -606,6 +643,7 @@ bool ctrlm_voice_t::voice_status(ctrlm_voice_status_t *status) {
         for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
             status->status[i] = this->device_status[i];
         }
+        status->wwFeedback = this->audio_ducking_beep_enabled;
         sem_post(&this->device_status_semaphore);
         ret = true;
     }
@@ -653,7 +691,7 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
       LOG_INFO("%s: opus encoder params <%s>\n", __FUNCTION__, this->prefs.opus_encoder_params_str.c_str());
    }
 
-   ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level};
+   ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level, this->audio_ducking_beep_enabled};
    bool changed = false;
 
    result = ctrlm_tr181_int_get(CTRLM_TR181_VOICE_PARAMS_AUDIO_MODE, (int*)&audio_settings.mode);
@@ -676,6 +714,8 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
        changed = true;
    }
+
+   // CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_BEEP doesn't exist because this is a user configurable setting via configureVoice thunder api
 
    int keyword_sensitivity = 0;
    result = ctrlm_tr181_int_get(CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY, &keyword_sensitivity);
@@ -1723,7 +1763,7 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
         if(this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_VSR || 
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_CONFIDENCE && this->confidence >= this->audio_confidence_threshold) ||
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_DUAL_SENSITIVITY && this->dual_sensitivity_immediate)) {
-            this->audio_state_set(true);
+            this->voice_keyword_verified_action();
         } else { // Await keyword verification
             kw_verification_required = true;
         }
@@ -2036,12 +2076,93 @@ void ctrlm_voice_t::voice_action_keyword_verification_callback(bool success, rdk
         if(this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_CLOUD || 
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_CONFIDENCE && this->confidence < this->audio_confidence_threshold) ||
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_DUAL_SENSITIVITY && !this->dual_sensitivity_immediate)) {
-            this->audio_state_set(true);
+            this->voice_keyword_verified_action();
         }
     }
 
     this->keyword_verified = success;
 }
+
+void ctrlm_voice_t::voice_keyword_verified_action(void) {
+   #ifdef BEEP_ON_KWD_ENABLED
+   if(this->audio_ducking_beep_enabled) { // play beep audio before ducking audio
+      if(this->audio_ducking_beep_in_progress) {
+         LOG_WARN("%s: audio ducking beep already in progress!\n", __FUNCTION__);
+         this->obj_sap.close();
+         this->audio_ducking_beep_in_progress = false;
+         // remove timeout
+         if(this->timeout_keyword_beep > 0) {
+             g_source_remove(this->timeout_keyword_beep);
+             this->timeout_keyword_beep = 0;
+         }
+      }
+      int8_t retry = 1;
+      do {
+         if(!this->sap_opened) {
+            this->sap_opened = this->obj_sap.open(SYSTEM_AUDIO_PLAYER_AUDIO_TYPE_WAV, SYSTEM_AUDIO_PLAYER_SOURCE_TYPE_FILE, SYSTEM_AUDIO_PLAYER_PLAY_MODE_SYSTEM);
+            if(!this->sap_opened) {
+               LOG_WARN("%s: unable to open system audio player\n", __FUNCTION__);
+               retry--;
+               continue;
+            }
+         }
+
+         if(!this->obj_sap.play("file://" BEEP_ON_KWD_FILE)) {
+            LOG_WARN("%s: unable to play beep file <%s>\n", __FUNCTION__, BEEP_ON_KWD_FILE);
+            if(!this->obj_sap.close()) {
+               LOG_WARN("%s: unable to close system audio player\n", __FUNCTION__);
+            }
+            this->sap_opened = false;
+            retry--;
+            continue;
+         }
+         this->audio_ducking_beep_in_progress = true;
+
+         rdkx_timestamp_get(&this->sap_play_timestamp);
+
+         // start a timer in case playback end event is not received
+         this->timeout_keyword_beep = g_timeout_add(CTRLM_VOICE_KEYWORD_BEEP_TIMEOUT, ctrlm_voice_keyword_beep_end_timeout, NULL);
+         return;
+      } while(retry >= 0);
+   }
+   #endif
+   this->audio_state_set(true);
+}
+
+#ifdef BEEP_ON_KWD_ENABLED
+void ctrlm_voice_t::voice_keyword_beep_completed_normal(void *data, int size) {
+   this->voice_keyword_beep_completed_callback(false, false);
+}
+
+void ctrlm_voice_t::voice_keyword_beep_completed_error(void *data, int size) {
+   this->voice_keyword_beep_completed_callback(false, true);
+}
+
+void ctrlm_voice_t::voice_keyword_beep_completed_callback(bool timeout, bool playback_error) {
+   if(!this->audio_ducking_beep_in_progress) {
+      return;
+   }
+   if(!timeout) { // remove timeout
+      if(this->timeout_keyword_beep > 0) {
+         g_source_remove(this->timeout_keyword_beep);
+         this->timeout_keyword_beep = 0;
+      }
+      if(playback_error) {
+         LOG_ERROR("%s: playback failure\n", __FUNCTION__);
+      }
+   } else {
+      LOG_ERROR("%s: timeout\n", __FUNCTION__);
+   }
+
+   this->audio_ducking_beep_in_progress = false;
+
+   LOG_WARN("%s: duration <%llu> ms dst <%s>\n", __FUNCTION__, rdkx_timestamp_since_ms(this->sap_play_timestamp), ctrlm_voice_state_dst_str(this->state_dst));
+
+   if(this->state_dst >= CTRLM_VOICE_STATE_DST_REQUESTED && this->state_dst <= CTRLM_VOICE_STATE_DST_STREAMING) {
+      this->audio_state_set(true);
+   }
+}
+#endif
 
 void ctrlm_voice_t::voice_session_transcription_callback(const char *transcription) {
     if(transcription) {
@@ -2307,6 +2428,8 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
         this->audio_confidence_threshold = JSON_FLOAT_VALUE_VOICE_AUDIO_CONFIDENCE_THRESHOLD;
     }
 
+    this->audio_ducking_beep_enabled = settings->ducking_beep;
+
     // Print configuration
     std::stringstream ss;
 
@@ -2314,6 +2437,11 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
     if(this->audio_mode == CTRLM_VOICE_AUDIO_MODE_DUCKING) {
         ss << ", Ducking Type < " << ctrlm_voice_audio_ducking_type_str(this->audio_ducking_type) << " >";
         ss << ", Ducking Level < " << this->audio_ducking_level * 100 << "% >";
+        if(this->audio_ducking_beep_enabled) {
+           ss << ", Ducking Beep < ENABLED >";
+        } else {
+           ss << ", Ducking Beep < DISABLED >";
+        }
     }
     if(this->audio_mode != CTRLM_VOICE_AUDIO_MODE_OFF) {
         ss << ", Audio Timing < " << ctrlm_voice_audio_timing_str(this->audio_timing) << " >";
@@ -2344,6 +2472,13 @@ int ctrlm_voice_t::ctrlm_voice_controller_command_status_read_timeout(void *data
     ctrlm_get_voice_obj()->voice_session_controller_command_status_read_timeout();
     return(false);
 }
+
+#ifdef BEEP_ON_KWD_ENABLED
+int ctrlm_voice_t::ctrlm_voice_keyword_beep_end_timeout(void *data) {
+    ctrlm_get_voice_obj()->voice_keyword_beep_completed_callback(true, false);
+    return(false);
+}
+#endif
 
 // Timeouts end
 
@@ -2532,3 +2667,44 @@ bool ctrlm_voice_t::is_standby_microphone(void) {
 
 }
 
+#ifdef BEEP_ON_KWD_ENABLED
+void ctrlm_voice_system_audio_player_event_handler(system_audio_player_event_t event, void *user_data) {
+   if(user_data == NULL) {
+      return;
+   }
+   switch(event) {
+      case SYSTEM_AUDIO_PLAYER_EVENT_PLAYBACK_STARTED: {
+         break;
+      }
+      case SYSTEM_AUDIO_PLAYER_EVENT_PLAYBACK_FINISHED: {
+         // Send event to control manager thread to make this call.
+         ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_t::voice_keyword_beep_completed_normal, NULL, 0, (void *)user_data);
+         break;
+      }
+      case SYSTEM_AUDIO_PLAYER_EVENT_PLAYBACK_PAUSED: {
+         break;
+      }
+      case SYSTEM_AUDIO_PLAYER_EVENT_PLAYBACK_RESUMED: {
+         break;
+      }
+      case SYSTEM_AUDIO_PLAYER_EVENT_NETWORK_ERROR: {
+         LOG_ERROR("%s: SYSTEM_AUDIO_PLAYER_EVENT_NETWORK_ERROR\n", __FUNCTION__);
+         break;
+      }
+      case SYSTEM_AUDIO_PLAYER_EVENT_PLAYBACK_ERROR: {
+         LOG_ERROR("%s: SYSTEM_AUDIO_PLAYER_EVENT_PLAYBACK_ERROR\n", __FUNCTION__);
+         // Send event to control manager thread to make this call.
+         ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_t::voice_keyword_beep_completed_error, NULL, 0, (void *)user_data);
+         break;
+      }
+      case SYSTEM_AUDIO_PLAYER_EVENT_NEED_DATA: {
+         LOG_ERROR("%s: SYSTEM_AUDIO_PLAYER_EVENT_NEED_DATA\n", __FUNCTION__);
+         break;
+      }
+      default: {
+         LOG_ERROR("%s: INVALID EVENT\n", __FUNCTION__);
+         break;
+      }
+   }
+}
+#endif
