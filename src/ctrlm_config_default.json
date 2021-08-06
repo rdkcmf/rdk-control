@@ -147,7 +147,7 @@
                "time_interval"           :  86400000
             },
             "mac" : {
-               "time_interval"           :      3000
+               "time_interval"           :      5000
             }
          },
          "xr19v1" : {
@@ -166,7 +166,7 @@
                "time_interval"           :  86400000
             },
             "mac" : {
-               "time_interval"           :      3000
+               "time_interval"           :      5000
             }
          }
       },
