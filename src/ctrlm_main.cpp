@@ -1035,27 +1035,6 @@ void ctrlm_terminate(void) {
    LOG_INFO("%s: IARM\n", __FUNCTION__);
    ctrlm_main_iarm_terminate();
 
-   LOG_INFO("%s: Recovery\n", __FUNCTION__);
-   ctrlm_recovery_terminate(FALSE);
-
-   LOG_INFO("%s: Validation\n", __FUNCTION__);
-   ctrlm_validation_terminate();
-
-   LOG_INFO("%s: Rcu\n", __FUNCTION__);
-   ctrlm_rcu_terminate();
-
-   LOG_INFO("%s: Voice\n", __FUNCTION__);
-   ctrlm_voice_terminate();
-
-   LOG_INFO("%s: Device Update\n", __FUNCTION__);
-   ctrlm_device_update_terminate();
-
-   LOG_INFO("%s: Networks\n", __FUNCTION__);
-   ctrlm_networks_terminate();
-
-   LOG_INFO("%s: Database\n", __FUNCTION__);
-   ctrlm_db_terminate();
-
    LOG_INFO("%s: Main\n", __FUNCTION__);
    // Now clean up control manager main
    if(g_ctrlm.main_thread != NULL) {
@@ -1084,6 +1063,29 @@ void ctrlm_terminate(void) {
          }
       }
    }
+
+   LOG_INFO("%s: Recovery\n", __FUNCTION__);
+   ctrlm_recovery_terminate(FALSE);
+
+   LOG_INFO("%s: Validation\n", __FUNCTION__);
+   ctrlm_validation_terminate();
+
+   LOG_INFO("%s: Rcu\n", __FUNCTION__);
+   ctrlm_rcu_terminate();
+
+   #ifndef USE_VOICE_SDK
+   LOG_INFO("%s: Voice\n", __FUNCTION__);
+   ctrlm_voice_terminate();
+   #endif
+
+   LOG_INFO("%s: Device Update\n", __FUNCTION__);
+   ctrlm_device_update_terminate();
+
+   LOG_INFO("%s: Networks\n", __FUNCTION__);
+   ctrlm_networks_terminate();
+
+   LOG_INFO("%s: Database\n", __FUNCTION__);
+   ctrlm_db_terminate();
 
    LOG_INFO("%s: IARM\n", __FUNCTION__);
    ctrlm_iarm_terminate();
