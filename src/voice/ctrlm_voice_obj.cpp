@@ -1287,12 +1287,14 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     }
 
     // Update source state
-    if(!this->session_active_server && !this->session_active_controller) {
-        this->state_src = CTRLM_VOICE_STATE_SRC_READY;
-        voice_session_stats_print();
-        voice_session_stats_clear();
-    } else if(this->session_active_controller) {
-        this->state_src = CTRLM_VOICE_STATE_SRC_WAITING;
+    if(this->session_active_controller) {
+       this->state_src = CTRLM_VOICE_STATE_SRC_WAITING;
+    } else {
+       this->state_src = CTRLM_VOICE_STATE_SRC_READY;
+       if(!this->session_active_server) {
+          voice_session_stats_print();
+          voice_session_stats_clear();
+       }
     }
 }
 
