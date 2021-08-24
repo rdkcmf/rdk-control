@@ -108,6 +108,12 @@ AC_ARG_ENABLE([thunder],
 [thunder=false])
 AM_CONDITIONAL([THUNDER_ENABLED], [test x$thunder = xtrue])
 
+AC_ARG_ENABLE([thunder-security],
+[  --enable-thunder-security    Enable thunder security],
+[thunder_security=true],
+[thunder_security=false])
+AM_CONDITIONAL([THUNDER_SECURITY], [test x$thunder_security = xtrue])
+
 AC_ARG_ENABLE([auth],
 [  --enable-auth    Turn on auth service support],
 [case "${enableval}" in

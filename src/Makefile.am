@@ -115,6 +115,9 @@ endif
 
 if THUNDER_ENABLED
 AM_CPPFLAGS += -DCTRLM_THUNDER
+if THUNDER_SECURITY
+AM_CPPFLAGS += -DTHUNDER_SECURITY
+endif
 controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin.cpp    \
                        thunder/ctrlm_thunder_controller.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_display_settings.cpp \
