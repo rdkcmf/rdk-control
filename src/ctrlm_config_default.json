@@ -242,7 +242,13 @@
       "audio_timing"                     :         0,
       "audio_confidence_threshold"       :       0.5,
       "audio_ducking_type"               :         0,
-      "audio_ducking_level"              :       0.5
+      "audio_ducking_level"              :       0.5,
+      "standby_connect_check_interval"   :       200,
+      "standby_timeout_connect"          :     15000,
+      "standby_timeout_inactivity"       :     15000,
+      "standby_timeout_session"          :     15000,
+      "standby_ipv4_fallback"            :      true,
+      "standby_backoff_delay"            :       100
    },
    "device_update" : {
       "dir_root"                         : "/srv/device_update/",

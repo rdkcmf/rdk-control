@@ -104,6 +104,15 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->keyword_verified                = false;
     this->is_session_by_text              = false;
 
+    #ifdef ENABLE_DEEP_SLEEP
+    this->prefs.standby_params.connect_check_interval = JSON_INT_VALUE_VOICE_STANDBY_CONNECT_CHECK_INTERVAL;
+    this->prefs.standby_params.timeout_connect        = JSON_INT_VALUE_VOICE_STANDBY_TIMEOUT_CONNECT;
+    this->prefs.standby_params.timeout_inactivity     = JSON_INT_VALUE_VOICE_STANDBY_TIMEOUT_INACTIVITY;
+    this->prefs.standby_params.timeout_session        = JSON_INT_VALUE_VOICE_STANDBY_TIMEOUT_SESSION;
+    this->prefs.standby_params.ipv4_fallback          = JSON_BOOL_VALUE_VOICE_STANDBY_IPV4_FALLBACK;
+    this->prefs.standby_params.backoff_delay          = JSON_INT_VALUE_VOICE_STANDBY_BACKOFF_DELAY;
+    #endif
+
     voice_session_info_reset();
 
     // Device Status initialization
@@ -265,6 +274,16 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, audio_settings.confidence_threshold, 0.0, 1.0);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_DUCKING_TYPE,           audio_settings.ducking_type, CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE, CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE);
         conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_DUCKING_LEVEL,        audio_settings.ducking_level, 0.0, 1.0);
+
+        #ifdef ENABLE_DEEP_SLEEP
+        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.standby_params.connect_check_interval);
+        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_CONNECT,        this->prefs.standby_params.timeout_connect);
+        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.standby_params.timeout_inactivity);
+        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_SESSION,        this->prefs.standby_params.timeout_session);
+        conf.config_value_get(JSON_BOOL_NAME_VOICE_STANDBY_IPV4_FALLBACK,         this->prefs.standby_params.ipv4_fallback);
+        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_BACKOFF_DELAY,          this->prefs.standby_params.backoff_delay);
+        #endif
+
         this->voice_params_opus_encoder_validate();
 
         // Check if enabled
@@ -964,7 +983,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     hal_input_params.input_format.container   = XRAUDIO_CONTAINER_NONE;
     hal_input_params.input_format.encoding    = voice_format_to_xraudio(format);
     hal_input_params.input_format.sample_rate = 16000;
-    hal_input_params.input_format.sample_size = 1;
+    hal_input_params.input_format.sample_size = is_standby_microphone() ? 4 : 1;
     hal_input_params.input_format.channel_qty = 1;
 
     ctrlm_hal_input_object_t hal_input_object = NULL;
@@ -1036,8 +1055,8 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     this->voice_status_set();
     this->last_cmd_id           = 0;
 
-    // Start packet timeout, but not if this is a voice session by text
-    if (!this->is_session_by_text) {
+    // Start packet timeout, but not if this is a voice session by text or standby microphone
+    if (!this->is_session_by_text && !is_standby_microphone()) {
         if(this->network_type == CTRLM_NETWORK_TYPE_IP) {
             this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
         } else {
@@ -1054,13 +1073,6 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     if(cb_confirm != NULL && cb_confirm_param != NULL) {
        *cb_confirm       = ctrlm_voice_session_response_confirm;
        *cb_confirm_param = NULL;
-    }
-    if(stream_params) {
-        this->has_stream_params = true;
-        this->stream_params = *stream_params;
-        xrsr_session_keyword_info_set(XRSR_SRC_RCU_FF, stream_params->pre_keyword_sample_qty, stream_params->keyword_sample_qty);
-    } else {
-        this->has_stream_params = false;
     }
 
     // Post
@@ -1312,6 +1324,12 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
           voice_session_stats_print();
           voice_session_stats_clear();
        }
+    }
+
+    if(is_standby_microphone()) {
+        if(!ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false)) {
+            LOG_ERROR("%s: failed to set power state!\n");
+        }
     }
 }
 
@@ -1849,11 +1867,6 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
     }
 
-    if( (this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY) ) {
-       //In this state, the system is ON while ctrlm is in STANDBY, bring ctrlm into alignment with system
-       ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false);
-    }
-
     if(this->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
         LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
     }
@@ -1888,7 +1901,6 @@ void ctrlm_voice_t::voice_server_message_callback(const char *msg, unsigned long
 
 void ctrlm_voice_t::voice_server_connected_callback(ctrlm_voice_cb_header_t *connected) {
    this->session_timing.srvr_connect           = connected->timestamp;
-
    this->session_timing.srvr_init_txd          = this->session_timing.srvr_connect;
    this->session_timing.srvr_audio_txd_first   = this->session_timing.srvr_connect;
    this->session_timing.srvr_audio_txd_keyword = this->session_timing.srvr_connect;
@@ -2490,3 +2502,33 @@ void ctrlm_voice_t::voice_device_status_change(ctrlm_voice_device_t device, ctrl
         #endif
     }
 }
+
+#ifdef ENABLE_DEEP_SLEEP
+void ctrlm_voice_t::voice_standby_session_request(void) {
+    ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_DSP;
+    ctrlm_controller_id_t controller_id = CTRLM_MAIN_CONTROLLER_ID_DSP;
+    ctrlm_voice_device_t device = CTRLM_VOICE_DEVICE_MICROPHONE;
+    ctrlm_voice_session_response_status_t voice_status;
+    ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_PCM;
+
+    #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
+    //If the user un-muted the device in standby, we must un-mute our path
+    //If the user muted the device in standby we won't be here
+    if(this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) {
+       this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, CTRLM_VOICE_DEVICE_STATUS_READY);
+    }
+    #endif
+LOG_INFO("%s: calling voice_session_req\n", __FUNCTION__);
+    voice_status = voice_session_req(network_id, controller_id, device, format, NULL, "DSP", "1", "1", 0.0, false, NULL, NULL, NULL, false);
+
+    if(VOICE_SESSION_RESPONSE_AVAILABLE != voice_status) {
+       LOG_ERROR("%s: Failed opening voice session in ctrlm_voice_t, error = <%d>\n", __FUNCTION__, voice_status);
+    }
+}
+#endif
+
+bool ctrlm_voice_t::is_standby_microphone(void) {
+   return ((this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
+
+}
+

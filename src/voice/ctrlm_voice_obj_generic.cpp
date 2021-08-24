@@ -41,14 +41,6 @@
 #include "ctrlm_voice_endpoint_sdt.h"
 #endif
 
-//I have seen it take up 12 seconds to get network so giving 15s timeout to be safe
-#define STANDBY_PARAMS_CONNECT_CHECK_INTERVAL (200)
-#define STANDBY_PARAMS_TIMEOUT_CONNECT        (15000)
-#define STANDBY_PARAMS_TIMEOUT_INACTIVITY     (15000)
-#define STANDBY_PARAMS_TIMEOUT_SESSION        (15000)
-#define STANDBY_PARAMS_IPV4_FALLBACK          (true)
-#define STANDBY_PARAMS_BACKOFF_DELAY          (100)
-
 // Application Interface Implementation
 ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
     LOG_INFO("%s: Constructor\n", __FUNCTION__);
@@ -127,14 +119,6 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
     xrsr_route_t routes[XRSR_SRC_INVALID + 1];
     std::vector<std::string> urls_translated;
     int          i = 0;
-    xrsr_dst_params_t standby_params = {0};
-
-    standby_params.connect_check_interval = STANDBY_PARAMS_CONNECT_CHECK_INTERVAL;
-    standby_params.timeout_connect        = STANDBY_PARAMS_TIMEOUT_CONNECT;
-    standby_params.timeout_inactivity     = STANDBY_PARAMS_TIMEOUT_INACTIVITY;
-    standby_params.timeout_session        = STANDBY_PARAMS_TIMEOUT_SESSION;
-    standby_params.ipv4_fallback          = STANDBY_PARAMS_IPV4_FALLBACK;
-    standby_params.backoff_delay          = STANDBY_PARAMS_BACKOFF_DELAY;
 
     errno_t safec_rc = memset_s(&routes, sizeof(routes), 0, sizeof(routes));
     ERR_CHK(safec_rc);
@@ -202,8 +186,11 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
-                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &standby_params : NULL;
-
+                #ifdef ENABLE_DEEP_SLEEP
+                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &this->prefs.standby_params : NULL;
+                #else
+                routes[i].dsts[0].params           = NULL;
+                #endif
                 i++;
             }
         } else if(url->rfind("ws", 0) == 0) {
@@ -222,7 +209,11 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
-                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &standby_params : NULL;
+                #ifdef ENABLE_DEEP_SLEEP
+                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &this->prefs.standby_params : NULL;
+                #else
+                routes[i].dsts[0].params          = NULL;
+                #endif
                 i++;
             }
         } else if(url->rfind("vrng", 0) == 0) {
@@ -243,7 +234,11 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
-                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &standby_params : NULL;
+                #ifdef ENABLE_DEEP_SLEEP
+                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &this->prefs.standby_params : NULL;
+                #else
+                routes[i].dsts[0].params         = NULL;
+                #endif
                 i++;
                 LOG_INFO("%s: url translation from %s to %s\n", __FUNCTION__, url->c_str(), urls_translated[translated_index].c_str());
             }

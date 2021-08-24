@@ -266,6 +266,9 @@ typedef struct {
    std::string                 opus_encoder_params_str;
    guchar                      opus_encoder_params[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS];
    bool                        force_toggle_fallback;
+   #ifdef ENABLE_DEEP_SLEEP
+   xrsr_dst_params_t           standby_params;
+   #endif
 } voice_session_prefss_t;
 
 typedef struct {
@@ -417,6 +420,9 @@ public:
     virtual void                  voice_server_return_code_callback(long ret_code);
     virtual void                  voice_session_transcription_callback(const char *transcription);
     virtual void                  voice_power_state_change(ctrlm_power_state_t power_state);
+    #ifdef ENABLE_DEEP_SLEEP
+    virtual void                  voice_standby_session_request(void);
+    #endif
     // End Event Interface
 
     protected:
@@ -526,6 +532,7 @@ public:
    void                 set_audio_mode(ctrlm_voice_audio_settings_t *settings);
    void                 audio_state_set(bool session);
    bool                 privacy_mode(void);
+   bool                 is_standby_microphone(void);
 
 };
 

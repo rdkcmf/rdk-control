@@ -993,43 +993,37 @@ ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void) {
    return power_state;
 }
 
-void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state, bool system) {
-   if(CTRLM_POWER_STATE_DEEP_SLEEP == *power_state) {
-      IARM_Bus_PWRMgr_NetworkStandbyMode_Param_t param = {0};
-      IARM_Result_t res = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetNetworkStandbyMode, (void *)&param, sizeof(param));
+#ifdef ENABLE_DEEP_SLEEP
+gboolean ctrlm_main_iarm_networked_standby(void) {
+   IARM_Bus_PWRMgr_NetworkStandbyMode_Param_t param = {0};
+   IARM_Result_t res = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetNetworkStandbyMode, (void *)&param, sizeof(param));
 
-      if (res == IARM_RESULT_SUCCESS) {
-         if(true == param.bStandbyMode) {
-            *power_state = CTRLM_POWER_STATE_STANDBY;
-            LOG_INFO("%s: deep sleep message set Network Standby flag, power state updated to <%s>\n", __FUNCTION__, ctrlm_power_state_str(*power_state));
-         }
-      } else {
-         LOG_ERROR("%s: IARM query for network standby mode failed, defaulting to deep sleep!\n", __FUNCTION__);
-      }
+   if (res != IARM_RESULT_SUCCESS) {
+      LOG_ERROR("%s: IARM query for network standby mode failed, default to NO!\n", __FUNCTION__);
+      return false;
    }
 
-   #ifdef ENABLE_DEEP_SLEEP
-   if(CTRLM_POWER_STATE_ON == *power_state) {
-      DeepSleep_WakeupReason_t wakeup_reason;
-      IARM_Result_t res = IARM_Bus_Call(IARM_BUS_DEEPSLEEPMGR_NAME, IARM_BUS_DEEPSLEEPMGR_API_GetLastWakeupReason, (void*)&wakeup_reason, sizeof(wakeup_reason));
-
-      if(res == IARM_RESULT_SUCCESS) {
-         LOG_INFO("%s wakeup_reason %d\n", __FUNCTION__, wakeup_reason);
-         if(system && (wakeup_reason == DEEPSLEEP_WAKEUPREASON_VOICE)) { //system sends ON while processing in standby, so wait
-            XLOGD_INFO("%s: system wake from voice, remain in standby\n", __FUNCTION__);
-            *power_state = CTRLM_POWER_STATE_STANDBY;
-         } else {
-            XLOGD_INFO("%s: not system wake from voice, transition to on\n", __FUNCTION__);
-            *power_state = CTRLM_POWER_STATE_ON;
-         }
-      } else {
-         *power_state = CTRLM_POWER_STATE_ON;
-         LOG_ERROR("%s: IARM query for wakeup reason failed, defaulting to ON!", __FUNCTION__);
-      }
-   }
-   #endif
-
+   return param.bStandbyMode ? true : false; //avoid any conflict between gboolean and bool
 }
+
+gboolean ctrlm_main_iarm_wakeup_reason_voice(void) {
+   DeepSleep_WakeupReason_t wakeup_reason;
+   IARM_Result_t res = IARM_Bus_Call(IARM_BUS_DEEPSLEEPMGR_NAME, IARM_BUS_DEEPSLEEPMGR_API_GetLastWakeupReason, (void*)&wakeup_reason, sizeof(wakeup_reason));
+
+   if(res != IARM_RESULT_SUCCESS) {
+      LOG_ERROR("%s: IARM query for wakeup reason failed, returning false!", __FUNCTION__);
+      return false;
+   }
+
+   LOG_INFO("%s wakeup_reason %d\n", __FUNCTION__, wakeup_reason);
+   
+   if(wakeup_reason != DEEPSLEEP_WAKEUPREASON_VOICE) {
+      return false;
+   }
+
+   return true;
+}
+#endif
 
 IARM_Result_t ctrlm_main_iarm_call_last_keypress_get(void *arg) {
    ctrlm_main_iarm_call_last_key_info_t *params = (ctrlm_main_iarm_call_last_key_info_t *)arg;

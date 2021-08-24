@@ -368,7 +368,7 @@ typedef struct {
    ctrlm_main_queue_msg_header_t header;
    ctrlm_power_state_t           old_state;
    ctrlm_power_state_t           new_state;
-   bool                          system;
+   gboolean                      system;
 } ctrlm_main_queue_power_state_change_t;
 
 gboolean                           ctrlm_main_iarm_init(void);
@@ -411,7 +411,7 @@ ctrlm_pairing_restrict_by_remote_t restrict_pairing_by_remote_get();
 void                               ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *data, size_t len);
 void                               ctrlm_event_handler_system(const char *owner, IARM_EventId_t event_id, void *data, size_t len);
 void                               ctrlm_quit_main_loop();
-gboolean                           ctrlm_power_state_change(ctrlm_power_state_t power_state, bool system);
+gboolean                           ctrlm_power_state_change(ctrlm_power_state_t power_state, gboolean system);
 
 gboolean ctrlm_main_iarm_call_status_get(ctrlm_main_iarm_call_status_t *status);
 gboolean ctrlm_main_iarm_call_network_status_get(ctrlm_main_iarm_call_network_status_t *status);
@@ -434,7 +434,12 @@ gboolean ctrlm_main_iarm_call_chip_status_get(ctrlm_main_iarm_call_chip_status_t
 
 ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void);
 ctrlm_power_state_t ctrlm_main_get_power_state(void);
-void ctrlm_main_iarm_update_power_state(ctrlm_power_state_t *power_state, bool system);
+#ifdef USE_VOICE_SDK
+#ifdef ENABLE_DEEP_SLEEP
+gboolean ctrlm_main_iarm_networked_standby(void);
+gboolean ctrlm_main_iarm_wakeup_reason_voice(void);
+#endif
+#endif
 
 
 void        ctrlm_main_iarm_event_binding_line_of_sight(gboolean active);

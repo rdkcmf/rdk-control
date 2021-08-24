@@ -942,6 +942,7 @@ const char *ctrlm_power_state_str(ctrlm_power_state_t state)
    case CTRLM_POWER_STATE_ON:                     return("ON");
    case CTRLM_POWER_STATE_LIGHT_SLEEP:            return("LIGHT_SLEEP");
    case CTRLM_POWER_STATE_DEEP_SLEEP:             return("DEEP_SLEEP");
+   case CTRLM_POWER_STATE_STANDBY_VOICE_SESSION:  return("STANDBY_VOICE_SESSION");
    default:                                       break;
    }
    return(ctrlm_invalid_return(state));

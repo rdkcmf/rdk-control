@@ -428,7 +428,8 @@ typedef enum {
    CTRLM_POWER_STATE_ON                     = 1,
    CTRLM_POWER_STATE_LIGHT_SLEEP            = 2,
    CTRLM_POWER_STATE_DEEP_SLEEP             = 3,
-   CTRLM_POWER_STATE_INVALID                = 4
+   CTRLM_POWER_STATE_STANDBY_VOICE_SESSION  = 4,
+   CTRLM_POWER_STATE_INVALID                = 5 
 }ctrlm_power_state_t;
 
 /// @brief Network Id Type

@@ -2413,32 +2413,57 @@ gpointer ctrlm_main_thread(gpointer param) {
                LOG_ERROR("%s: Power State Change msg NULL\n", __FUNCTION__);
                break;
             }
-            if(g_ctrlm.power_state == dqm->new_state ) {
-               LOG_INFO("%s: already in power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
-            } else {
-               /* If this message came from Power Manager, then Deep Sleep may set Networked Standby, and
-                * waking from deep sleep might be from voice or from button press
-                */
-               ctrlm_main_iarm_update_power_state(&dqm->new_state, dqm->system);
-               if(g_ctrlm.power_state == dqm->new_state) {
-                  LOG_INFO("%s: already in updated power state %s, do nothing\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
-                  break;
+            #ifdef USE_VOICE_SDK
+            #ifdef ENABLE_DEEP_SLEEP
+            //Deep Sleep may set Networked Standby, may need other power state modifications later
+            //Internal power state changes must not check wakeup reason
+            if(dqm->system) {
+               if((dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) && ctrlm_main_iarm_networked_standby())  {
+                  LOG_INFO("%s: deep sleep message set Network Standby flag\n", __FUNCTION__);
+                  dqm->new_state = CTRLM_POWER_STATE_STANDBY;
                }
-
-               dqm->old_state = g_ctrlm.power_state;
-               g_ctrlm.power_state = dqm->new_state;
-               // Set Power change in Networks
-               for(auto const &itr : g_ctrlm.networks) {
-                  itr.second->power_state_change(dqm);
-               }
-
-               // Set Power change in DB
-               ctrlm_db_power_state_change(dqm);
-
-               #ifdef USE_VOICE_SDK
-               g_ctrlm.voice_session->voice_power_state_change(g_ctrlm.power_state);
-               #endif
             }
+            #endif
+            #endif
+
+            if(g_ctrlm.power_state == dqm->new_state) {
+               LOG_INFO("%s: already in power state %s\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
+               break;
+            }
+
+            dqm->old_state = g_ctrlm.power_state;
+            g_ctrlm.power_state = dqm->new_state;
+
+            #ifdef USE_VOICE_SDK
+            #ifdef ENABLE_DEEP_SLEEP
+            /* We have a problem in that if a voice command fails and the EPG does not come up, then
+             * the user will use the remote to bring up the EPG in which case we get a wake up message
+             * again saying the wakeup reason was voice, because that was actually the last wake
+             * from deep sleep reason. Using a unique power state to allow for correct transitions
+             */
+            if((dqm->old_state == CTRLM_POWER_STATE_STANDBY && ctrlm_main_iarm_wakeup_reason_voice())) {
+               LOG_INFO("%s wake from voice in standby, initiate voice transaction\n,", __FUNCTION__);
+               g_ctrlm.power_state = CTRLM_POWER_STATE_STANDBY_VOICE_SESSION;
+               g_ctrlm.voice_session->voice_standby_session_request();
+               //voice will transition power state to ON after voice transaction
+               break;
+            }
+            #endif
+            #endif
+
+
+            // Set Power change in Networks
+            for(auto const &itr : g_ctrlm.networks) {
+               itr.second->power_state_change(dqm);
+            }
+
+            // Set Power change in DB
+            ctrlm_db_power_state_change(dqm);
+
+            #ifdef USE_VOICE_SDK
+            g_ctrlm.voice_session->voice_power_state_change(g_ctrlm.power_state);
+            #endif
+
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL: {
@@ -5486,7 +5511,7 @@ gboolean ctrlm_ntp_check(gpointer user_data) {
    return(false);
 }
 
-gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state, bool system) {
+gboolean ctrlm_power_state_change(ctrlm_power_state_t power_state, gboolean system) {
    //Allocate a message and send it to Control Manager's queue
    ctrlm_main_queue_power_state_change_t *msg = (ctrlm_main_queue_power_state_change_t *)g_malloc(sizeof(ctrlm_main_queue_power_state_change_t));
    if(NULL == msg) {
