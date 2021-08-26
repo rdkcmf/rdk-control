@@ -58,6 +58,11 @@ ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
 ctrlm_voice_generic_t::~ctrlm_voice_generic_t() {
     LOG_INFO("%s: Destructor\n", __FUNCTION__);
 
+    if(this->voice_state_src_get() != CTRLM_VOICE_STATE_SRC_READY) { // Need to terminate session before destroying endpoints
+        LOG_WARN("%s: Voice session in progress.. Terminating..\n", __FUNCTION__);
+        xrsr_session_terminate();
+    }
+
     if(this->obj_ws != NULL) {
         delete this->obj_ws;
         this->obj_ws = NULL;
