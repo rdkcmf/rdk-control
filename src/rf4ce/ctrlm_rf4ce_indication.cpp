@@ -260,6 +260,10 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_data(ctrlm_network_id_t network_id, ctrlm
    ctrlm_network_type_t network_type;
    
    LOG_DEBUG("%s: Network Id %u Controller Id %u\n", __FUNCTION__, network_id, controller_id);
+   if(!ctrlm_main_successful_init_get()) {
+      LOG_WARN("%s: Network Is Not Initialized.  Ignore.\n", __FUNCTION__);
+      return(CTRLM_HAL_RESULT_ERROR_NETWORK_NOT_READY);
+   }
 
    if(params.data == NULL && params.cb_data_read == NULL)  {
       LOG_ERROR("%s: Invalid parameters\n", __FUNCTION__);
