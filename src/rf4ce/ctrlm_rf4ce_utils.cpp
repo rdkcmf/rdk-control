@@ -38,7 +38,8 @@ const char *ctrlm_rf4ce_user_strings[] = {
 "XR11-20",
 "XR15-10",
 "XR15-20",
-"XR16-10"
+"XR16-10",
+"XRA-10"
 };
 
 
