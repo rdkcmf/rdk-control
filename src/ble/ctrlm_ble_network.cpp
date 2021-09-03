@@ -382,7 +382,7 @@ void ctrlm_obj_network_ble_t::req_process_controller_status(void *data, int size
 }
 
 void ctrlm_obj_network_ble_t::req_process_voice_session_begin(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_voice_session_t *dqm = (ctrlm_main_queue_msg_voice_session_t *)data;
 
@@ -390,7 +390,11 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_begin(void *data, int si
    g_assert(size == sizeof(ctrlm_main_queue_msg_voice_session_t));
 
    dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR;
-   
+
+#ifdef DISABLE_BLE_VOICE
+   LOG_WARN("%s: BLE Voice is disabled in ControlMgr, so not starting a voice session.\n", __PRETTY_FUNCTION__);
+   dqm->params->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+#else
    if (!ready_) {
       LOG_FATAL("%s: Network is not ready!\n", __PRETTY_FUNCTION__);
    } else {
@@ -453,13 +457,14 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_begin(void *data, int si
          }
       }
    }
+#endif   //DISABLE_BLE_VOICE
    if(dqm->semaphore) {
       sem_post(dqm->semaphore);
    }
 }
 
 void ctrlm_obj_network_ble_t::req_process_voice_session_end(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_voice_session_t *dqm = (ctrlm_main_queue_msg_voice_session_t *)data;
 
@@ -467,7 +472,9 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_end(void *data, int size
    g_assert(size == sizeof(ctrlm_main_queue_msg_voice_session_t));
 
    dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR;
-
+#ifdef DISABLE_BLE_VOICE
+   dqm->params->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+#else
    if (!ready_) {
       LOG_FATAL("%s: Network is not ready!\n", __PRETTY_FUNCTION__);
    } else {
@@ -492,6 +499,7 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_end(void *data, int size
          }
       }
    }
+#endif   //DISABLE_BLE_VOICE
    if(dqm->semaphore) {
       sem_post(dqm->semaphore);
    }
@@ -499,7 +507,7 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_end(void *data, int size
 
 
 void ctrlm_obj_network_ble_t::req_process_start_pairing(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_start_pairing_t *dqm = (ctrlm_main_queue_msg_start_pairing_t *)data;
 
@@ -529,7 +537,7 @@ void ctrlm_obj_network_ble_t::req_process_start_pairing(void *data, int size) {
 
 
 void ctrlm_obj_network_ble_t::req_process_pair_with_code(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_pair_with_code_t *dqm = (ctrlm_main_queue_msg_pair_with_code_t *)data;
 
@@ -595,7 +603,7 @@ void ctrlm_obj_network_ble_t::req_process_ir_set_code(void *data, int size) {
    }
 }
 void ctrlm_obj_network_ble_t::req_process_ir_clear_codes(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_ir_clear_t *dqm = (ctrlm_main_queue_msg_ir_clear_t *)data;
 
@@ -631,7 +639,7 @@ void ctrlm_obj_network_ble_t::req_process_ir_clear_codes(void *data, int size) {
 }
 
 void ctrlm_obj_network_ble_t::req_process_find_my_remote(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_find_my_remote_t *dqm = (ctrlm_main_queue_msg_find_my_remote_t *)data;
 
@@ -669,7 +677,7 @@ void ctrlm_obj_network_ble_t::req_process_find_my_remote(void *data, int size) {
 }
 
 void ctrlm_obj_network_ble_t::req_process_get_ble_log_levels(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_ble_log_levels_t *dqm = (ctrlm_main_queue_msg_ble_log_levels_t *)data;
 
@@ -697,7 +705,7 @@ void ctrlm_obj_network_ble_t::req_process_get_ble_log_levels(void *data, int siz
 }
 
 void ctrlm_obj_network_ble_t::req_process_set_ble_log_levels(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_ble_log_levels_t *dqm = (ctrlm_main_queue_msg_ble_log_levels_t *)data;
 
@@ -723,7 +731,7 @@ void ctrlm_obj_network_ble_t::req_process_set_ble_log_levels(void *data, int siz
 }
 
 void ctrlm_obj_network_ble_t::req_process_get_rcu_unpair_reason(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_get_rcu_unpair_reason_t *dqm = (ctrlm_main_queue_msg_get_rcu_unpair_reason_t *)data;
 
@@ -759,7 +767,7 @@ void ctrlm_obj_network_ble_t::req_process_get_rcu_unpair_reason(void *data, int 
 }
 
 void ctrlm_obj_network_ble_t::req_process_get_rcu_reboot_reason(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_get_rcu_reboot_reason_t *dqm = (ctrlm_main_queue_msg_get_rcu_reboot_reason_t *)data;
 
@@ -795,7 +803,7 @@ void ctrlm_obj_network_ble_t::req_process_get_rcu_reboot_reason(void *data, int 
 }
 
 void ctrlm_obj_network_ble_t::req_process_get_rcu_last_wakeup_key(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_get_last_wakeup_key_t *dqm = (ctrlm_main_queue_msg_get_last_wakeup_key_t *)data;
 
@@ -831,7 +839,7 @@ void ctrlm_obj_network_ble_t::req_process_get_rcu_last_wakeup_key(void *data, in
 }
 
 void ctrlm_obj_network_ble_t::req_process_send_rcu_action(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_send_rcu_action_t *dqm = (ctrlm_main_queue_msg_send_rcu_action_t *)data;
 
@@ -892,7 +900,7 @@ void ctrlm_obj_network_ble_t::factory_reset(void) {
 }
 
 void ctrlm_obj_network_ble_t::req_process_get_rcu_status(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_get_rcu_status_t *dqm = (ctrlm_main_queue_msg_get_rcu_status_t *)data;
 
@@ -913,7 +921,7 @@ void ctrlm_obj_network_ble_t::req_process_get_rcu_status(void *data, int size) {
 }
 
 void ctrlm_obj_network_ble_t::req_process_get_last_keypress(void *data, int size) {
-   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_get_last_keypress_t *dqm = (ctrlm_main_queue_msg_get_last_keypress_t *)data;
 
@@ -1417,7 +1425,7 @@ ctrlm_controller_id_t ctrlm_obj_network_ble_t::controller_add(ctrlm_hal_ble_rcu_
 }
 
 void ctrlm_obj_network_ble_t::ind_process_paired(void *data, int size) {
-   LOG_INFO("%s, Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s, Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
 
    ctrlm_hal_ble_IndPaired_params_t *dqm = (ctrlm_hal_ble_IndPaired_params_t *)data;
@@ -1447,7 +1455,7 @@ void ctrlm_obj_network_ble_t::ind_process_paired(void *data, int size) {
 }
 
 void ctrlm_obj_network_ble_t::ind_process_unpaired(void *data, int size) {
-   LOG_INFO("%s, Enter...\n", __PRETTY_FUNCTION__);
+   LOG_DEBUG("%s, Enter...\n", __PRETTY_FUNCTION__);
    THREAD_ID_VALIDATE();
 
    ctrlm_hal_ble_IndUnPaired_params_t *dqm = (ctrlm_hal_ble_IndUnPaired_params_t *)data;
@@ -1584,7 +1592,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_RcuStatus(ctrlm_network_id_t id, ctrlm_
 }
 
 ctrlm_hal_result_t ctrlm_ble_IndicateHAL_Paired(ctrlm_network_id_t id, ctrlm_hal_ble_IndPaired_params_t *params) {
-   LOG_INFO("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
+   LOG_DEBUG("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
    if (!ctrlm_network_id_is_valid(id)) {
       LOG_ERROR("%s: Network ID is not valid.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
@@ -1596,7 +1604,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_Paired(ctrlm_network_id_t id, ctrlm_hal
    return(CTRLM_HAL_RESULT_SUCCESS);
 }
 ctrlm_hal_result_t ctrlm_ble_IndicateHAL_UnPaired(ctrlm_network_id_t id, ctrlm_hal_ble_IndUnPaired_params_t *params) {
-   LOG_INFO("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
+   LOG_DEBUG("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
    if (!ctrlm_network_id_is_valid(id)) {
       LOG_ERROR("%s: Network ID is not valid.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
@@ -1609,7 +1617,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_UnPaired(ctrlm_network_id_t id, ctrlm_h
 }
 
 ctrlm_hal_result_t ctrlm_ble_Request_VoiceSessionBegin(ctrlm_network_id_t id, ctrlm_hal_ble_ReqVoiceSession_params_t *params) {
-   LOG_INFO("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
+   LOG_DEBUG("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
    if (!ctrlm_network_id_is_valid(id)) {
       LOG_ERROR("%s: Network ID is not valid.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
@@ -1639,7 +1647,7 @@ ctrlm_hal_result_t ctrlm_ble_Request_VoiceSessionBegin(ctrlm_network_id_t id, ct
 }
 
 ctrlm_hal_result_t ctrlm_ble_Request_VoiceSessionEnd(ctrlm_network_id_t id, ctrlm_hal_ble_ReqVoiceSession_params_t *params) {
-   LOG_INFO("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
+   LOG_DEBUG("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
    if (!ctrlm_network_id_is_valid(id)) {
       LOG_ERROR("%s: Network ID is not valid.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
@@ -1669,7 +1677,7 @@ ctrlm_hal_result_t ctrlm_ble_Request_VoiceSessionEnd(ctrlm_network_id_t id, ctrl
 }
 
 ctrlm_hal_result_t ctrlm_ble_IndicateHAL_VoiceData(ctrlm_network_id_t network_id, ctrlm_hal_ble_VoiceData_t *params) {
-   // LOG_INFO("%s: Enter... Network Id = %u, params->ieee_address = <0x%llX>, params->controller_id = <%d>\n", __FUNCTION__, network_id, params->ieee_address, params->controller_id);
+   // LOG_DEBUG("%s: Enter... Network Id = %u, params->ieee_address = <0x%llX>, params->controller_id = <%d>\n", __FUNCTION__, network_id, params->ieee_address, params->controller_id);
    if (!ctrlm_network_id_is_valid(network_id)) {
       LOG_ERROR("%s: Network ID is not valid.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
@@ -1683,7 +1691,7 @@ ctrlm_hal_result_t ctrlm_ble_IndicateHAL_VoiceData(ctrlm_network_id_t network_id
 }
 
 ctrlm_hal_result_t ctrlm_ble_IndicateHAL_Keypress(ctrlm_network_id_t network_id, ctrlm_hal_ble_IndKeypress_params_t *params) {
-   // LOG_INFO("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
+   // LOG_DEBUG("%s: Enter... Network Id = %u\n", __FUNCTION__, id);
    if (!ctrlm_network_id_is_valid(network_id)) {
       LOG_ERROR("%s: Network ID is not valid.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR_NETWORK_ID);
