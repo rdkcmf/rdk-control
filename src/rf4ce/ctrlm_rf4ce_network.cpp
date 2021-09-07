@@ -2919,7 +2919,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
    bool mac_polling_enabled = false;
    if(CTRLM_TR181_RESULT_SUCCESS == ctrlm_tr181_bool_get(CTRLM_RF4CE_TR181_MAC_POLLING_CONFIGURATION_ENABLE, &mac_polling_enabled)) {
       LOG_INFO("%s: Default Mac Polling Configuration from TR181\n", __FUNCTION__);
-      b_has_default_mac_config = true;
+      b_has_default_mac_config = mac_polling_enabled;
       ctrlm_tr181_int_get(CTRLM_RF4CE_TR181_MAC_POLLING_CONFIGURATION_INTERVAL, (int*)&default_polling_config_mac.time_interval, 1000, 60000);
 
       if(mac_polling_enabled) {
@@ -2964,6 +2964,10 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
         }
      }
 
+     if (b_has_default_mac_config) {
+        controller_polling_configuration_mac_[i] = default_polling_config_mac;
+     }
+
      if(controller_tr181_str) {
         if (b_has_default_config) {
            controller_polling_methods_[i] = default_polling_methods;
@@ -2971,18 +2975,24 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
         }
 	safec_rc = memset_s(tr181_buf, sizeof(tr181_buf), 0, sizeof(tr181_buf));
         ERR_CHK(safec_rc);
+        ctrlm_rf4ce_polling_configuration_t controller_polling_configuration;
         if(CTRLM_TR181_RESULT_SUCCESS == ctrlm_tr181_string_get(controller_tr181_str, tr181_buf, sizeof(tr181_buf))) {
            if(4 == sscanf(tr181_buf, "%hhu:%hu:%hhu:%u:", &controller_polling_methods_[i],
-                 &controller_polling_configuration_heartbeat_[i].trigger,
-                 &controller_polling_configuration_heartbeat_[i].kp_counter,
-                 &controller_polling_configuration_heartbeat_[i].time_interval)) {
+                 &controller_polling_configuration.trigger,
+                 &controller_polling_configuration.kp_counter,
+                 &controller_polling_configuration.time_interval)) {
+              //If MAC polling bit is set, save the mac config
+              if(controller_polling_methods_[i] & POLLING_METHODS_FLAG_MAC) {
+                 controller_polling_configuration_mac_[i] = controller_polling_configuration;
+              }
+              //If Heartbeat polling bit is set, save the heartbeat config
+              if(controller_polling_methods_[i] & POLLING_METHODS_FLAG_HEARTBEAT) {
+                 controller_polling_configuration_heartbeat_[i] = controller_polling_configuration;
+              }
               LOG_INFO("%s: Controller Polling Configuration Read from TR181 <%s><%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str((ctrlm_rf4ce_controller_type_t)i),ctrlm_rf4ce_controller_polling_methods_str(controller_polling_methods_[i]));
               continue;
            }
         }
-     }
-     if (b_has_default_mac_config) {
-        controller_polling_configuration_heartbeat_[i] = default_polling_config_mac;
      }
    }
 }
