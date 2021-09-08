@@ -598,7 +598,7 @@ const char *ctrlm_rcu_ir_remote_types_str(ctrlm_ir_remote_type controller_type) 
       case CTRLM_IR_REMOTE_TYPE_PLATCO:    return("PLATCO");
       case CTRLM_IR_REMOTE_TYPE_XR15V2:    return("XR15-20");
       case CTRLM_IR_REMOTE_TYPE_XR16V1:    return("XR16-10");
-      case CTRLM_IR_REMOTE_TYPE_XRAV1:     return("XRAV-10");
+      case CTRLM_IR_REMOTE_TYPE_XRAV1:     return("XRA-10");
       case CTRLM_IR_REMOTE_TYPE_XR20V1:    return("XR20-10");
       case CTRLM_IR_REMOTE_TYPE_UNDEFINED: return("UNDEFINED");
    }
