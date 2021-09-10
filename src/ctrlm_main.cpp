@@ -1909,7 +1909,7 @@ gboolean ctrlm_networks_pre_init(json_t *json_obj_net_rf4ce, json_t *json_config
 
    for(auto const &itr : g_ctrlm.networks) {
       itr.second->stb_name_set(g_ctrlm.stb_name);
-      itr.second->mask_key_codes_set(g_ctrlm.mask_key_codes_json);
+      itr.second->mask_key_codes_set(ctrlm_is_production_build() ? true : g_ctrlm.mask_key_codes_json);
    }
 
    return(true);
