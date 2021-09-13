@@ -5382,6 +5382,10 @@ void ctrlm_obj_controller_rf4ce_t::handle_voice_configuration() {
    ctrlm_rf4ce_polling_action_push(network_id_get(), controller_id_get(), RF4CE_POLLING_ACTION_VOICE_CONFIGURATION, NULL, 0);
 }
 
+void ctrlm_obj_controller_rf4ce_t::handle_controller_battery_status() {
+   ctrlm_rf4ce_polling_action_push(network_id_get(), controller_id_get(), RF4CE_POLLING_ACTION_BATTERY_STATUS, NULL, 0);
+}
+
 void ctrlm_obj_controller_rf4ce_t::push_ir_codes(void) {
    // ROBIN -- Check Target IRDB status
    guchar flags = this->obj_network_rf4ce_->target_irdb_status_flags_get();

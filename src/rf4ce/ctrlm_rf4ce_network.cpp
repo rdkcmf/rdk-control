@@ -3917,6 +3917,7 @@ void ctrlm_obj_network_rf4ce_t::set_timers() {
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
       it->second->handle_voice_configuration();
       it->second->handle_controller_metrics();
+      it->second->handle_controller_battery_status();
    }
 }
 

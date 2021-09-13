@@ -439,6 +439,7 @@ typedef enum {
    RF4CE_POLLING_ACTION_DSP_CONFIGURATION   = 0x09,
    RF4CE_POLLING_ACTION_METRICS             = 0x0A,
    RF4CE_POLLING_ACTION_EOS                 = 0x0B,
+   RF4CE_POLLING_ACTION_BATTERY_STATUS      = 0x0D,
    RF4CE_POLLING_ACTION_IRRF_STATUS         = 0x10
 } ctrlm_rf4ce_polling_action_t;
 
@@ -743,6 +744,7 @@ public:
 
    void handle_controller_metrics(void *data = NULL, int size = 0);
    void handle_voice_configuration();
+   void handle_controller_battery_status();
 
    bool device_update_session_resume_support(void);
    bool device_update_session_resume_available(void);

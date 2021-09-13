@@ -369,6 +369,7 @@ typedef enum {
    RCU_POLLING_ACTION_METRICS             = 0x0A,
    RCU_POLLING_ACTION_EOS                 = 0x0B,
    RCU_POLLING_ACTION_SETUP_COMPLETE      = 0x0C,
+   RCU_POLLING_ACTION_BATTERY_STATUS      = 0x0D,
    RCU_POLLING_ACTION_IRRF_STATUS         = 0x10
 } ctrlm_rcu_polling_action_t;
 

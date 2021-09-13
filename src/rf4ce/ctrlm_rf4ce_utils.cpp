@@ -366,6 +366,7 @@ const char *ctrlm_rf4ce_polling_action_str(ctrlm_rf4ce_polling_action_t action) 
       case RF4CE_POLLING_ACTION_DSP_CONFIGURATION:   return("DSP CONFIGURATION");
       case RF4CE_POLLING_ACTION_METRICS:             return("METRICS");
       case RF4CE_POLLING_ACTION_EOS:                 return("EOS");
+      case RF4CE_POLLING_ACTION_BATTERY_STATUS:      return("BATTERY STATUS");
       case RF4CE_POLLING_ACTION_IRRF_STATUS:         return("IRRF STATUS");
    }
    return("");
