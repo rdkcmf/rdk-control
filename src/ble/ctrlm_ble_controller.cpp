@@ -438,6 +438,13 @@ guint16 ctrlm_obj_controller_ble_t::getLastKeyCode() {
    return last_key_code_;
 }
 
+void ctrlm_obj_controller_ble_t::setLastWakeupKey(guint16 code) {
+   last_wakeup_key_code_ = code;
+}
+guint16 ctrlm_obj_controller_ble_t::getLastWakeupKey() {
+   return last_wakeup_key_code_;
+}
+
 void ctrlm_obj_controller_ble_t::process_event_key(ctrlm_key_status_t key_status, guint16 key_code) {
    last_key_status_ = key_status;
    last_key_code_   = key_code;
@@ -703,6 +710,7 @@ void ctrlm_obj_controller_ble_t::print_status() {
    LOG_INFO("%s: Bound Time      : %s\n", __FUNCTION__, time_binding_str);
    LOG_INFO("%s: Last Key Code   : 0x%X\n", __FUNCTION__, last_key_code_);
    LOG_INFO("%s: Last Key Time   : %s\n", __FUNCTION__, time_last_key_str);
+   LOG_INFO("%s: Last Wakeup Key : 0x%X\n", __FUNCTION__, last_wakeup_key_code_);
    LOG_INFO("%s: Voice Cmd Count Today        : %lu\n", __FUNCTION__, voice_cmd_count_today_);
    LOG_INFO("%s: Voice Packets Sent Today     : %lu\n", __FUNCTION__, voice_packets_sent_today_);
    LOG_INFO("%s: Voice Packets Lost Today     : %lu\n", __FUNCTION__, voice_packets_lost_today_);

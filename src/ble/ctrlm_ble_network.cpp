@@ -1301,8 +1301,10 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   break;
                case CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY:
                   LOG_INFO("%s: Controller (0x%llX) notified last wakeup key = <0x%X>\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.last_wakeup_key);
-                  report_status = false;
-                  print_status = false;
+                  state_ = CTRLM_BLE_STATE_WAKEUP_KEY;
+                  controller->setLastWakeupKey(dqm->rcu_data.last_wakeup_key);
+                  report_status = true;
+                  print_status = true;
                   break;
                default:
                   LOG_WARN("%s: Unhandled Property: %d !!!!!!!!!!!!!!!!!!!!!!!!\n", __PRETTY_FUNCTION__, dqm->property_updated);
@@ -1337,10 +1339,11 @@ void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_p
    errno_t safec_rc = -1;
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
       if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType()) {
-         msg->remotes[i].controller_id = it->second->controller_id_get();
-         msg->remotes[i].deviceid      = it->second->getDeviceID();
-         msg->remotes[i].batterylevel  = it->second->getBatteryPercent();
-         msg->remotes[i].connected     = (it->second->getConnected()) ? 1 : 0;
+         msg->remotes[i].controller_id    = it->second->controller_id_get();
+         msg->remotes[i].deviceid         = it->second->getDeviceID();
+         msg->remotes[i].batterylevel     = it->second->getBatteryPercent();
+         msg->remotes[i].connected        = (it->second->getConnected()) ? 1 : 0;
+         msg->remotes[i].wakeup_key_code  = it->second->getLastWakeupKey();
 
          safec_rc = strncpy_s(msg->remotes[i].ieee_address_str, sizeof(msg->remotes[i].ieee_address_str), ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
          safec_rc = strncpy_s(msg->remotes[i].btlswver, sizeof(msg->remotes[i].btlswver), it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);

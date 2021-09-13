@@ -129,7 +129,10 @@ public:
    time_t                        getLastKeyTime();
    guint16                       getLastKeyCode();
    void                          process_event_key(ctrlm_key_status_t key_status, guint16 key_code);
-   
+
+   void                          setLastWakeupKey(guint16 code);
+   guint16                       getLastWakeupKey();
+
    void                          update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost);
    void                          property_write_voice_metrics(void);
    guchar                        property_parse_voice_metrics(guchar *data, guchar length);
@@ -170,6 +173,7 @@ private:
    time_t                           last_key_time_flush_;
    ctrlm_key_status_t               last_key_status_;
    guint16                          last_key_code_;
+   guint16                          last_wakeup_key_code_;
 
    int                              battery_percent_;
 

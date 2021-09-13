@@ -62,13 +62,14 @@ unsigned long long ctrlm_ble_utils_GetIEEEAddressFromObjPath(std::string obj_pat
 const char *ctrlm_ble_utils_RcuStateToString(ctrlm_ble_state_t state)
 {
     switch(state) {
-        case CTRLM_BLE_STATE_INITIALIZING:    return("CTRLM_BLE_STATE_INITIALIZING");
-        case CTRLM_BLE_STATE_IDLE:            return("CTRLM_BLE_STATE_IDLE");
-        case CTRLM_BLE_STATE_SEARCHING:       return("CTRLM_BLE_STATE_SEARCHING");
-        case CTRLM_BLE_STATE_PAIRING:         return("CTRLM_BLE_STATE_PAIRING");
-        case CTRLM_BLE_STATE_COMPLETE:        return("CTRLM_BLE_STATE_COMPLETE");
-        case CTRLM_BLE_STATE_FAILED:          return("CTRLM_BLE_STATE_FAILED");
-        case CTRLM_BLE_STATE_UNKNOWN:         return("CTRLM_BLE_STATE_UNKNOWN");
+        case CTRLM_BLE_STATE_INITIALIZING:    return("INITIALIZING");
+        case CTRLM_BLE_STATE_IDLE:            return("IDLE");
+        case CTRLM_BLE_STATE_SEARCHING:       return("SEARCHING");
+        case CTRLM_BLE_STATE_PAIRING:         return("PAIRING");
+        case CTRLM_BLE_STATE_COMPLETE:        return("COMPLETE");
+        case CTRLM_BLE_STATE_FAILED:          return("FAILED");
+        case CTRLM_BLE_STATE_WAKEUP_KEY:      return("WAKEUP_KEY");
+        case CTRLM_BLE_STATE_UNKNOWN:         return("UNKNOWN");
         default:                              return("INVALID__TYPE");
     }
 }
