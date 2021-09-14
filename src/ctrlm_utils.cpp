@@ -696,14 +696,15 @@ const char *ctrlm_device_update_iarm_load_type_str(ctrlm_device_update_iarm_load
 
 const char *ctrlm_device_update_iarm_load_result_str(ctrlm_device_update_iarm_load_result_t load_result) {
    switch(load_result) {
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_SUCCESS:       return("SUCCESS");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REQUEST: return("ERROR_REQUEST");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_CRC:     return("ERROR_CRC");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_ABORT:   return("ERROR_ABORT");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REJECT:  return("ERROR_REJECT");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_TIMEOUT: return("ERROR_TIMEOUT");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_OTHER:   return("ERROR_OTHER");
-      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_MAX:           return("MAX");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_SUCCESS:        return("SUCCESS");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REQUEST:  return("ERROR_REQUEST");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_CRC:      return("ERROR_CRC");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_ABORT:    return("ERROR_ABORT");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REJECT:   return("ERROR_REJECT");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_TIMEOUT:  return("ERROR_TIMEOUT");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_BAD_HASH: return("ERROR_BAD_HASH");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_OTHER:    return("ERROR_OTHER");
+      case CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_MAX:            return("MAX");
    }
    return(ctrlm_invalid_return(load_result));
 }

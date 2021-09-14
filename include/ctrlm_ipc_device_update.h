@@ -77,14 +77,15 @@ typedef enum {
 /// @brief Device Update Load Results
 /// @details An enumeration of the result codes that can be returned from the image load operation.
 typedef enum {
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_SUCCESS       = 0, ///< The image load completed successfully.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REQUEST = 1, ///< The image load failed due to a request error.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_CRC     = 2, ///< The image load failed due to a CRC mismatch.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_ABORT   = 3, ///< The image load failed due to an abort.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REJECT  = 4, ///< The image load failed due to rejection by the device.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_TIMEOUT = 5, ///< The image load failed due to a timeout.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_OTHER   = 6, ///< The image load failed due to another error.
-   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_MAX           = 7  ///< Load result maximum value
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_SUCCESS        = 0, ///< The image load completed successfully.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REQUEST  = 1, ///< The image load failed due to a request error.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_CRC      = 2, ///< The image load failed due to a CRC mismatch.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_ABORT    = 3, ///< The image load failed due to an abort.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_REJECT   = 4, ///< The image load failed due to rejection by the device.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_TIMEOUT  = 5, ///< The image load failed due to a timeout.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_BAD_HASH = 6, ///< The image load failed due to bad hash.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_OTHER    = 7, ///< The image load failed due to another error.
+   CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_MAX            = 8  ///< Load result maximum value
 } ctrlm_device_update_iarm_load_result_t;
 
 /// @brief Device Update Image Types

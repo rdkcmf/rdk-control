@@ -533,6 +533,12 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_download_complete(ctrlm_t
          log_string += " status: TIMEOUT";
          break;
       }
+      case RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH: {
+         LOG_INFO("%s: <%s> (%u, 0x%04X) Image download complete - BAD HASH\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), image_id);
+         load_result = CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_BAD_HASH;
+         log_string += " status: BAD HASH";
+         break;
+      }
       default: {
          LOG_WARN("%s: <%s> (%u, 0x%04X) Image download complete - UNKNOWN\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), image_id);
          log_string += " status: UNKNOWN";
