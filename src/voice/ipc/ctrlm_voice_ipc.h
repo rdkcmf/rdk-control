@@ -134,9 +134,9 @@ public:
     long                                       return_code_internal;
     // End Error
 
-    // Short Utterance / Abort
+    // Error / Short Utterance / Abort
     int                                        reason;
-    // End Short Utterance / Abort
+    // End Error / Short Utterance / Abort
 
     // Stats
     ctrlm_voice_ipc_event_session_end_stb_stats_t    *stb_stats;

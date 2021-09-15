@@ -1911,6 +1911,7 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
             ctrlm_voice_ipc_event_session_end_t end;
             end.common                       = this->ipc_common_data;
             end.result                       = (session_end->success ? SESSION_END_SUCCESS : SESSION_END_FAILURE);
+            end.reason                       = stats->reason;
             end.return_code_protocol         = stats->ret_code_protocol;
             end.return_code_protocol_library = stats->ret_code_library;
             end.return_code_server           = this->server_ret_code;

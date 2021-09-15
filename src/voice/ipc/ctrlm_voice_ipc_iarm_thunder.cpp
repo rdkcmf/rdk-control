@@ -58,6 +58,7 @@
 #define JSON_SESSION_END_SERVER_ERROR                 "serverErrorCode"
 #define JSON_SESSION_END_SERVER_STR                   "serverErrorString"
 #define JSON_SESSION_END_INTERNAL_ERROR               "internalErrorCode"
+#define JSON_SESSION_END_ERROR_REASON                 "reason"
 #define JSON_SESSION_END_ABORT_REASON                 "reason"
 #define JSON_SESSION_END_SHORT_REASON                 "reason"
 #define JSON_SESSION_END_STB_STATS                    "stbStats"
@@ -243,7 +244,8 @@ bool ctrlm_voice_ipc_iarm_thunder_t::session_end(const ctrlm_voice_ipc_event_ses
             rc |= json_object_set_new_nocheck(event_data, JSON_SESSION_END_RESULT, json_string(JSON_SESSION_END_RESULT_ERROR));
 
             // Add Failure Data to result object
-            rc_failure  = json_object_set_new_nocheck(event_result, JSON_SESSION_END_PROTOCOL_ERROR, json_integer(session_end.return_code_protocol));
+            rc_failure  = json_object_set_new_nocheck(event_result, JSON_SESSION_END_ERROR_REASON, json_integer(session_end.reason));
+            rc_failure |= json_object_set_new_nocheck(event_result, JSON_SESSION_END_PROTOCOL_ERROR, json_integer(session_end.return_code_protocol));
             rc_failure |= json_object_set_new_nocheck(event_result, JSON_SESSION_END_PROTOCOL_LIBRARY_ERROR, json_integer(session_end.return_code_protocol_library));
             rc_failure |= json_object_set_new_nocheck(event_result, JSON_SESSION_END_SERVER_ERROR, json_integer(session_end.return_code_server));
             rc_failure |= json_object_set_new_nocheck(event_result, JSON_SESSION_END_SERVER_STR, json_string(session_end.return_code_server_str.c_str()));
