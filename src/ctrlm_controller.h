@@ -145,6 +145,7 @@ public:
    ctrlm_irdb_ir_entry_id_t get_irdb_entry_id_name_tv();
    ctrlm_irdb_ir_entry_id_t get_irdb_entry_id_name_avr();
    bool is_par_voice_supported() const;
+   bool is_haptics_feedback_supported() const;
 
    // Internal methods
    ctrlm_controller_id_t controller_id_get() const;
@@ -167,6 +168,7 @@ private:
 
 protected:
    bool                     par_voice_supported_;
+   bool                     haptics_feedback_supported_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_tv_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_avr_;
 };
