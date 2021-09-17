@@ -205,6 +205,7 @@ typedef struct {
    guint                              thread_monitor_timeout_val;
    guint                              thread_monitor_timeout_tag;
    guint                              thread_monitor_index;
+   bool                               thread_monitor_active;
    bool                               thread_monitor_minidump;
    string                             server_url_authservice;
    guint                              authservice_poll_val;
@@ -314,6 +315,7 @@ static void     ctrlm_queue_msg_destroy(gpointer msg);
 static gboolean ctrlm_timeout_recently_booted(gpointer user_data);
 static gboolean ctrlm_timeout_systemd_restart_delay(gpointer user_data);
 static gboolean ctrlm_thread_monitor(gpointer user_data);
+static gboolean ctrlm_was_cpu_halted(void);
 static gboolean ctrlm_start_iarm(gpointer user_data);
 #ifdef AUTH_ENABLED
 static gboolean ctrlm_authservice_poll(gpointer user_data);
@@ -506,6 +508,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.service_access_token_expiration_tag = 0;
    g_ctrlm.thread_monitor_timeout_val     = JSON_INT_VALUE_CTRLM_GLOBAL_THREAD_MONITOR_PERIOD * 1000;
    g_ctrlm.thread_monitor_index           = 0;
+   g_ctrlm.thread_monitor_active          = true;
    g_ctrlm.thread_monitor_minidump        = JSON_BOOL_VALUE_CTRLM_GLOBAL_THREAD_MONITOR_MINIDUMP;
    g_ctrlm.server_url_authservice         = JSON_STR_VALUE_CTRLM_GLOBAL_URL_AUTH_SERVICE;
    g_ctrlm.authservice_poll_val           = JSON_INT_VALUE_CTRLM_GLOBAL_AUTHSERVICE_POLL_PERIOD * 1000;
@@ -915,86 +918,102 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
    }
    #endif
 
-   // Check the response from each thread on the previous attempt
-   for(vector<ctrlm_thread_monitor_t>::iterator it = g_ctrlm.monitor_threads.begin(); it != g_ctrlm.monitor_threads.end(); it++) {
-      LOG_DEBUG("%s: Checking %s\n", __FUNCTION__, it->name);
+   if(ctrlm_was_cpu_halted()) {
+      LOG_INFO("%s: skipping response check due to power state <%s>\n", __FUNCTION__,ctrlm_power_state_str(g_ctrlm.power_state));
+      g_ctrlm.thread_monitor_active = false; // Deactivate thread monitoring
+   } else if(!g_ctrlm.thread_monitor_active) {
+      LOG_INFO("%s: activate due to power state <%s>\n", __FUNCTION__,ctrlm_power_state_str(g_ctrlm.power_state));
+      g_ctrlm.thread_monitor_active = true;  // Activate thread monitoring again
+   } else {
+      // Check the response from each thread on the previous attempt
+      for(vector<ctrlm_thread_monitor_t>::iterator it = g_ctrlm.monitor_threads.begin(); it != g_ctrlm.monitor_threads.end(); it++) {
+         LOG_DEBUG("%s: Checking %s\n", __FUNCTION__, it->name);
 
-      //ctrlm thread may run while db thread is stopped
-      if(((ctrlm_db_queue_msg_push_front == it->queue_push) || (ctrlm_db_queue_msg_push == it->queue_push)) &&
-        ((CTRLM_POWER_STATE_STANDBY      == g_ctrlm.power_state) ||
-        (CTRLM_POWER_STATE_DEEP_SLEEP    == g_ctrlm.power_state))) {
-            continue;
-      }
+         if(it->response != CTRLM_THREAD_MONITOR_RESPONSE_ALIVE) {
+            LOG_FATAL("%s: Thread %s is unresponsive\n", __FUNCTION__, it->name);
+            #ifdef BREAKPAD_SUPPORT
+            if(g_ctrlm.thread_monitor_minidump) {
+               LOG_FATAL("%s: Thread Monitor Minidump is enabled\n", __FUNCTION__);
 
-      if(it->response != CTRLM_THREAD_MONITOR_RESPONSE_ALIVE) {
-         LOG_FATAL("%s: Thread %s is unresponsive\n", __FUNCTION__, it->name);
-         #ifdef BREAKPAD_SUPPORT
-         if(g_ctrlm.thread_monitor_minidump) {
-            LOG_FATAL("%s: Thread Monitor Minidump is enabled\n", __FUNCTION__);
-
-            if(       0 == strncmp(it->name, CTRLM_THREAD_NAME_MAIN,          sizeof(CTRLM_THREAD_NAME_MAIN))) {
-               ctrlm_crash_ctrlm_main();
-            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_VOICE_SDK,     sizeof(CTRLM_THREAD_NAME_VOICE_SDK))) {
-               ctrlm_crash_vsdk();
-            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_RF4CE,         sizeof(CTRLM_THREAD_NAME_RF4CE))) {
-               #ifdef RF4CE_HAL_QORVO
-               ctrlm_crash_rf4ce_qorvo();
-               #else
-               ctrlm_crash_rf4ce_ti();
-               #endif
-            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_BLE,           sizeof(CTRLM_THREAD_NAME_BLE))) {
-               ctrlm_crash_ble();
-            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_DATABASE,      sizeof(CTRLM_THREAD_NAME_DATABASE))) {
-               ctrlm_crash_ctrlm_database();
-            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_DEVICE_UPDATE, sizeof(CTRLM_THREAD_NAME_DEVICE_UPDATE))) {
-               ctrlm_crash_ctrlm_device_update();
-            } else {
-               ctrlm_crash();
+               if(       0 == strncmp(it->name, CTRLM_THREAD_NAME_MAIN,          sizeof(CTRLM_THREAD_NAME_MAIN))) {
+                  ctrlm_crash_ctrlm_main();
+               } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_VOICE_SDK,     sizeof(CTRLM_THREAD_NAME_VOICE_SDK))) {
+                  ctrlm_crash_vsdk();
+               } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_RF4CE,         sizeof(CTRLM_THREAD_NAME_RF4CE))) {
+                  #ifdef RF4CE_HAL_QORVO
+                  ctrlm_crash_rf4ce_qorvo();
+                  #else
+                  ctrlm_crash_rf4ce_ti();
+                  #endif
+               } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_BLE,           sizeof(CTRLM_THREAD_NAME_BLE))) {
+                  ctrlm_crash_ble();
+               } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_DATABASE,      sizeof(CTRLM_THREAD_NAME_DATABASE))) {
+                  ctrlm_crash_ctrlm_database();
+               } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_DEVICE_UPDATE, sizeof(CTRLM_THREAD_NAME_DEVICE_UPDATE))) {
+                  ctrlm_crash_ctrlm_device_update();
+               } else {
+                  ctrlm_crash();
+               }
             }
+            #endif
+            ctrlm_quit_main_loop();
+            return (FALSE);
          }
-         #endif
-         ctrlm_quit_main_loop();
-         return (FALSE);
       }
    }
 
-   // Send a message to each thread to respond
-   for(vector<ctrlm_thread_monitor_t>::iterator it = g_ctrlm.monitor_threads.begin(); it != g_ctrlm.monitor_threads.end(); it++) {
-      LOG_DEBUG("%s: Sending %s\n", __FUNCTION__, it->name);
-      it->response = CTRLM_THREAD_MONITOR_RESPONSE_DEAD;
+   if(g_ctrlm.thread_monitor_active) { // Thread monitoring is active
+      // Send a message to each thread to respond
+      for(vector<ctrlm_thread_monitor_t>::iterator it = g_ctrlm.monitor_threads.begin(); it != g_ctrlm.monitor_threads.end(); it++) {
+         LOG_DEBUG("%s: Sending %s\n", __FUNCTION__, it->name);
+         it->response = CTRLM_THREAD_MONITOR_RESPONSE_DEAD;
 
-      if(it->queue_push != NULL) { // Allocate a message and send it to the thread's queue
-         ctrlm_thread_monitor_msg_t *msg = (ctrlm_thread_monitor_msg_t *)g_malloc(sizeof(ctrlm_thread_monitor_msg_t));
+         if(it->queue_push != NULL) { // Allocate a message and send it to the thread's queue
+            ctrlm_thread_monitor_msg_t *msg = (ctrlm_thread_monitor_msg_t *)g_malloc(sizeof(ctrlm_thread_monitor_msg_t));
 
-         if(NULL == msg) {
-            LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
-            g_assert(0);
-            ctrlm_quit_main_loop();
-            return(FALSE);
+            if(NULL == msg) {
+               LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
+               g_assert(0);
+               ctrlm_quit_main_loop();
+               return(FALSE);
+            }
+            msg->type     = CTRLM_MAIN_QUEUE_MSG_TYPE_TICKLE;
+            msg->response = &it->response;
+
+            (*(it->queue_push))((gpointer)msg);
+         } else if(it->obj_network != NULL){
+            ctrlm_thread_monitor_msg_t *msg = (ctrlm_thread_monitor_msg_t *)g_malloc(sizeof(ctrlm_thread_monitor_msg_t));
+
+            if(NULL == msg) {
+               LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
+               g_assert(0);
+               ctrlm_quit_main_loop();
+               return(FALSE);
+            }
+            msg->type        = CTRLM_MAIN_QUEUE_MSG_TYPE_THREAD_MONITOR_POLL;
+            msg->obj_network = it->obj_network;
+            msg->response    = &it->response;
+            ctrlm_main_queue_msg_push(msg);
+         } else if(it->function != NULL) {
+            (*it->function)(&it->response);
          }
-         msg->type     = CTRLM_MAIN_QUEUE_MSG_TYPE_TICKLE;
-         msg->response = &it->response;
-
-         (*(it->queue_push))((gpointer)msg);
-      } else if(it->obj_network != NULL){
-         ctrlm_thread_monitor_msg_t *msg = (ctrlm_thread_monitor_msg_t *)g_malloc(sizeof(ctrlm_thread_monitor_msg_t));
-
-         if(NULL == msg) {
-            LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
-            g_assert(0);
-            ctrlm_quit_main_loop();
-            return(FALSE);
-         }
-         msg->type        = CTRLM_MAIN_QUEUE_MSG_TYPE_THREAD_MONITOR_POLL;
-         msg->obj_network = it->obj_network;
-         msg->response    = &it->response;
-         ctrlm_main_queue_msg_push(msg);
-      } else if(it->function != NULL) {
-         (*it->function)(&it->response);
       }
    }
 
    return(TRUE);
+}
+
+// Returns true if the CPU was halted based on the current power state
+gboolean ctrlm_was_cpu_halted(void) {
+   #ifdef ENABLE_DEEP_SLEEP
+   if(g_ctrlm.power_state == CTRLM_POWER_STATE_STANDBY) {
+      return(TRUE);
+   }
+   #endif
+   if(g_ctrlm.power_state == CTRLM_POWER_STATE_DEEP_SLEEP || g_ctrlm.power_state == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION) {
+      return(TRUE);
+   }
+   return(FALSE);
 }
 
 void ctrlm_vsdk_thread_response(void *data) {
@@ -2594,6 +2613,8 @@ gpointer ctrlm_main_thread(gpointer param) {
 
             dqm->old_state = g_ctrlm.power_state;
             g_ctrlm.power_state = dqm->new_state;
+
+            LOG_INFO("%s: enter power state %s\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
 
             #ifdef ENABLE_DEEP_SLEEP
             /* We have a problem in that if a voice command fails and the EPG does not come up, then
