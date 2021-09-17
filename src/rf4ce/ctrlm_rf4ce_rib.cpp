@@ -536,15 +536,23 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_get(gboolean target, ctrlm_timestam
          break;
       }
       case CTRLM_RF4CE_RIB_ATTR_ID_MFG_TEST: {
-         if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) {
-            LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
-            status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-         } else if(index > 0x00) {
+         if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST) { // Mfg Test timing data
+            if((length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) || (length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+               value_length = property_read_mfg_test(data_buf, length);
+            } else {
+               LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
+               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+            }
+         } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT) { // Mfg Security Key Test Rib Result
+            if(length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
+               value_length = property_read_mfg_test_result(data_buf, length);
+            } else {
+               LOG_ERROR("%s: MFG Security Key Test Result  - Invalid Length (%u)\n", __FUNCTION__, length);
+               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+            }
+         } else {
             LOG_ERROR("%s: MFG Test - Invalid Index (%u)\n", __FUNCTION__, index);
             status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-         } else {
-            // add the payload to the response
-            value_length = property_read_mfg_test(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST);
          }
          break;
       }
@@ -1242,24 +1250,41 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set(gboolean target, ctrlm_timestam
          break;
       }
       case CTRLM_RF4CE_RIB_ATTR_ID_MFG_TEST: {
-         if(!target) {
-            LOG_ERROR("%s: controller write to read only identifier MFG TEST\n", __FUNCTION__);
-         } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) {
-            LOG_ERROR("%s: MFG TEST - Invalid Length (%u)\n", __FUNCTION__, length);
-            status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-         } else if(index > 0x00) {
+         if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST) { // Mfg Test timing data
+            if(target) {
+               if((length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) || (length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+                  // Store this data in the object
+                  property_write_mfg_test(data, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               } else {
+                  LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               }
+            } else {
+               LOG_ERROR("%s: controller write to read only identifier MFG TEST\n", __FUNCTION__);
+            }
+         } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT) { // Mfg Security Key Test Rib Result
+            if(!target || ctrlm_is_production_build()) {
+               if(length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
+                  // Store this data in the object
+                  property_write_mfg_test_result(data, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               } else {
+                  LOG_ERROR("%s: MFG Security Key Test Result - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               }
+            } else {
+               LOG_ERROR("%s: target failed to write to controller attribute identifier MFG SECURITY KEY TEST RESULT\n", __FUNCTION__);
+            }
+         } else {
             LOG_ERROR("%s: MFG TEST - Invalid Index (%u)\n", __FUNCTION__, index);
             status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-         } else {
-            // Store this data in the object
-            property_write_mfg_test(data, CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST);
-            status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
          }
          break;
       }
       case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_METHODS: {
          if(!target) {
-            LOG_ERROR("%s: controller write to read only indentifier POLLING METHODS\n", __FUNCTION__);
+            LOG_ERROR("%s: controller write to read only identifier POLLING METHODS\n", __FUNCTION__);
          } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS) {
             LOG_ERROR("%s: POLLING METHODS - Invalid Length (%u)\n", __FUNCTION__, length);
             status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
@@ -1274,7 +1299,7 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set(gboolean target, ctrlm_timestam
       }
       case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_CONFIGURATION: {
          if(!target) {
-            LOG_ERROR("%s: controller write to read only indentifier POLLING CONFIGURATION\n", __FUNCTION__);
+            LOG_ERROR("%s: controller write to read only identifier POLLING CONFIGURATION\n", __FUNCTION__);
          } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION) {
             LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
             status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
@@ -1318,7 +1343,7 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set(gboolean target, ctrlm_timestam
       }
       case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_CONFIGURATION: {
          if(!target) {
-            LOG_ERROR("%s: controller write to read only indentifier FAR FIELD CONFIGURATION\n", __FUNCTION__);
+            LOG_ERROR("%s: controller write to read only identifier FAR FIELD CONFIGURATION\n", __FUNCTION__);
          } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION) {
             LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
             status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
@@ -1346,7 +1371,7 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set(gboolean target, ctrlm_timestam
       }
       case CTRLM_RF4CE_RIB_ATTR_ID_DSP_CONFIGURATION: {
          if(!target) {
-            LOG_ERROR("%s: controller write to read only indentifier DSP CONFIGURATION\n", __FUNCTION__);
+            LOG_ERROR("%s: controller write to read only identifier DSP CONFIGURATION\n", __FUNCTION__);
          } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION) {
             LOG_ERROR("%s: DSP CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
             status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;

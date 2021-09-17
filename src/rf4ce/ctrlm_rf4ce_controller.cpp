@@ -192,10 +192,11 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    needs_reset_(false),
    did_reset_(false),
 #endif
-   fmr_supported_(false)
+   fmr_supported_(false),
+   mfg_test_result_(1)
 {
    LOG_INFO("ctrlm_obj_controller_rf4ce_t constructor - %u\n", controller_id);
-   
+
 #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    short_rf_retry_period_        = JSON_INT_VALUE_SHORT_RF_RETRY_PERIOD;
    utterance_duration_max_       = JSON_INT_VALUE_UTTERANCE_DURATION_MAX;
@@ -1187,6 +1188,15 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
    ctrlm_db_rf4ce_read_rib_configuration_complete(network_id, controller_id, (int *)&rib_configuration_complete_status_);
    ctrlm_db_rf4ce_read_time_last_heartbeat(network_id, controller_id, &time_last_heartbeat_);
 
+   ctrlm_db_rf4ce_read_mfg_test_result(network_id, controller_id, &data, &length);
+   if(data == NULL) {
+      LOG_WARN("%s: Not read from DB - Mfg Test Result\n", __FUNCTION__);
+   } else {
+      property_write_mfg_test_result(data, length);
+      ctrlm_db_free(data);
+      data = NULL;
+   }
+
    // Clear the loading flag so subsequent updates are rewritten to the DB
    loading_db_ = false;
 
@@ -1347,6 +1357,10 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
 
    ctrlm_db_rf4ce_write_rib_configuration_complete(network_id, controller_id, (int)rib_configuration_complete_status_);
    ctrlm_db_rf4ce_write_time_last_heartbeat(network_id, controller_id, time_last_heartbeat_);
+
+   if(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT == property_read_mfg_test_result(data, CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT)) {
+      ctrlm_db_rf4ce_write_mfg_test_result(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT);
+   }
 }
 
 void ctrlm_obj_controller_rf4ce_t::validation_result_set(ctrlm_rcu_binding_type_t binding_type, ctrlm_rcu_validation_type_t validation_type, ctrlm_rf4ce_result_validation_t result, time_t time_binding, time_t time_last_key) {
@@ -4369,11 +4383,66 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_stats(guchar *data, g
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_read_mfg_test(guchar *data, guchar length) {
+   if((!haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) ||
+      (haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+      LOG_ERROR("%s: INVALID Length for controller with HAPTICS <%s>\n", __FUNCTION__, (haptics_feedback_supported_ ? "ENABLED" : "DISABLED"));
+      return(0);
+   }
+
    return(obj_network_rf4ce_->property_read_mfg_test(data, length));
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_mfg_test(guchar *data, guchar length) {
+   if((!haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) ||
+      (haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+      LOG_ERROR("%s: INVALID Length for controller with HAPTICS <%s>\n", __FUNCTION__, (haptics_feedback_supported_ ? "ENABLED" : "DISABLED"));
+      return(0);
+   }
+
    return(obj_network_rf4ce_->property_write_mfg_test(data, length));
+}
+
+guchar ctrlm_obj_controller_rf4ce_t::property_read_mfg_test_result(guchar *data, guchar length) {
+   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT ) {
+      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
+      return(0);
+   }
+
+   if(!obj_network_rf4ce_->mfg_test_enabled()) {
+      LOG_ERROR("%s: Manufacturing testing is disabled\n", __FUNCTION__);
+      return(0);
+   }
+
+   // Load the data from the controller object
+   data[0]  = mfg_test_result_;
+
+   LOG_INFO("%s: MFG Security Key Test Result <%u>\n", __FUNCTION__, mfg_test_result_);
+   return(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT);
+}
+
+guchar ctrlm_obj_controller_rf4ce_t::property_write_mfg_test_result(guchar *data, guchar length) {
+   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
+      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
+      return(0);
+   }
+
+   if(!obj_network_rf4ce_->mfg_test_enabled()) {
+      LOG_ERROR("%s: Manufacturing testing is disabled\n", __FUNCTION__);
+      return(0);
+   }
+
+   guint8 mfg_test_result = data[0];
+
+   if(mfg_test_result_ != mfg_test_result) {
+      // Store the data on the controller object
+      mfg_test_result_ = mfg_test_result;
+      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
+         ctrlm_db_rf4ce_write_mfg_test_result(network_id_get(), controller_id_get(), data, length);
+      }
+   }
+
+   LOG_INFO("%s: MFG Security Key Test Result <%u>\n", __FUNCTION__, mfg_test_result_);
+   return(length);
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_polling_methods(guchar *data, guchar length) {
@@ -4381,7 +4450,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_polling_methods(guchar *data
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   
+
    polling_methods_ = (guint8)data[0];
 
    if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database

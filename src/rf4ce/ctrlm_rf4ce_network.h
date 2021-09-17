@@ -204,6 +204,8 @@ typedef struct {
    guint16  mic_delay;
    guint16  mic_duration;
    guint16  sweep_delay;
+   guint16  haptic_delay;
+   guint16  haptic_duration;
    guint16  reset_delay;
 } ctrlm_rf4ce_mfg_test_t;
 
@@ -354,7 +356,9 @@ public:
    void                                 voice_command_status_set(void *data, int size);
    gboolean                             mfg_test_enabled();
    guchar                               property_read_mfg_test(guchar *data, guchar length);
+   guchar                               property_read_mfg_test_result(guchar *data, guchar length);
    guchar                               property_write_mfg_test(guchar *data, guchar length);
+   guchar                               property_write_mfg_test_result(guchar *data, guchar length);
    // Polling Functions
    gboolean                             polling_configuration_by_controller_type(ctrlm_rf4ce_controller_type_t, guint8 *polling_methods, ctrlm_rf4ce_polling_configuration_t *configurations);
    void                                 notify_firmware(ctrlm_rf4ce_controller_type_t controller_type, ctrlm_rf4ce_device_update_image_type_t image_type, bool force_update, version_software_t version_software, version_hardware_t version_hardware_min, version_software_t version_bootloader_min);

@@ -176,9 +176,11 @@ class ctrlm_obj_network_rf4ce_t;
 #define CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATS              (16)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_STATS              (16)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST                   (8)
+#define CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS          (12)
+#define CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT            (1)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_DIAGNOSTICS        (20)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATISTICS         (16)
-#define CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES        (sizeof(battery_voltage_milestones_t)) 
+#define CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES        (sizeof(battery_voltage_milestones_t))
 #define CTRLM_RF4CE_RIB_ATTR_LEN_UPTIME_PRIVACY_INFO       (12)
 
 #define CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS_MINUS_LOAD_STATUS_BYTES (13)
@@ -198,6 +200,8 @@ class ctrlm_obj_network_rf4ce_t;
 #define CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID     (0x02)
 #define CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC    (0x01)
 #define CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_HEARTBEAT (0x01)
+#define CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST                     (0x00)
+#define CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT              (0x01)
 #define CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL                      (0x00)
 
 
@@ -885,6 +889,7 @@ private:
 #endif
    // HACK for XR15-704
    bool                                    fmr_supported_;
+   guint8                                  mfg_test_result_;
 
    ctrlm_timestamp_t                       checkin_time_;    ///< OUT - Timestamp indicating the most recent poll indication of the controller
 
@@ -978,6 +983,7 @@ private:
    guchar property_read_receiver_id(guchar *data, guchar length);
    guchar property_read_device_id(guchar *data, guchar length);
    guchar property_read_mfg_test(guchar *data, guchar length);
+   guchar property_read_mfg_test_result(guchar *data, guchar length);
    guchar property_read_polling_methods(guchar *data, guchar length);
    guchar property_read_polling_configuration_heartbeat(guchar *data, guchar length);
    guchar property_read_polling_configuration_mac(guchar *data, guchar length);
@@ -1078,6 +1084,7 @@ private:
    guchar property_write_receiver_id(guchar *data, guchar length);
    guchar property_write_device_id(guchar *data, guchar length);
    guchar property_write_mfg_test(guchar *data, guchar length);
+   guchar property_write_mfg_test_result(guchar *data, guchar length);
    guchar property_write_polling_methods(guchar *data, guchar length);
    guchar property_write_polling_configuration_heartbeat(guchar *data, guchar length);
    guchar property_write_polling_configuration_mac(guchar *data, guchar length);

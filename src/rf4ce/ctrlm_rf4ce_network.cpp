@@ -186,6 +186,8 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    mfg_test_.mic_delay           = JSON_INT_VALUE_NETWORK_RF4CE_MFG_TEST_MIC_DELAY;
    mfg_test_.mic_duration        = JSON_INT_VALUE_NETWORK_RF4CE_MFG_TEST_MIC_DURATION;
    mfg_test_.sweep_delay         = JSON_INT_VALUE_NETWORK_RF4CE_MFG_TEST_SWEEP_DELAY;
+   mfg_test_.haptic_delay        = JSON_INT_VALUE_NETWORK_RF4CE_MFG_TEST_HAPTIC_DELAY;
+   mfg_test_.haptic_duration     = JSON_INT_VALUE_NETWORK_RF4CE_MFG_TEST_HAPTIC_DURATION;
    mfg_test_.reset_delay         = JSON_INT_VALUE_NETWORK_RF4CE_MFG_TEST_RESET_DELAY;
    polling_methods_              = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_TARGET_METHODS;
    max_fmr_controllers_          = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_TARGET_FMR_CONTROLLERS_MAX;
@@ -628,6 +630,8 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
         sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_MIC_DELAY, mfg_test_.mic_delay);
         sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_MIC_DURATION, mfg_test_.mic_duration);
         sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_SWEEP_DELAY, mfg_test_.sweep_delay);
+        sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_HAPTIC_DELAY, mfg_test_.haptic_delay);
+        sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_HAPTIC_DURATION, mfg_test_.haptic_duration);
         sub_conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_RESET_DELAY, mfg_test_.reset_delay);
       }
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 11)
@@ -723,6 +727,8 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
    LOG_INFO("%s: Mfg Test Mic Delay            %u\n",       __FUNCTION__, mfg_test_.mic_delay);
    LOG_INFO("%s: Mfg Test Mic Duration         %u\n",       __FUNCTION__, mfg_test_.mic_duration);
    LOG_INFO("%s: Mfg Test Sweep Delay          %u\n",       __FUNCTION__, mfg_test_.sweep_delay);
+   LOG_INFO("%s: Mfg Test Haptic Delay         %u\n",       __FUNCTION__, mfg_test_.haptic_delay);
+   LOG_INFO("%s: Mfg Test Haptic Duration      %u\n",       __FUNCTION__, mfg_test_.haptic_duration);
    LOG_INFO("%s: Mfg Test Reset Delay          %u\n",       __FUNCTION__, mfg_test_.reset_delay);
 #if (CTRLM_HAL_RF4CE_API_VERSION >= 11)
    LOG_INFO("%s: DPI Pattern List              %u\n",       __FUNCTION__, dpi_pattern_list);
@@ -2697,31 +2703,49 @@ void ctrlm_obj_network_rf4ce_t::req_process_polling_action_push(void *data, int 
 
 guchar ctrlm_obj_network_rf4ce_t::property_read_mfg_test(guchar *data, guchar length) {
    THREAD_ID_VALIDATE();
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) {
+   if((length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) && (length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
+
    if(!mfg_test_enabled()) {
     LOG_ERROR("%s: Manufacturing testing is disabled\n", __FUNCTION__);
     return 0;
    }
-   // Load the data from the target object
-   data[0]  =  mfg_test_.mic_delay          & 0xFF;
-   data[1]  = (mfg_test_.mic_delay >> 8)    & 0xFF;
-   data[2]  =  mfg_test_.mic_duration       & 0xFF;
-   data[3]  = (mfg_test_.mic_duration >> 8) & 0xFF;
-   data[4]  =  mfg_test_.sweep_delay        & 0xFF;
-   data[5]  = (mfg_test_.sweep_delay >> 8)  & 0xFF;
-   data[6]  =  mfg_test_.reset_delay        & 0xFF;
-   data[7]  = (mfg_test_.reset_delay >> 8)  & 0xFF;
 
-   LOG_INFO("%s: Mic Delay <%u>, Mic Duration <%u>, Sweep Delay <%u>, Reset Delay <%u>\n", __FUNCTION__, mfg_test_.mic_delay, mfg_test_.mic_duration, mfg_test_.sweep_delay, mfg_test_.reset_delay);
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST);
+   // Load the data from the target object
+   if(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS == length) {
+      data[0]  =  mfg_test_.mic_delay             & 0xFF;
+      data[1]  = (mfg_test_.mic_delay >> 8)       & 0xFF;
+      data[2]  =  mfg_test_.mic_duration          & 0xFF;
+      data[3]  = (mfg_test_.mic_duration >> 8)    & 0xFF;
+      data[4]  =  mfg_test_.sweep_delay           & 0xFF;
+      data[5]  = (mfg_test_.sweep_delay >> 8)     & 0xFF;
+      data[6]  =  mfg_test_.haptic_delay          & 0xFF;
+      data[7]  = (mfg_test_.haptic_delay >> 8)    & 0xFF;
+      data[8]  =  mfg_test_.haptic_duration       & 0xFF;
+      data[9]  = (mfg_test_.haptic_duration >> 8) & 0xFF;
+      data[10] =  mfg_test_.reset_delay           & 0xFF;
+      data[11] = (mfg_test_.reset_delay >> 8)     & 0xFF;
+      LOG_INFO("%s: Mic Delay <%u>/Duration <%u>, Sweep Delay <%u>, Haptics Delay <%u>/Duration <%u>, Reset Delay <%u>\n", __FUNCTION__, mfg_test_.mic_delay, mfg_test_.mic_duration, mfg_test_.sweep_delay, mfg_test_.haptic_delay, mfg_test_.haptic_duration, mfg_test_.reset_delay);
+   } else {
+      data[0]  =  mfg_test_.mic_delay          & 0xFF;
+      data[1]  = (mfg_test_.mic_delay >> 8)    & 0xFF;
+      data[2]  =  mfg_test_.mic_duration       & 0xFF;
+      data[3]  = (mfg_test_.mic_duration >> 8) & 0xFF;
+      data[4]  =  mfg_test_.sweep_delay        & 0xFF;
+      data[5]  = (mfg_test_.sweep_delay >> 8)  & 0xFF;
+      data[6]  =  mfg_test_.reset_delay        & 0xFF;
+      data[7]  = (mfg_test_.reset_delay >> 8)  & 0xFF;
+      LOG_INFO("%s: Mic Delay <%u>, Mic Duration <%u>, Sweep Delay <%u>, Reset Delay <%u>\n", __FUNCTION__, mfg_test_.mic_delay, mfg_test_.mic_duration, mfg_test_.sweep_delay, mfg_test_.reset_delay);
+   }
+
+   return(length);
 }
 
 guchar ctrlm_obj_network_rf4ce_t::property_write_mfg_test(guchar *data, guchar length) {
    THREAD_ID_VALIDATE();
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) {
+   if((length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) && (length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
@@ -2731,13 +2755,23 @@ guchar ctrlm_obj_network_rf4ce_t::property_write_mfg_test(guchar *data, guchar l
     return 0;
    }
 
-   mfg_test_.mic_delay    = data[0] + (data[1] << 8);
-   mfg_test_.mic_duration = data[2] + (data[3] << 8);
-   mfg_test_.sweep_delay  = data[4] + (data[5] << 8);
-   mfg_test_.reset_delay  = data[6] + (data[7] << 8);
+   if(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS == length) {
+      mfg_test_.mic_delay       = data[0]  + (data[1]  << 8);
+      mfg_test_.mic_duration    = data[2]  + (data[3]  << 8);
+      mfg_test_.sweep_delay     = data[4]  + (data[5]  << 8);
+      mfg_test_.haptic_delay    = data[6]  + (data[7]  << 8);
+      mfg_test_.haptic_duration = data[8]  + (data[9]  << 8);
+      mfg_test_.reset_delay     = data[10] + (data[11] << 8);
+      LOG_INFO("%s: Mic Delay <%u>/Duration <%u>, Sweep Delay <%u>, Haptics Delay <%u>/Duration <%u>, Reset Delay <%u>\n", __FUNCTION__, mfg_test_.mic_delay, mfg_test_.mic_duration, mfg_test_.sweep_delay, mfg_test_.haptic_delay, mfg_test_.haptic_duration, mfg_test_.reset_delay);
+   } else {
+      mfg_test_.mic_delay    = data[0] + (data[1] << 8);
+      mfg_test_.mic_duration = data[2] + (data[3] << 8);
+      mfg_test_.sweep_delay  = data[4] + (data[5] << 8);
+      mfg_test_.reset_delay  = data[6] + (data[7] << 8);
+      LOG_INFO("%s: Mic Delay <%u>, Mic Duration <%u>, Sweep Delay <%u>, Reset Delay <%u>\n", __FUNCTION__, mfg_test_.mic_delay, mfg_test_.mic_duration, mfg_test_.sweep_delay, mfg_test_.reset_delay);
+   }
 
-   LOG_INFO("%s: Mic Delay <%u>, Mic Duration <%u>, Sweep Delay <%u>, Reset Delay <%u>\n", __FUNCTION__, mfg_test_.mic_delay, mfg_test_.mic_duration, mfg_test_.sweep_delay, mfg_test_.reset_delay);
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST);
+   return(length);
 }
 
 gint *ctrlm_obj_network_rf4ce_t::controller_binding_in_progress_get_pointer() {

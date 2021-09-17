@@ -97,6 +97,8 @@
 #define CTRLM_RCU_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS    (15)    ///< RIB Attribute Length - Controller IRDB Status
 #define CTRLM_RCU_RIB_ATTR_LEN_TARGET_IRDB_STATUS        (13)    ///< RIB Attribute Length - Target IRDB Status
 #define CTRLM_RCU_RIB_ATTR_LEN_MFG_TEST                   (8)    ///< RIB Attribute Length - MFG Test
+#define CTRLM_RCU_RIB_ATTR_LEN_MFG_TEST_HAPTICS          (12)    ///< RIB Attribute Length - MFG Test with haptics
+#define CTRLM_RCU_RIB_ATTR_LEN_MFG_TEST_RESULT            (1)    ///< RIB Attribute Length - MFG Security Key Test Rib Result
 
 #define CTRLM_RCU_POLLING_RESPONSE_DATA_LEN               (5)
 /// @}

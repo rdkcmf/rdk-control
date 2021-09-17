@@ -83,6 +83,8 @@
          "mic_delay"                     :      3000,
          "mic_duration"                  :      4000,
          "sweep_delay"                   :      5000,
+         "haptic_delay"                  :      2000,
+         "haptic_duration"               :      1000,
          "reset_delay"                   :      6000
       },
       "dpi_pattern"                      :         0,
