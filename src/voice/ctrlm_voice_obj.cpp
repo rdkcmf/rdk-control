@@ -206,7 +206,7 @@ bool ctrlm_voice_t::privacy_mode(void) {
    bool privacy;
 
    if(!xrsr_privacy_mode_get(&privacy)) {
-      LOG_ERROR("%s: error getting privcay mode, defaulting to ON\n", __FUNCTION__);
+      LOG_ERROR("%s: error getting privacy mode, defaulting to ON\n", __FUNCTION__);
       privacy = true;
    }
 
@@ -360,6 +360,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         ctrlm_db_voice_read_init_blob(init);
         ctrlm_db_voice_read_audio_ducking_beep_enable(this->audio_ducking_beep_enabled);
         audio_settings.ducking_beep = this->audio_ducking_beep_enabled;
+
         ctrlm_db_voice_read_par_voice_status(this->prefs.par_voice_enabled);
     } else {
         LOG_WARN("%s: Reading voice settings from old style DB\n", __FUNCTION__);
@@ -2635,16 +2636,16 @@ void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
          }
          break;
       case CTRLM_POWER_STATE_ON: {
-            bool update = false;
             ctrlm_voice_device_status_t status;
-            //Handle case of device put into privacy mode while in standby
-            if(privacy_mode()) {
-               #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
-               status = CTRLM_VOICE_DEVICE_STATUS_PRIVACY;
-               #else
-               status = CTRLM_VOICE_DEVICE_STATUS_DISABLED;
-               #endif
-               this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, status, &update);
+            //Handle privacy mode changing in standby and woken with remote
+            #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
+            status = privacy_mode() ? CTRLM_VOICE_DEVICE_STATUS_PRIVACY : CTRLM_VOICE_DEVICE_STATUS_READY;
+            #else
+            status = privacy_mode() ? CTRLM_VOICE_DEVICE_STATUS_DISABLED : CTRLM_VOICE_DEVICE_STATUS_READY;
+            #endif
+            if(status != this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE]) {
+                this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, status);
+                ctrlm_db_voice_write_device_status(CTRLM_VOICE_DEVICE_MICROPHONE, status);
             }
 
             if(!xrsr_power_mode_set(XRSR_POWER_MODE_FULL)) {
@@ -2689,35 +2690,6 @@ void ctrlm_voice_t::voice_device_status_change(ctrlm_voice_device_t device, ctrl
     }
 }
 
-#ifdef ENABLE_DEEP_SLEEP
-void ctrlm_voice_t::voice_standby_session_request(void) {
-    ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_DSP;
-    ctrlm_controller_id_t controller_id = CTRLM_MAIN_CONTROLLER_ID_DSP;
-    ctrlm_voice_device_t device = CTRLM_VOICE_DEVICE_MICROPHONE;
-    ctrlm_voice_session_response_status_t voice_status;
-    ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_PCM;
-
-    #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
-    //If the user un-muted the device in standby, we must un-mute our path
-    //If the user muted the device in standby we won't be here
-    if(this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) {
-       this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, CTRLM_VOICE_DEVICE_STATUS_READY);
-    }
-    #endif
-LOG_INFO("%s: calling voice_session_req\n", __FUNCTION__);
-    voice_status = voice_session_req(network_id, controller_id, device, format, NULL, "DSP", "1", "1", 0.0, false, NULL, NULL, NULL, false);
-
-    if(VOICE_SESSION_RESPONSE_AVAILABLE != voice_status) {
-       LOG_ERROR("%s: Failed opening voice session in ctrlm_voice_t, error = <%d>\n", __FUNCTION__, voice_status);
-    }
-}
-#endif
-
-bool ctrlm_voice_t::is_standby_microphone(void) {
-   return ((this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
-
-}
-
 #ifdef BEEP_ON_KWD_ENABLED
 void ctrlm_voice_system_audio_player_event_handler(system_audio_player_event_t event, void *user_data) {
    if(user_data == NULL) {
@@ -2759,3 +2731,32 @@ void ctrlm_voice_system_audio_player_event_handler(system_audio_player_event_t e
    }
 }
 #endif
+
+#ifdef ENABLE_DEEP_SLEEP
+void ctrlm_voice_t::voice_standby_session_request(void) {
+    ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_DSP;
+    ctrlm_controller_id_t controller_id = CTRLM_MAIN_CONTROLLER_ID_DSP;
+    ctrlm_voice_device_t device = CTRLM_VOICE_DEVICE_MICROPHONE;
+    ctrlm_voice_session_response_status_t voice_status;
+    ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_PCM;
+
+    #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
+    //If the user un-muted the microphones in standby, we must un-mute our components
+    if(this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) {
+        this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, CTRLM_VOICE_DEVICE_STATUS_READY);
+        ctrlm_db_voice_write_device_status(CTRLM_VOICE_DEVICE_MICROPHONE, this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE]);
+    }
+    #endif
+
+    voice_status = voice_session_req(network_id, controller_id, device, format, NULL, "DSP", "1", "1", 0.0, false, NULL, NULL, NULL, false);
+
+    if(VOICE_SESSION_RESPONSE_AVAILABLE != voice_status) {
+       LOG_ERROR("%s: Failed opening voice session in ctrlm_voice_t, error = <%d>\n", __FUNCTION__, voice_status);
+    }
+}
+#endif
+
+bool ctrlm_voice_t::is_standby_microphone(void) {
+   return ((this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
+
+}
