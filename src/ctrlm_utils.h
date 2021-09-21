@@ -29,6 +29,7 @@
 #include "ctrlm_hal.h"
 #include "ctrlm_hal_rf4ce.h"
 #include "libIBus.h"
+#include "libIBusDaemon.h"
 
 #define TIMEOUT_TAG_INVALID (0)
 
@@ -142,6 +143,7 @@ void        ctrlm_archive_extract_ble_tmp_dir_make(std::string tmp_dir_path);
 bool        ctrlm_archive_extract_ble_check_dir_exists(std::string path);
 std::string ctrlm_xml_tag_text_get(std::string xml, std::string tag);
 
+ctrlm_power_state_t ctrlm_iarm_power_state_map(IARM_Bus_PowerState_t iarm_power_state);
 #ifdef __cplusplus
 }
 #endif

@@ -729,17 +729,10 @@ IARM_Result_t ctrlm_event_handler_power_pre_change(void* pArgs)
        g_assert(0);
        return IARM_RESULT_OOM;
     }
-    //ctrlm is on, sleep, or standby. For Llama standby == networked standby power manager transitions from nsm to light sleep to on but ctrlm needs to be "on" during light sleep to process audio
+
     msg->header.type = CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE;
     msg->system = true;
-    switch(pParams->newState) {
-       case IARM_BUS_PWRMGR_POWERSTATE_ON:
-       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
-       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: msg->new_state = CTRLM_POWER_STATE_ON;         break;
-       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP:
-       case IARM_BUS_PWRMGR_POWERSTATE_OFF:                 msg->new_state = CTRLM_POWER_STATE_DEEP_SLEEP; break;
-    }
-
+    msg->new_state = ctrlm_iarm_power_state_map(pParams->newState);
     LOG_INFO("%s: Power State set to %s >\n", __FUNCTION__, ctrlm_power_state_str(msg->new_state));
     ctrlm_main_queue_msg_push(msg);
 
@@ -971,26 +964,19 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_status(void *arg) {
 }
 
 ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void) {
-   IARM_Result_t err;
-   IARM_Bus_PWRMgr_GetPowerState_Param_t param;
-   ctrlm_power_state_t power_state = CTRLM_POWER_STATE_ON;
+    IARM_Result_t err;
+    IARM_Bus_PWRMgr_GetPowerState_Param_t param;
+    ctrlm_power_state_t power_state = CTRLM_POWER_STATE_ON;
 
-   err = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetPowerState, (void *)&param, sizeof(param));
-   if(err == IARM_RESULT_SUCCESS) {
-      switch(param.curState) {
-         case IARM_BUS_PWRMGR_POWERSTATE_ON:
-         case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
-         case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: power_state = CTRLM_POWER_STATE_ON;         break;
-         case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP:
-         case IARM_BUS_PWRMGR_POWERSTATE_OFF:                 power_state = CTRLM_POWER_STATE_DEEP_SLEEP; break;
-      }
+    err = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetPowerState, (void *)&param, sizeof(param));
+    if(err == IARM_RESULT_SUCCESS) {
+        power_state = ctrlm_iarm_power_state_map(param.curState);
+        LOG_INFO("%s: power state is : <%s>\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+    } else {
+        LOG_ERROR("%s: IARM bus failed to read power state, defaulting to %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
+    }
 
-      LOG_INFO("%s: power state is : <%s>\n", __FUNCTION__, ctrlm_power_state_str(power_state));
-      } else {
-         LOG_ERROR("%s: IARM bus failed to read power state, defaulting to %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
-      }
-
-   return power_state;
+    return power_state;
 }
 
 #ifdef ENABLE_DEEP_SLEEP

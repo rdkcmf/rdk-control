@@ -1765,3 +1765,18 @@ std::string ctrlm_xml_tag_text_get(std::string xml, std::string tag) {
    //grab all content between start and end tag
    return xml.substr(idx, idx2 - idx);
 }
+
+ctrlm_power_state_t ctrlm_iarm_power_state_map(IARM_Bus_PowerState_t iarm_power_state) {
+    ctrlm_power_state_t ctrlm_power_state = CTRLM_POWER_STATE_ON;
+
+    switch(iarm_power_state) {
+       case IARM_BUS_PWRMGR_POWERSTATE_ON:                  ctrlm_power_state = CTRLM_POWER_STATE_ON;          break;
+       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
+       //IARM standby means not to change state while CTRLM standby means to handle NSM
+       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: ctrlm_power_state = CTRLM_POWER_STATE_LIGHT_SLEEP; break;
+       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP:
+       case IARM_BUS_PWRMGR_POWERSTATE_OFF:                 ctrlm_power_state = CTRLM_POWER_STATE_DEEP_SLEEP;  break;
+    }
+
+    return ctrlm_power_state;
+}

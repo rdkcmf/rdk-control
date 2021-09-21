@@ -401,8 +401,8 @@ int main(int argc, char *argv[]) {
    #else
    FILE *fp= NULL;;
    if(( fp = fopen("/tmp/.SecureDumpEnable", "r")) != NULL) {
-	minidump_path = "/opt/secure/minidumps";
-	fclose(fp);
+        minidump_path = "/opt/secure/minidumps";
+        fclose(fp);
    }
    #endif
 
@@ -2418,9 +2418,18 @@ gpointer ctrlm_main_thread(gpointer param) {
             //Deep Sleep may set Networked Standby, may need other power state modifications later
             //Internal power state changes must not check wakeup reason
             if(dqm->system) {
-               if((dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) && ctrlm_main_iarm_networked_standby())  {
+               if(dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP && ctrlm_main_iarm_networked_standby())  {
                   LOG_INFO("%s: deep sleep message set Network Standby flag\n", __FUNCTION__);
                   dqm->new_state = CTRLM_POWER_STATE_STANDBY;
+               }
+               if(dqm->new_state == CTRLM_POWER_STATE_LIGHT_SLEEP) {
+                  LOG_INFO("%s: light sleep, skip\n", __FUNCTION__);
+                  dqm->new_state = g_ctrlm.power_state;
+               }
+                //Sky EPG sends excess ON messages, filter them. Will not adversely affect other EPGs
+               if(dqm->new_state == CTRLM_POWER_STATE_ON && g_ctrlm.power_state == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION) {
+                  LOG_INFO("%s: handling standby voice, ignore ON\n", __FUNCTION__);
+                  dqm->new_state = g_ctrlm.power_state;
                }
             }
             #endif
@@ -4125,7 +4134,7 @@ void ctrlm_event_handler_ir(const char *owner, IARM_EventId_t event_id, void *da
          ctrlm_controller_product_name_get(controller_id, source_name);
       } else {
          controller_id = -1;
-	 //Check to see if the tag was included.  If so, use it.
+         //Check to see if the tag was included.  If so, use it.
          ctrlm_check_for_key_tag(key_tag);
          safec_rc = strcpy_s(source_name, sizeof(source_name), ctrlm_rcu_ir_remote_types_str(g_ctrlm.last_key_info.last_ir_remote_type));
          ERR_CHK(safec_rc);
