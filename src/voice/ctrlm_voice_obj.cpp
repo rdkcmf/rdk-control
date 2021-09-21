@@ -2667,8 +2667,6 @@ void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
 
    if(!xrsr_power_mode_set(xrsr_power_mode)) {
       LOG_ERROR("%s: failed to set xrsr to power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
-   } else { 
-      this->voice_sdk_update_routes();
    }
 }
 

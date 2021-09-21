@@ -192,9 +192,9 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
                 #ifdef ENABLE_DEEP_SLEEP
-                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &this->prefs.standby_params : NULL;
-                #else
-                routes[i].dsts[0].params           = NULL;
+                if(src == XRSR_SRC_MICROPHONE) {
+                    routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.standby_params;
+                }
                 #endif
                 i++;
             }
@@ -215,9 +215,9 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
                 #ifdef ENABLE_DEEP_SLEEP
-                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &this->prefs.standby_params : NULL;
-                #else
-                routes[i].dsts[0].params          = NULL;
+                if(src == XRSR_SRC_MICROPHONE) {
+                    routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.standby_params;
+                }
                 #endif
                 i++;
             }
@@ -240,9 +240,9 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
                 #ifdef ENABLE_DEEP_SLEEP
-                routes[i].dsts[0].params          = ((src == XRSR_SRC_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY)) ? &this->prefs.standby_params : NULL;
-                #else
-                routes[i].dsts[0].params         = NULL;
+                if(src == XRSR_SRC_MICROPHONE) {
+                    routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.standby_params;
+                }
                 #endif
                 i++;
                 LOG_INFO("%s: url translation from %s to %s\n", __FUNCTION__, url->c_str(), urls_translated[translated_index].c_str());
@@ -266,7 +266,11 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
-                routes[i].dsts[0].params          = NULL;
+                #ifdef ENABLE_DEEP_SLEEP
+                if(src == XRSR_SRC_MICROPHONE) {
+                    routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.standby_params;
+                }
+                #endif
                 i++;
             }
         }
