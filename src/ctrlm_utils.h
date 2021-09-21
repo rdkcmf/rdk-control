@@ -30,6 +30,9 @@
 #include "ctrlm_hal_rf4ce.h"
 #include "libIBus.h"
 #include "libIBusDaemon.h"
+#ifdef ENABLE_DEEP_SLEEP
+#include "deepSleepMgr.h"
+#endif
 
 #define TIMEOUT_TAG_INVALID (0)
 
@@ -111,6 +114,9 @@ const char *ctrlm_rf4ce_reboot_reason_str(controller_reboot_reason_t reboot_reas
 const char *ctrlm_ir_state_str(ctrlm_ir_state_t state);
 
 const char *ctrlm_power_state_str(ctrlm_power_state_t state);
+#ifdef ENABLE_DEEP_SLEEP
+const char *ctrlm_wakeup_reason_str(DeepSleep_WakeupReason_t wakeup_reason);
+#endif
 
 bool        ctrlm_file_copy(const char* src, const char* dst, bool overwrite);
 bool        ctrlm_file_exists(const char* path);

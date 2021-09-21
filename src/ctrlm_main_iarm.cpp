@@ -1001,7 +1001,7 @@ gboolean ctrlm_main_iarm_wakeup_reason_voice(void) {
       return false;
    }
 
-   LOG_INFO("%s wakeup_reason %d\n", __FUNCTION__, wakeup_reason);
+   LOG_INFO("%s wakeup_reason %s\n", __FUNCTION__, ctrlm_wakeup_reason_str(wakeup_reason));
    
    if(wakeup_reason != DEEPSLEEP_WAKEUPREASON_VOICE) {
       return false;

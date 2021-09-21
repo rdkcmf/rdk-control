@@ -2451,7 +2451,6 @@ gpointer ctrlm_main_thread(gpointer param) {
              * from deep sleep reason. Using a unique power state to allow for correct transitions
              */
             if((dqm->old_state == CTRLM_POWER_STATE_STANDBY && ctrlm_main_iarm_wakeup_reason_voice())) {
-               LOG_INFO("%s wake from voice in standby, initiate voice transaction\n,", __FUNCTION__);
                g_ctrlm.power_state = CTRLM_POWER_STATE_STANDBY_VOICE_SESSION;
                g_ctrlm.voice_session->voice_standby_session_request();
                //voice will transition power state to ON after voice transaction
