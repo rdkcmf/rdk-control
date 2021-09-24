@@ -1752,6 +1752,13 @@ void ctrlm_voice_t::voice_session_notify_abort(ctrlm_network_id_t network_id, ct
         end.reason                   = (int)reason;
         this->voice_ipc->session_end(end);
     }
+
+    //device is INVALID here so cannot use is_standby_microphone
+    if(ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION) {
+        if(!ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false)) {
+            LOG_ERROR("%s: failed to set power state!\n");
+        }
+    }
 }
 // Application Interface Implementation End
 
