@@ -238,7 +238,6 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    safec_rc = memset_s(&ff_configuration_, sizeof(ff_configuration_), 0, sizeof(ff_configuration_));
    ERR_CHK(safec_rc);
 
-   process_xconf();
    load_config(json_obj_net_rf4ce);
 
    is_import_                    = FALSE;
@@ -680,6 +679,7 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
    }
    //Read tr181 values here. tr181 values will override any config file values.
    polling_config_tr181_read();
+   process_xconf();
 
    LOG_INFO("%s: User String                   <%s>\n",     __FUNCTION__, user_string_.c_str());
    LOG_INFO("%s: Timeout Key Release           %u ms\n",    __FUNCTION__, timeout_key_release_);
