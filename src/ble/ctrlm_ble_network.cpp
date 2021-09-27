@@ -1301,10 +1301,9 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   break;
                case CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY:
                   LOG_INFO("%s: Controller (0x%llX) notified last wakeup key = <0x%X>\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.last_wakeup_key);
-                  state_ = CTRLM_BLE_STATE_WAKEUP_KEY;
                   controller->setLastWakeupKey(dqm->rcu_data.last_wakeup_key);
-                  report_status = true;
-                  print_status = true;
+                  report_status = false;
+                  print_status = false;
                   break;
                default:
                   LOG_WARN("%s: Unhandled Property: %d !!!!!!!!!!!!!!!!!!!!!!!!\n", __PRETTY_FUNCTION__, dqm->property_updated);
@@ -1343,7 +1342,7 @@ void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_p
          msg->remotes[i].deviceid         = it->second->getDeviceID();
          msg->remotes[i].batterylevel     = it->second->getBatteryPercent();
          msg->remotes[i].connected        = (it->second->getConnected()) ? 1 : 0;
-         msg->remotes[i].wakeup_key_code  = it->second->getLastWakeupKey();
+         msg->remotes[i].wakeup_key_code  = (CTRLM_KEY_CODE_INVALID == it->second->getLastWakeupKey()) ? -1 : it->second->getLastWakeupKey();
 
          safec_rc = strncpy_s(msg->remotes[i].ieee_address_str, sizeof(msg->remotes[i].ieee_address_str), ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
          safec_rc = strncpy_s(msg->remotes[i].btlswver, sizeof(msg->remotes[i].btlswver), it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
@@ -1902,6 +1901,12 @@ void ctrlm_obj_network_ble_t::power_state_change(ctrlm_main_queue_power_state_ch
    if ((dqm->old_state != CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) ||
        (dqm->old_state == CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP))
    {
+      // When going into deep sleep, need to reset wakeup key to invalid
+      if (dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP) {
+         for(auto &controller : controllers_) {
+            controller.second->setLastWakeupKey(CTRLM_KEY_CODE_INVALID);
+         }
+      }
       ctrlm_hal_ble_HandleDeepsleep_params_t params;
       params.waking_up = dqm->old_state == CTRLM_POWER_STATE_DEEP_SLEEP && dqm->new_state != CTRLM_POWER_STATE_DEEP_SLEEP;
       if (hal_api_handle_deepsleep_) {

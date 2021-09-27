@@ -68,7 +68,6 @@ const char *ctrlm_ble_utils_RcuStateToString(ctrlm_ble_state_t state)
         case CTRLM_BLE_STATE_PAIRING:         return("PAIRING");
         case CTRLM_BLE_STATE_COMPLETE:        return("COMPLETE");
         case CTRLM_BLE_STATE_FAILED:          return("FAILED");
-        case CTRLM_BLE_STATE_WAKEUP_KEY:      return("WAKEUP_KEY");
         case CTRLM_BLE_STATE_UNKNOWN:         return("UNKNOWN");
         default:                              return("INVALID__TYPE");
     }

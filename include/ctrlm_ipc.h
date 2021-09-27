@@ -396,7 +396,6 @@ typedef enum {
    CTRLM_BLE_STATE_PAIRING,                 // device is pairing to an RCU
    CTRLM_BLE_STATE_COMPLETE,                // device successfully paired to an RCU
    CTRLM_BLE_STATE_FAILED,                  // device failed to find or pair to an RCU
-   CTRLM_BLE_STATE_WAKEUP_KEY,              // device notified sleep wakeup keypress
    CTRLM_BLE_STATE_UNKNOWN                  // unknown status
 } ctrlm_ble_state_t;
 
@@ -708,7 +707,7 @@ typedef struct {
    char                    avr_code[CTRLM_MAX_PARAM_STR_LEN];
    unsigned char           connected;
    int                     batterylevel;
-   unsigned char           wakeup_key_code;
+   int                     wakeup_key_code;
 } ctrlm_rcu_data_t;
 
 // This struct is used for the event (CTRLM_RCU_IARM_EVENT_RCU_STATUS) and get (CTRLM_MAIN_IARM_CALL_GET_RCU_STATUS)

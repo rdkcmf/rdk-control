@@ -57,6 +57,7 @@ ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t(ctrlm_controller_id_t con
    last_key_time_flush_(0), // First key will always get flushed to DB
    last_key_status_(CTRLM_KEY_STATUS_INVALID),
    last_key_code_(CTRLM_KEY_CODE_INVALID),
+   last_wakeup_key_code_(CTRLM_KEY_CODE_INVALID),
    battery_percent_(0),
    voice_cmd_count_today_(0),
    voice_cmd_count_yesterday_(0),
