@@ -508,6 +508,7 @@ private:
    ctrlm_voice_session_rsp_confirm_t       voice_session_rsp_confirm_;
    void *                                  voice_session_rsp_confirm_param_;
    ctrlm_rf4ce_voice_session_rsp_params_t  voice_session_rsp_params_;
+   guint32                                 voice_session_active_count_;
    #endif
    voice_session_response_stream_t         stream_begin_;
    gint16                                  stream_offset_;

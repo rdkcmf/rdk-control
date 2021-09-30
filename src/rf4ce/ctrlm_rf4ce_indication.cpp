@@ -408,6 +408,9 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
          ERR_CHK(safec_rc);
       }
       ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_request, &msg, sizeof(msg), NULL, network_id);
+
+      // Always disable frequency agility by default (if the session is denied for any reason, frequency agility will be enabled again)
+      agility_state = CTRLM_HAL_FREQUENCY_AGILITY_DISABLE;
 #else
       if(ctrlm_voice_ind_voice_session_request(network_id, controller_id, timestamp)) {
          // Need to disable frequency agility (channel hopping)

@@ -213,6 +213,7 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    ERR_CHK(safec_rc);
    voice_session_rsp_params_.network_id = (ctrlm_network_id_t *)malloc(sizeof(ctrlm_network_id_t));
    (*voice_session_rsp_params_.network_id) = network_id_get();
+   voice_session_active_count_ = 0;
    #endif
 
    stream_begin_                 = (voice_session_response_stream_t)JSON_INT_VALUE_NETWORK_RF4CE_VOICE_STREAM_BEGIN;
@@ -3640,8 +3641,17 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
 
    if(!controller_exists(dqm->controller_id)) {
       LOG_INFO("%s: invalid controller id (%u)\n", __FUNCTION__, dqm->controller_id);
+
+      // There will be no response so re-enable frequency agility as needed
+      if(voice_session_active_count_ == 0) {
+         ctrlm_hal_network_property_frequency_agility_t property;
+         property.state = CTRLM_HAL_FREQUENCY_AGILITY_ENABLE;
+         ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));
+      }
       return;
    }
+   voice_session_active_count_++;
+
    sw_version_obj = controllers_[dqm->controller_id]->version_software_get();
    hw_version_obj = controllers_[dqm->controller_id]->version_hardware_get();
    battery_status = controllers_[dqm->controller_id]->battery_status_get();
@@ -3826,11 +3836,14 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
 
    LOG_INFO("%s: session response delivered\n", __FUNCTION__);
 
-   if(session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK           || session == VOICE_SESSION_RESPONSE_AVAILABLE ||
-      session == VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE || session == VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
-      ctrlm_hal_network_property_frequency_agility_t property;
-      property.state = CTRLM_HAL_FREQUENCY_AGILITY_DISABLE;
-      ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));
+   if(session != VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK           && session != VOICE_SESSION_RESPONSE_AVAILABLE &&
+      session != VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE && session != VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
+      voice_session_active_count_--;
+      if(voice_session_active_count_ == 0) { // Re-enable frequency agility if the no other active RF4CE voice sessions
+         ctrlm_hal_network_property_frequency_agility_t property;
+         property.state = CTRLM_HAL_FREQUENCY_AGILITY_ENABLE;
+         ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));
+      }
    }
 
    if(dqm->status != VOICE_SESSION_RESPONSE_AVAILABLE && dqm->status != VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK) { // Session was aborted
@@ -3898,18 +3911,21 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_end(void *data, int si
    ctrlm_controller_id_t controller_id = dqm->controller_id;
    if(!controller_exists(controller_id)) {
       LOG_ERROR("%s: Controller object doesn't exist for controller id %u!\n", __FUNCTION__, controller_id);
-      return;
+   } else {
+      //Voice command will update the last key info
+      ctrlm_update_last_key_info(controller_id, IARM_BUS_IRMGR_KEYSRC_RF, KED_PUSH_TO_TALK, controllers_[controller_id]->product_name_get(), false, true);
+
+      // Update the time last key
+      controllers_[controller_id]->time_last_key_update();
    }
+
+   voice_session_active_count_--;
    
-   //Voice command will update the last key info
-   ctrlm_update_last_key_info(controller_id, IARM_BUS_IRMGR_KEYSRC_RF, KED_PUSH_TO_TALK, controllers_[controller_id]->product_name_get(), false, true);
-
-   // Update the time last key
-   controllers_[controller_id]->time_last_key_update();
-
-   ctrlm_hal_network_property_frequency_agility_t property;
-   property.state = CTRLM_HAL_FREQUENCY_AGILITY_ENABLE;
-   ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));
+   if(voice_session_active_count_ == 0) {
+      ctrlm_hal_network_property_frequency_agility_t property;
+      property.state = CTRLM_HAL_FREQUENCY_AGILITY_ENABLE;
+      ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));
+   }
 }
 #endif
 
