@@ -96,6 +96,7 @@ static void ctrlm_hal_ble_DBusOnPropertyChangedCB (GDBusProxy *proxy,
                                                     GVariant   *changed_properties,
                                                     GStrv       invalidated_properties,
                                                     gpointer    user_data);
+static uint16_t ctrlm_hal_ble_ConvertHIDUsageCodeToLinux(ctrlm_hal_ble_USBKeyboardKeyCode_t hid_code);
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_StartThreads(void);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_PropertyGet(ctrlm_hal_network_property_t property, void **value);
@@ -1179,6 +1180,44 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_Get
 
     return ret;
 }
+
+static uint16_t ctrlm_hal_ble_ConvertHIDUsageCodeToLinux(ctrlm_hal_ble_USBKeyboardKeyCode_t hid_code) {
+    switch (hid_code) {
+        case CTRLM_HAL_BLE_HID_USAGE_ID_1          : return KEY_1;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_2          : return KEY_2;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_3          : return KEY_3;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_4          : return KEY_4;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_5          : return KEY_5;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_6          : return KEY_6;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_7          : return KEY_7;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_8          : return KEY_8;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_9          : return KEY_9;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_0          : return KEY_0;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_ENTER      : return KEY_ENTER;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_ESCAPE     : return KEY_ESC;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F1         : return KEY_F1;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F2         : return KEY_F2;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F4         : return KEY_F4;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F5         : return KEY_F5;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F8         : return KEY_F8;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F9         : return KEY_F9;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_INSERT     : return KEY_INSERT;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_HOME       : return KEY_HOME;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_DELETE     : return KEY_DELETE;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_END        : return KEY_END;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_RIGHT      : return KEY_RIGHT;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_LEFT       : return KEY_LEFT;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_DOWN       : return KEY_DOWN;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_UP         : return KEY_UP;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_KPASTERISK : return KEY_KPASTERISK;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_KPMINUS    : return KEY_KPMINUS;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_KPPLUS     : return KEY_KPPLUS;
+        case CTRLM_HAL_BLE_HID_USAGE_ID_F15        : return KEY_F15;
+        default:
+            LOG_ERROR("%s: Unhandled keycode received: 0x%X\n", __FUNCTION__, hid_code);
+            return CTRLM_KEY_CODE_INVALID;
+    }
+}
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params)
 {
     LOG_INFO("%s: Enter...\n", __FUNCTION__);
@@ -1209,7 +1248,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_Ge
             GVariant  *v = NULL;
             g_variant_get (reply, "(v)", &v);
             g_variant_get (v, "y", &key_);
-            params->key = key_;
+            params->key = ctrlm_hal_ble_ConvertHIDUsageCodeToLinux((ctrlm_hal_ble_USBKeyboardKeyCode_t)key_);
             if (NULL != v) { g_variant_unref(v); }
         }
     }
@@ -1454,7 +1493,7 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
     } else if (0 == prop.compare("LastKeypress")) {
         g_variant_get (value, "y", &char_variant);
         LOG_DEBUG("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
-        rcu_status.rcu_data.last_wakeup_key = (uint8_t)char_variant;
+        rcu_status.rcu_data.last_wakeup_key = ctrlm_hal_ble_ConvertHIDUsageCodeToLinux((ctrlm_hal_ble_USBKeyboardKeyCode_t)char_variant);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY;
     } else {
         LOG_WARN("%s: Item '%s' with type '%s' is unhandled signal!!!!!!!\n", __FUNCTION__, prop.c_str(), g_variant_get_type_string (value));

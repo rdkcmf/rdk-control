@@ -47,6 +47,43 @@
 /// @brief Enumerated Types
 /// @details The Control Manager HAL provides enumerated types for logical groups of values.
 
+
+/// @brief keymapping for USB Keyboard usage page 0x07.  These are the keycodes sent from
+/// the remote, that are mapped to linux codes in USB HID driver
+typedef enum {
+   CTRLM_HAL_BLE_HID_USAGE_ID_1           = 0x1E,
+   CTRLM_HAL_BLE_HID_USAGE_ID_2           = 0x1F,
+   CTRLM_HAL_BLE_HID_USAGE_ID_3           = 0x20,
+   CTRLM_HAL_BLE_HID_USAGE_ID_4           = 0x21,
+   CTRLM_HAL_BLE_HID_USAGE_ID_5           = 0x22,
+   CTRLM_HAL_BLE_HID_USAGE_ID_6           = 0x23,
+   CTRLM_HAL_BLE_HID_USAGE_ID_7           = 0x24,
+   CTRLM_HAL_BLE_HID_USAGE_ID_8           = 0x25,
+   CTRLM_HAL_BLE_HID_USAGE_ID_9           = 0x26,
+   CTRLM_HAL_BLE_HID_USAGE_ID_0           = 0x27,
+   CTRLM_HAL_BLE_HID_USAGE_ID_ENTER       = 0x28,
+   CTRLM_HAL_BLE_HID_USAGE_ID_ESCAPE      = 0x29,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F1          = 0x3A,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F2          = 0x3B,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F4          = 0x3D,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F5          = 0x3E,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F8          = 0x41,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F9          = 0x42,
+   CTRLM_HAL_BLE_HID_USAGE_ID_INSERT      = 0x49,
+   CTRLM_HAL_BLE_HID_USAGE_ID_HOME        = 0x4A,
+   CTRLM_HAL_BLE_HID_USAGE_ID_DELETE      = 0x4C,
+   CTRLM_HAL_BLE_HID_USAGE_ID_END         = 0x4D,
+   CTRLM_HAL_BLE_HID_USAGE_ID_RIGHT       = 0x4F,
+   CTRLM_HAL_BLE_HID_USAGE_ID_LEFT        = 0x50,
+   CTRLM_HAL_BLE_HID_USAGE_ID_DOWN        = 0x51,
+   CTRLM_HAL_BLE_HID_USAGE_ID_UP          = 0x52,
+   CTRLM_HAL_BLE_HID_USAGE_ID_KPASTERISK  = 0x55,
+   CTRLM_HAL_BLE_HID_USAGE_ID_KPMINUS     = 0x56,
+   CTRLM_HAL_BLE_HID_USAGE_ID_KPPLUS      = 0x57,
+   CTRLM_HAL_BLE_HID_USAGE_ID_F15         = 0x6A,
+} ctrlm_hal_ble_USBKeyboardKeyCode_t;
+
+
 /// @brief BleRcuDaemon IR Key Code types (CDI format)
 typedef enum {
    CTRLM_HAL_BLE_IR_KEY_POWER    = 0xE000,
@@ -120,7 +157,7 @@ typedef struct {
    int                           upgrade_progress;
    ctrlm_ble_RcuUnpairReason_t   unpair_reason;
    ctrlm_ble_RcuRebootReason_t   reboot_reason;
-   uint8_t                       last_wakeup_key;
+   uint16_t                      last_wakeup_key;
 } ctrlm_hal_ble_rcu_data_t;
 
 typedef struct {
@@ -212,7 +249,7 @@ typedef struct {
 } ctrlm_hal_ble_GetRcuRebootReason_params_t;
 typedef struct {
    unsigned long long            ieee_address;
-   uint8_t                       key;
+   uint16_t                      key;
 } ctrlm_hal_ble_GetRcuLastWakeupKey_params_t;
 typedef struct {
    unsigned long long      ieee_address;
