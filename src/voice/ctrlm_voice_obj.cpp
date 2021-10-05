@@ -1058,6 +1058,10 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         // Cancel current speech router session
         LOG_INFO("%s: Waiting on the results from previous session, aborting this and continuing..\n", __FUNCTION__);
         xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
+    } else if(this->controller_id == controller_id && (this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || this->state_dst != CTRLM_VOICE_STATE_DST_READY)) {
+        // Cancel current speech router session
+        LOG_WARN("%s: Session in progress with same controller - src <%s> dst <%s>, aborting this and continuing..\n", __FUNCTION__, ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
+        xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
     }
 
     bool l_session_by_text = (transcription_in != NULL);

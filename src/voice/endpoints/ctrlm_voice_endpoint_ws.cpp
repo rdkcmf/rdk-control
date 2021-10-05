@@ -395,7 +395,12 @@ void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_session_end(const uuid_t 
     uuid_copy(msg.uuid, uuid);
     SET_IF_VALID(msg.stats, stats);
     msg.timestamp = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
-    ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_ws_t::voice_session_end_callback_ws, &msg, sizeof(msg), (void *)endpoint);
+
+    if(stats != NULL && stats->reason == XRSR_SESSION_END_REASON_TERMINATE) { // Call handler directly because another voice request is waiting
+        endpoint->voice_session_end_callback_ws(&msg, sizeof(msg));
+    } else {
+        ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_ws_t::voice_session_end_callback_ws, &msg, sizeof(msg), (void *)endpoint);
+    }
     endpoint->voice_obj->voice_status_set();
 }
 
