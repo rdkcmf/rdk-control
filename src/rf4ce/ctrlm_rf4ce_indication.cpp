@@ -424,7 +424,14 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
    } else if(command_id == MSO_VOICE_CMD_ID_VOICE_SESSION_STOP) {
       if(data_length == 1 || data_length == 3) {  // Remote supports old stop command (TODO: Do not accept 3 byte packet after XR15 is fixed)
 #ifdef USE_VOICE_SDK // TODO add stop reason to voice sdk implementation
-         voice_obj->voice_session_end(network_id, controller_id, CTRLM_VOICE_SESSION_END_REASON_DONE, &timestamp);
+         ctrlm_main_queue_msg_voice_session_stop_t msg = {0};
+
+         msg.controller_id      = controller_id;
+         msg.timestamp          = timestamp;
+         msg.session_end_reason = CTRLM_VOICE_SESSION_END_REASON_DONE;
+         msg.key_code           = 0;
+
+         ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_stop, &msg, sizeof(msg), NULL, network_id);
 #else
          LOG_INFO("%s: session stop - regular\n", __FUNCTION__);
          agility_state = ctrlm_voice_ind_voice_session_end(network_id, controller_id, CTRLM_VOICE_SESSION_END_REASON_DONE, 0);
@@ -444,7 +451,14 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
 
          if(reason == CRTLM_VOICE_REMOTE_VOICE_END_SECONDARY_KEY_PRESS) {
 #ifdef USE_VOICE_SDK
-            voice_obj->voice_session_end(network_id, controller_id, CTRLM_VOICE_SESSION_END_REASON_OTHER_KEY_PRESSED, &timestamp);
+            ctrlm_main_queue_msg_voice_session_stop_t msg = {0};
+
+            msg.controller_id      = controller_id;
+            msg.timestamp          = timestamp;
+            msg.session_end_reason = CTRLM_VOICE_SESSION_END_REASON_OTHER_KEY_PRESSED;
+            msg.key_code           = data[2];
+
+            ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_stop, &msg, sizeof(msg), NULL, network_id);
 #else
             guchar key_code = data[2];
             agility_state = ctrlm_voice_ind_voice_session_end(network_id, controller_id, CTRLM_VOICE_SESSION_END_REASON_OTHER_KEY_PRESSED, key_code);
@@ -458,7 +472,14 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
                session_end_reason = CTRLM_VOICE_SESSION_END_REASON_MINIMUM_QOS;
             }
 #ifdef USE_VOICE_SDK
-            voice_obj->voice_session_end(network_id, controller_id, session_end_reason, &timestamp);
+            ctrlm_main_queue_msg_voice_session_stop_t msg = {0};
+
+            msg.controller_id      = controller_id;
+            msg.timestamp          = timestamp;
+            msg.session_end_reason = session_end_reason;
+            msg.key_code           = 0;
+
+            ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_stop, &msg, sizeof(msg), NULL, network_id);
 #else
             agility_state = ctrlm_voice_ind_voice_session_end(network_id, controller_id, session_end_reason, 0);
 #endif

@@ -3936,6 +3936,16 @@ void ctrlm_obj_network_rf4ce_t::cfm_voice_session_rsp(void *data, int size) {
    }
 }
 
+void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_stop(void *data, int size) {
+   THREAD_ID_VALIDATE();
+   ctrlm_main_queue_msg_voice_session_stop_t *dqm = (ctrlm_main_queue_msg_voice_session_stop_t *)data;
+
+   g_assert(dqm);
+   g_assert(size == sizeof(ctrlm_main_queue_msg_voice_session_stop_t));
+
+   ctrlm_get_voice_obj()->voice_session_end(network_id_get(), dqm->controller_id, dqm->session_end_reason, &dqm->timestamp);
+}
+
 void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_end(void *data, int size) {
    THREAD_ID_VALIDATE();
    ctrlm_main_queue_msg_voice_session_end_t *dqm = (ctrlm_main_queue_msg_voice_session_end_t *)data;

@@ -397,6 +397,10 @@ void ctrlm_obj_network_t::ind_process_voice_session_request(void *data, int size
   LOG_WARN("%s: request is not valid for %s network\n", __FUNCTION__, name_get());
 }
 
+void ctrlm_obj_network_t::ind_process_voice_session_stop(void *data, int size){
+  LOG_WARN("%s: request is not valid for %s network\n", __FUNCTION__, name_get());
+}
+
 void ctrlm_obj_network_t::ind_process_voice_session_begin(void *data, int size){
   LOG_WARN("%s: request is not valid for %s network\n", __FUNCTION__, name_get());
 }

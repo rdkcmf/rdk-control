@@ -281,6 +281,9 @@ public:
    void                                 ind_process_unpair(void *data, int size);     
    void                                 ind_process_data(void *data, int size);
    void                                 ind_process_voice_session_request(void *data, int size);
+   #ifdef USE_VOICE_SDK
+   void                                 ind_process_voice_session_stop(void *data, int size);
+   #endif
    void                                 ind_process_voice_session_begin(void *data, int size);
    void                                 ind_process_voice_session_end(void *data, int size);
    void                                 ind_process_voice_session_stats(void *data, int size);

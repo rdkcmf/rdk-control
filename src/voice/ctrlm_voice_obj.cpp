@@ -1188,7 +1188,11 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
 
 void ctrlm_voice_t::voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp) {
    if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
-       LOG_ERROR("%s: No voice session in progress\n", __FUNCTION__);
+       if(this->power_state == CTRLM_POWER_STATE_DEEP_SLEEP || this->power_state == CTRLM_POWER_STATE_STANDBY) {
+           LOG_WARN("%s: missed voice session response window after waking from <%s>\n", __FUNCTION__, ctrlm_power_state_str(this->power_state));
+       } else {
+           LOG_ERROR("%s: No voice session in progress\n", __FUNCTION__);
+       }
        return;
    }
    if(!result) {

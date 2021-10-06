@@ -177,6 +177,14 @@ typedef struct {
    ctrlm_voice_session_abort_reason_t    reason;
 } ctrlm_main_queue_msg_voice_session_request_t;
 
+
+typedef struct {
+   ctrlm_controller_id_t            controller_id;
+   ctrlm_timestamp_t                timestamp;
+   ctrlm_voice_session_end_reason_t session_end_reason;
+   unsigned char                    key_code;
+} ctrlm_main_queue_msg_voice_session_stop_t;
+
 typedef struct {
    ctrlm_controller_id_t            controller_id;
    ctrlm_voice_session_end_reason_t reason;
