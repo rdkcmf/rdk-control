@@ -1267,6 +1267,13 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   break;
                case CTRLM_HAL_BLE_PROPERTY_AUDIO_GAIN_LEVEL:
                   controller->setAudioGainLevel(dqm->rcu_data.audio_gain_level);
+                  report_status = false;
+                  print_status = false;
+                  break;
+               case CTRLM_HAL_BLE_PROPERTY_AUDIO_CODECS:
+                  controller->setAudioCodecs(dqm->rcu_data.audio_codecs);
+                  report_status = false;
+                  print_status = false;
                   break;
                case CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING:
                   LOG_INFO("%s: Controller (0x%llX) firmware upgrading = %s\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.is_upgrading ? "TRUE" : "FALSE");
@@ -1401,6 +1408,7 @@ ctrlm_controller_id_t ctrlm_obj_network_ble_t::controller_add(ctrlm_hal_ble_rcu_
       controller->setHwRevision(string(rcu_data.hw_revision));
       controller->setSwRevision(string(rcu_data.sw_revision));
       controller->setAudioGainLevel(rcu_data.audio_gain_level);
+      controller->setAudioCodecs(rcu_data.audio_codecs);
       controller->setBatteryPercent(rcu_data.battery_level);
       controller->setConnected(rcu_data.connected);
       controller->db_store();

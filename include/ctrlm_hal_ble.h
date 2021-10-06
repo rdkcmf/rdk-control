@@ -120,6 +120,7 @@ typedef enum {
    CTRLM_HAL_BLE_PROPERTY_PAIRING_CODE,
    CTRLM_HAL_BLE_PROPERTY_AUDIO_STREAMING,
    CTRLM_HAL_BLE_PROPERTY_AUDIO_GAIN_LEVEL,
+   CTRLM_HAL_BLE_PROPERTY_AUDIO_CODECS,
    CTRLM_HAL_BLE_PROPERTY_IR_STATE,
    CTRLM_HAL_BLE_PROPERTY_STATE,
    CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING,
@@ -150,6 +151,7 @@ typedef struct {
    char                          serial_number[CTRLM_MAX_PARAM_STR_LEN];
    int                           ir_code;
    uint8_t                       audio_gain_level;
+   uint32_t                      audio_codecs;
    bool                          audio_streaming;
    unsigned int                  touch_mode;
    bool                          touch_mode_settable;

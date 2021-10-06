@@ -121,7 +121,8 @@ public:
    bool                          getUpgradeAttempted(void);
 
    void                          setIrCode(int code);
-   void                          setAudioGainLevel(int gain);
+   void                          setAudioGainLevel(guint8 gain);
+   void                          setAudioCodecs(guint32 value);
    void                          setAudioStreaming(bool streaming);
    void                          setTouchMode(unsigned int param);
    void                          setTouchModeSettable(bool param);
@@ -158,7 +159,8 @@ private:
 
    int                              ir_code_;
 
-   int                              audio_gain_level_;
+   guint8                           audio_gain_level_;
+   guint32                          audio_codecs_;
    bool                             audio_streaming_;
 
    unsigned int                     touch_mode_;

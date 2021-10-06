@@ -409,9 +409,14 @@ void ctrlm_obj_controller_ble_t::setAudioStreaming(bool streaming) {
    audio_streaming_ = streaming;
 }
 
-void ctrlm_obj_controller_ble_t::setAudioGainLevel(int gain) {
-   LOG_DEBUG("%s: Controller %u set Audio Gain level to %d\n", __FUNCTION__, controller_id_get(), gain);
+void ctrlm_obj_controller_ble_t::setAudioGainLevel(guint8 gain) {
+   LOG_DEBUG("%s: Controller %u set Audio Gain level to %u\n", __FUNCTION__, controller_id_get(), gain);
    audio_gain_level_ = gain;
+}
+
+void ctrlm_obj_controller_ble_t::setAudioCodecs(guint32 value) {
+   LOG_DEBUG("%s: Controller %u set Audio Codecs to 0x%X\n", __FUNCTION__, controller_id_get(), value);
+   audio_codecs_ = value;
 }
 
 void ctrlm_obj_controller_ble_t::setTouchMode(unsigned int param) {
