@@ -711,8 +711,10 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
    LOG_INFO("%s: Voice XCONF Settings\n", __FUNCTION__);
    int result;
 
-   char encoder_params_str[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS * 2 + 1] = {0};
    char vsdk_config_str[CTRLM_RFC_MAX_PARAM_LEN] = {0}; //MAX_PARAM_LEN from rfcapi.h is 2048
+
+#ifdef CTRLM_NETWORK_RF4CE
+   char encoder_params_str[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS * 2 + 1] = {0};
 
    result  = ctrlm_tr181_string_get(CTRLM_RF4CE_TR181_RF4CE_OPUS_ENCODER_PARAMS, encoder_params_str, sizeof(encoder_params_str));
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
@@ -721,6 +723,7 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
 
       LOG_INFO("%s: opus encoder params <%s>\n", __FUNCTION__, this->prefs.opus_encoder_params_str.c_str());
    }
+#endif
 
    ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level, this->audio_ducking_beep_enabled};
    bool changed = false;

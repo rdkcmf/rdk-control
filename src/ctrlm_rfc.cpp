@@ -228,35 +228,42 @@ gboolean ip_rfc_get() {
 
 // Public Function Implementations
 gboolean ctrlm_rfc_init() {
-   g_ctrlm_rfc_rf4ce_blackout = NULL;
    g_ctrlm_rfc_ip             = NULL;
 
-   // Allocate rfc structs
-   if(NULL == (g_ctrlm_rfc_rf4ce_blackout = (ctrlm_rfc_t *)malloc(sizeof(ctrlm_rfc_t)))) {
-      LOG_ERROR("%s: Failed to allocate memory for rf4ce blackout rfc object\n", __FUNCTION__);
+   // Allocate rfc struct
+   if(NULL == (g_ctrlm_rfc_ip = (ctrlm_rfc_t *)malloc(sizeof(ctrlm_rfc_t)))) {
+      LOG_ERROR("%s: Failed to allocate memory for ip rfc object\n", __FUNCTION__);
       return false;
    }
 
-   if(NULL == (g_ctrlm_rfc_ip = (ctrlm_rfc_t *)malloc(sizeof(ctrlm_rfc_t)))) {
-      LOG_ERROR("%s: Failed to allocate memory for ip rfc object\n", __FUNCTION__);
-      if(g_ctrlm_rfc_rf4ce_blackout) {
-         free(g_ctrlm_rfc_rf4ce_blackout);
+   // Default struct
+   rfc_struct_default(g_ctrlm_rfc_ip);
+
+   // Retrieve the RFC information
+   if(false == ip_rfc_get()) {
+      LOG_WARN("%s: Failed to get IP RFC settings\n", __FUNCTION__);
+   }
+
+#ifdef CTRLM_NETWORK_RF4CE
+   g_ctrlm_rfc_rf4ce_blackout = NULL;
+
+   // Allocate rfc struct
+   if(NULL == (g_ctrlm_rfc_rf4ce_blackout = (ctrlm_rfc_t *)malloc(sizeof(ctrlm_rfc_t)))) {
+      LOG_ERROR("%s: Failed to allocate memory for rf4ce blackout rfc object\n", __FUNCTION__);
+      if(g_ctrlm_rfc_ip) {
+         free(g_ctrlm_rfc_ip);
       }
       return false;
    }
 
-   // Default structs
+   // Default struct
    rfc_struct_default(g_ctrlm_rfc_rf4ce_blackout);
-   rfc_struct_default(g_ctrlm_rfc_ip);
 
    // Retrieve the RFC information
    if(false == rf4ce_blackout_rfc_get()) {
       LOG_WARN("%s: Failed to get RF4CE Blackout RFC settings..\n", __FUNCTION__);
    }
-
-   if(false == ip_rfc_get()) {
-      LOG_WARN("%s: Failed to get IP RFC settings\n", __FUNCTION__);
-   }
+#endif
 
    init = true;
 
