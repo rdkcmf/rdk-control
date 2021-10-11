@@ -4613,7 +4613,7 @@ ctrlm_hal_result_t ctrlm_obj_network_rf4ce_t::hal_rf4ce_decrypt(ctrlm_hal_rf4ce_
    }
 
    if(!EVP_DecryptFinal_ex(ctx_, &param->cipher_text[outl], &outl)) {
-       LOG_ERROR("%s: EVP_DecryptFinal_ex() : decrypt failed\n", __FUNCTION__);
+       LOG_DEBUG("%s: EVP_DecryptFinal_ex() : decrypt finalization is not successful\n", __FUNCTION__);
    }  //cID:160255 - checked return
 
    return CTRLM_HAL_RESULT_SUCCESS;
