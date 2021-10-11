@@ -270,7 +270,7 @@ static gboolean ctrlm_load_device_id(void);
 static void     ctrlm_main_has_device_id_set(gboolean has_id);
 #endif
 #ifdef AUTH_ACCOUNT_ID
-static gboolean ctrlm_load_service_account_id(void);
+static gboolean ctrlm_load_service_account_id(const char *account_id);
 static void     ctrlm_main_has_service_account_id_set(gboolean has_id);
 #endif
 #ifdef AUTH_PARTNER_ID
@@ -1246,10 +1246,14 @@ void ctrlm_main_has_service_account_id_set(gboolean has_id) {
    g_ctrlm.has_service_account_id = has_id;
 }
 
-gboolean ctrlm_load_service_account_id(void) {
-   if(!g_ctrlm.authservice->get_account_id(g_ctrlm.service_account_id)) {
-      ctrlm_main_has_service_account_id_set(false);
-      return(false);
+gboolean ctrlm_load_service_account_id(const char *account_id) {
+   if(account_id == NULL) {
+      if(!g_ctrlm.authservice->get_account_id(g_ctrlm.service_account_id)) {
+         ctrlm_main_has_service_account_id_set(false);
+         return(false);
+      }
+   } else {
+      g_ctrlm.service_account_id = account_id;
    }
 #ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_account_number_set(g_ctrlm.service_account_id);
@@ -1443,7 +1447,7 @@ gboolean ctrlm_load_authservice_data(void) {
 #ifdef AUTH_ACCOUNT_ID
    if(!ctrlm_main_has_service_account_id_get()) {
       LOG_INFO("%s: load account id\n", __FUNCTION__);
-      if(!ctrlm_load_service_account_id()) {
+      if(!ctrlm_load_service_account_id(NULL)) {
          LOG_WARN("%s: failed to load account id\n", __FUNCTION__);
          ret = FALSE;
       } else {
@@ -2756,6 +2760,18 @@ gpointer ctrlm_main_thread(gpointer param) {
             LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_STOP\n", __FUNCTION__);
             #ifdef USE_VOICE_SDK
             ctrlm_voice_xrsr_session_capture_stop();
+            #endif
+            break;
+         }
+         case CTRLM_MAIN_QUEUE_MSG_TYPE_ACCOUNT_ID_UPDATE: {
+            LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_ACCOUNT_ID_UPDATE\n", __FUNCTION__);
+            #ifdef AUTH_ENABLED
+            #ifdef AUTH_ACCOUNT_ID
+            ctrlm_main_queue_msg_account_id_update_t *dqm = (ctrlm_main_queue_msg_account_id_update_t *)msg;
+            if(dqm) {
+               ctrlm_load_service_account_id(dqm->account_id);
+            }
+            #endif
             #endif
             break;
          }

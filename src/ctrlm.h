@@ -112,7 +112,8 @@ typedef enum {
    CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_START,
    CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_STOP,
    CTRLM_MAIN_QUEUE_MSG_TYPE_POWER_STATE_CHANGE,
-   CTRLM_MAIN_QUEUE_MSG_TYPE_EXPORT_CONTROLLER_LIST
+   CTRLM_MAIN_QUEUE_MSG_TYPE_EXPORT_CONTROLLER_LIST,
+   CTRLM_MAIN_QUEUE_MSG_TYPE_ACCOUNT_ID_UPDATE
    // End global messages
 } ctrlm_main_queue_msg_type_t;
 
@@ -330,6 +331,11 @@ typedef struct {
    uint32_t                                packets_total;
    uint32_t                                packets_lost;
 } ctrlm_main_queue_msg_controller_voice_metrics_t;
+
+typedef struct {
+   ctrlm_main_queue_msg_header_t   header;
+   char                            account_id[1024]; // We don't know the size contraints for Account ID, but this should be plenty.
+} ctrlm_main_queue_msg_account_id_update_t;
 
 typedef enum {
    CTRLM_HANDLER_NETWORK,
