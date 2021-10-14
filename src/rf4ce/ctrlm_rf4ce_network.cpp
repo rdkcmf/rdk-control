@@ -2349,6 +2349,7 @@ guchar ctrlm_obj_network_rf4ce_t::property_write_ir_rf_database(guchar index, gu
    } else {
       if(length > 0 && data[0] == 0xC0) {
          LOG_WARN("%s: Index <%s> set to default\n", __FUNCTION__, ctrlm_key_code_str((ctrlm_key_code_t)index));
+         this->ir_rf_database_.remove_entry((ctrlm_key_code_t)index);
       } else {
          LOG_ERROR("%s: Invalid ir rf data\n", __FUNCTION__);
          ctrlm_print_data_hex(__FUNCTION__, data, length, 32);
