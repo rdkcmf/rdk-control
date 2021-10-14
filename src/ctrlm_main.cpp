@@ -2420,21 +2420,23 @@ gpointer ctrlm_main_thread(gpointer param) {
             #ifdef USE_VOICE_SDK
             #ifdef ENABLE_DEEP_SLEEP
             //Deep Sleep may set Networked Standby, may need other power state modifications later
-            //Internal power state changes must not check wakeup reason
             if(dqm->system) {
-               if(dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP && ctrlm_main_iarm_networked_standby())  {
-                  LOG_INFO("%s: deep sleep message set Network Standby flag\n", __FUNCTION__);
-                  dqm->new_state = CTRLM_POWER_STATE_STANDBY;
-               }
-               if(dqm->new_state == CTRLM_POWER_STATE_LIGHT_SLEEP) {
-                  LOG_INFO("%s: light sleep, skip\n", __FUNCTION__);
-                  dqm->new_state = g_ctrlm.power_state;
-               }
+                //If Power Manager has sent STANDBY, then ctrlm is either in ON or STANDBY and should remain so until next Power Manager message
+               if(dqm->new_state == CTRLM_POWER_STATE_STANDBY) {
+                    LOG_INFO("%s: system STANDBY, skip\n", __FUNCTION__);
+                    dqm->new_state = g_ctrlm.power_state;
+                }
+
+                if(dqm->new_state == CTRLM_POWER_STATE_DEEP_SLEEP && ctrlm_main_iarm_networked_standby())  {
+                    LOG_INFO("%s: deep sleep message set Network Standby flag\n", __FUNCTION__);
+                    dqm->new_state = CTRLM_POWER_STATE_STANDBY;
+                }
+ 
                 //Sky EPG sends excess ON messages, filter them. Will not adversely affect other EPGs
-               if(dqm->new_state == CTRLM_POWER_STATE_ON && g_ctrlm.power_state == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION) {
-                  LOG_INFO("%s: handling standby voice, ignore ON\n", __FUNCTION__);
-                  dqm->new_state = g_ctrlm.power_state;
-               }
+                if(dqm->new_state == CTRLM_POWER_STATE_ON && g_ctrlm.power_state == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION) {
+                    LOG_INFO("%s: handling standby voice, ignore ON\n", __FUNCTION__);
+                    dqm->new_state = g_ctrlm.power_state;
+                }
             }
             #endif
             #endif

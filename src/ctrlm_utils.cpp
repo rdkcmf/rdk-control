@@ -1224,7 +1224,7 @@ const char *ctrlm_wakeup_reason_str(DeepSleep_WakeupReason_t wakeup_reason) {
         case DEEPSLEEP_WAKEUPREASON_GPIO:             return("GPIO");
         case DEEPSLEEP_WAKEUPREASON_LAN:              return("LAN");
         case DEEPSLEEP_WAKEUPREASON_WLAN:             return("WLAN");
-	case DEEPSLEEP_WAKEUPREASON_TIMER:            return("TIMER");
+        case DEEPSLEEP_WAKEUPREASON_TIMER:            return("TIMER");
         case DEEPSLEEP_WAKEUPREASON_FRONT_PANEL:      return("FRONT_PANEL");
         case DEEPSLEEP_WAKEUPREASON_WATCHDOG:         return("WATCHDOG");
         case DEEPSLEEP_WAKEUPREASON_SOFTWARE_RESET:   return("SOFTWARE_RESET");
@@ -1800,7 +1800,7 @@ ctrlm_power_state_t ctrlm_iarm_power_state_map(IARM_Bus_PowerState_t iarm_power_
        case IARM_BUS_PWRMGR_POWERSTATE_ON:                  ctrlm_power_state = CTRLM_POWER_STATE_ON;          break;
        case IARM_BUS_PWRMGR_POWERSTATE_STANDBY:
        //IARM standby means not to change state while CTRLM standby means to handle NSM
-       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: ctrlm_power_state = CTRLM_POWER_STATE_LIGHT_SLEEP; break;
+       case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_LIGHT_SLEEP: ctrlm_power_state = CTRLM_POWER_STATE_STANDBY; break;
        case IARM_BUS_PWRMGR_POWERSTATE_STANDBY_DEEP_SLEEP:
        case IARM_BUS_PWRMGR_POWERSTATE_OFF:                 ctrlm_power_state = CTRLM_POWER_STATE_DEEP_SLEEP;  break;
     }

@@ -59,6 +59,8 @@ static void ctrlm_voice_data_post_processing_cb (ctrlm_hal_data_cb_params_t *par
 static void ctrlm_voice_system_audio_player_event_handler(system_audio_player_event_t event, void *user_data);
 #endif
 
+static xrsr_power_mode_t voice_xrsr_power_map(ctrlm_power_state_t ctrlm_power_state);
+
 // Application Interface Implementation
 ctrlm_voice_t::ctrlm_voice_t() {
     LOG_INFO("%s: Constructor\n", __FUNCTION__);
@@ -249,9 +251,12 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
        LOG_ERROR("%s: Failed to get host name <%s>\n", __FUNCTION__, strerror(errsv));
    }
 
-   //HAL is not available because xrsr is not open so use stored status. Init means full power
+   //HAL is not available to query mute state because xrsr is not open, so use stored status.
    bool privacy = (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] == CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
-   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, XRSR_POWER_MODE_FULL, privacy, json_obj_vsdk)) {
+   ctrlm_power_state_t ctrlm_power_state = ctrlm_main_get_power_state();
+   xrsr_power_mode_t   xrsr_power_mode   = voice_xrsr_power_map(ctrlm_power_state);
+
+   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, xrsr_power_mode, privacy, json_obj_vsdk)) {
       LOG_ERROR("%s: Failed to open speech router\n", __FUNCTION__);
       g_assert(0);
    }
@@ -2638,41 +2643,25 @@ void ctrlm_voice_t::voice_set_ipc(ctrlm_voice_ipc_t *ipc) {
 
 void  ctrlm_voice_t::voice_power_state_change(ctrlm_power_state_t power_state) {
 
-   bool success = true;
-   switch(power_state) {
-      case CTRLM_POWER_STATE_STANDBY:
-         if(!xrsr_power_mode_set(XRSR_POWER_MODE_LOW)) {
-            success = false;
-         }
-         break;
-      case CTRLM_POWER_STATE_DEEP_SLEEP:
-         if(!xrsr_power_mode_set(XRSR_POWER_MODE_SLEEP)) {
-            success = false;
-         }
-         break;
-      case CTRLM_POWER_STATE_ON: {
-            ctrlm_voice_device_status_t status;
-            //Handle privacy mode changing in standby and woken with remote
-            #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
-            status = privacy_mode() ? CTRLM_VOICE_DEVICE_STATUS_PRIVACY : CTRLM_VOICE_DEVICE_STATUS_READY;
-            #else
-            status = privacy_mode() ? CTRLM_VOICE_DEVICE_STATUS_DISABLED : CTRLM_VOICE_DEVICE_STATUS_READY;
-            #endif
-            if(status != this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE]) {
-                this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, status);
-                ctrlm_db_voice_write_device_status(CTRLM_VOICE_DEVICE_MICROPHONE, status);
-            }
+   xrsr_power_mode_t xrsr_power_mode = voice_xrsr_power_map(power_state);
 
-            if(!xrsr_power_mode_set(XRSR_POWER_MODE_FULL)) {
-               success = false;
-            }
-         }
-         break;
-      default:
-         LOG_INFO("%s: no action needed for power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
-         break;
+   if(power_state == CTRLM_POWER_STATE_ON) {
+      ctrlm_voice_device_status_t status;
+      //Handle privacy mode changing in standby and woken with remote
+      #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
+      status = privacy_mode() ? CTRLM_VOICE_DEVICE_STATUS_PRIVACY : CTRLM_VOICE_DEVICE_STATUS_READY;
+      #else
+      status = privacy_mode() ? CTRLM_VOICE_DEVICE_STATUS_DISABLED : CTRLM_VOICE_DEVICE_STATUS_READY;
+      #endif
+      if(status != this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE]) {
+         sem_wait(&this->device_status_semaphore);
+         this->voice_device_status_change(CTRLM_VOICE_DEVICE_MICROPHONE, status);
+         sem_post(&this->device_status_semaphore);
+         ctrlm_db_voice_write_device_status(CTRLM_VOICE_DEVICE_MICROPHONE, status);
+      }
    }
-   if(!success) {
+
+   if(!xrsr_power_mode_set(xrsr_power_mode)) {
       LOG_ERROR("%s: failed to set xrsr to power state %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
    } else { 
       this->voice_sdk_update_routes();
@@ -2774,4 +2763,27 @@ void ctrlm_voice_t::voice_standby_session_request(void) {
 bool ctrlm_voice_t::is_standby_microphone(void) {
    return ((this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
 
+}
+
+xrsr_power_mode_t voice_xrsr_power_map(ctrlm_power_state_t ctrlm_power_state) {
+
+   xrsr_power_mode_t xrsr_power_mode;
+
+   switch(ctrlm_power_state) {
+      case CTRLM_POWER_STATE_STANDBY:
+         xrsr_power_mode = XRSR_POWER_MODE_LOW;
+        break;
+      case CTRLM_POWER_STATE_DEEP_SLEEP:
+         xrsr_power_mode = XRSR_POWER_MODE_SLEEP;
+         break;
+      case CTRLM_POWER_STATE_ON:
+         xrsr_power_mode = XRSR_POWER_MODE_FULL;
+         break;
+      default:
+         LOG_WARN("%s defaulting to FULL because %s is unexpected\n", __FUNCTION__, ctrlm_power_state_str(ctrlm_power_state));
+         xrsr_power_mode = XRSR_POWER_MODE_FULL;
+         break;
+   }
+
+   return xrsr_power_mode;
 }

@@ -971,6 +971,16 @@ ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void) {
     err = IARM_Bus_Call(IARM_BUS_PWRMGR_NAME, IARM_BUS_PWRMGR_API_GetPowerState, (void *)&param, sizeof(param));
     if(err == IARM_RESULT_SUCCESS) {
         power_state = ctrlm_iarm_power_state_map(param.curState);
+        #ifdef ENABLE_DEEP_SLEEP
+        //If ctrlm restarts with system STANDBY state, set to ON, will receive a DEEP_SLEEP or ON message shortly
+        if(power_state == CTRLM_POWER_STATE_STANDBY) {
+            power_state = CTRLM_POWER_STATE_ON;
+        }
+        //If ctrlm restarts with system in DEEP_SLEEP state, check for NSM
+        if(power_state == CTRLM_POWER_STATE_DEEP_SLEEP) {
+            power_state = ctrlm_main_iarm_networked_standby() ? CTRLM_POWER_STATE_STANDBY : power_state; 
+        }
+        #endif
         LOG_INFO("%s: power state is : <%s>\n", __FUNCTION__, ctrlm_power_state_str(power_state));
     } else {
         LOG_ERROR("%s: IARM bus failed to read power state, defaulting to %s\n", __FUNCTION__, ctrlm_power_state_str(power_state));
