@@ -801,6 +801,9 @@ const char *ctrlm_hal_network_property_str(ctrlm_hal_network_property_t property
 #if CTRLM_HAL_RF4CE_API_VERSION >= 14
       case CTRLM_HAL_NETWORK_PROPERTY_NVM_VERSION:         return("NVM_VERSION");
       case CTRLM_HAL_NETWORK_PROPERTY_INDIRECT_TX_TIMEOUT: return("INDIRECT_TX_TIMEOUT");
+#if CTRLM_HAL_RF4CE_API_VERSION >= 16
+      case CTRLM_HAL_NETWORK_PROPERTY_AUTO_ACK:            return("AUTO_ACK");
+#endif
 #endif
 #endif
       case CTRLM_HAL_NETWORK_PROPERTY_MAX:                 return("MAX");

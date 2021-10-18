@@ -33,7 +33,7 @@
 /// these names to allow the network code to function correctly if the values change.
 
 #ifndef CTRLM_HAL_RF4CE_API_VERSION
-#define CTRLM_HAL_RF4CE_API_VERSION                   (15) ///< Version of the HAL RF4CE API
+#define CTRLM_HAL_RF4CE_API_VERSION                   (16) ///< Version of the HAL RF4CE API
 #endif
 
 #ifndef CTRLM_HAL_BLE_API_VERSION
@@ -44,15 +44,15 @@
 #define CTRLM_HAL_IP_API_VERSION                      (1)  ///< Version of the HAL IP API
 #endif
 
-#if CTRLM_HAL_RF4CE_API_VERSION < 8 || CTRLM_HAL_RF4CE_API_VERSION > 15
-#error "Values for CTRLM_HAL_RF4CE_API_VERSION must be in range 8 - 15"
+#if CTRLM_HAL_RF4CE_API_VERSION < 8 || CTRLM_HAL_RF4CE_API_VERSION > 16
+#error "Values for CTRLM_HAL_RF4CE_API_VERSION must be in range 8 - 16"
 #endif
 
 #if CTRLM_HAL_RF4CE_API_VERSION < 12 && defined(ASB)
 #error "ASB is only supported in RF4CE API 12 and above"
 #endif
 
-#define CTRLM_HAL_NETWORK_VERSION_STRING_SIZE    (32) ///< Maximum size of a network's version string
+#define CTRLM_HAL_NETWORK_VERSION_STRING_SIZE   (128) ///< Maximum size of a network's version string
 #define CTRLM_HAL_NETWORK_AES128_KEY_SIZE        (16) ///< Size of the AES128 key
 
 #define CTRLM_HAL_NETWORK_ID_INVALID           (0xFF) ///< An invalid network identifier
@@ -150,6 +150,9 @@ typedef enum {
 #if CTRLM_HAL_RF4CE_API_VERSION >= 14
    CTRLM_HAL_NETWORK_PROPERTY_NVM_VERSION         = 10, ///< RO - Current NVM version
    CTRLM_HAL_NETWORK_PROPERTY_INDIRECT_TX_TIMEOUT = 11, ///< WO - Timeout for indirect tx packet in milliseconds, used for mac polling
+#if CTRLM_HAL_RF4CE_API_VERSION >= 16
+   CTRLM_HAL_NETWORK_PROPERTY_AUTO_ACK            = 12, ///< RW - Auto Acknowledge Packets
+#endif // 16
 #endif // 14
 #endif // 10
    CTRLM_HAL_NETWORK_PROPERTY_MAX                      ///< NA - Network property maximum value

@@ -257,6 +257,7 @@ typedef struct {
    ctrlm_auth_t                      *authservice;
 #endif
    ctrlm_power_state_t                power_state;
+   gboolean                           auto_ack;
 } ctrlm_global_t;
 
 static ctrlm_global_t g_ctrlm;
@@ -539,6 +540,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.loading_db                     = false;
    g_ctrlm.return_code                    = 0;
    g_ctrlm.power_state                    = ctrlm_main_iarm_call_get_power_state();
+   g_ctrlm.auto_ack                       = true;
 
    g_ctrlm.service_access_token.clear();
    g_ctrlm.has_receiver_id                = false;
@@ -3417,6 +3419,27 @@ void ctrlm_main_iarm_call_property_set_(ctrlm_main_iarm_call_property_t *propert
          }
          break;
       }
+      case CTRLM_PROPERTY_AUTO_ACK: {
+         if(ctrlm_is_production_build()) {
+            LOG_ERROR("%s: AUTO ACK - unable to set in prod build\n", __FUNCTION__);
+         } else {
+            g_ctrlm.auto_ack = property->value ? true : false;
+
+            #ifdef CTRLM_NETWORK_RF4CE
+            #if CTRLM_HAL_RF4CE_API_VERSION >= 16
+            for(auto const &itr : g_ctrlm.networks) {
+               if(itr.second->type_get() == CTRLM_NETWORK_TYPE_RF4CE) {
+                  itr.second->property_set(CTRLM_HAL_NETWORK_PROPERTY_AUTO_ACK, &g_ctrlm.auto_ack);
+               }
+            }
+            #endif
+            #endif
+
+            property->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+            LOG_INFO("%s: AUTO ACK <%s>\n", __FUNCTION__, property->value ? "enabled" : "disabled");
+         }
+         break;
+      }
       default: {
          LOG_ERROR("%s: Invalid Property %d\n", __FUNCTION__, property->name);
          property->result = CTRLM_IARM_CALL_RESULT_ERROR_INVALID_PARAMETER;
@@ -3547,6 +3570,12 @@ void ctrlm_main_iarm_call_property_get_(ctrlm_main_iarm_call_property_t *propert
          property->value  = ctrlm_validation_timeout_configuration_get();
          property->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
          LOG_INFO("%s: CONFIGURATION TIMEOUT %lu ms\n", __FUNCTION__, property->value);
+         break;
+      }
+      case CTRLM_PROPERTY_AUTO_ACK: {
+         property->value  = g_ctrlm.auto_ack;
+         property->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+         LOG_INFO("%s: AUTO ACK <%s>\n", __FUNCTION__, property->value ? "enabled" : "disabled");
          break;
       }
       default: {

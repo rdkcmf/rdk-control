@@ -251,7 +251,8 @@ typedef enum {
    CTRLM_PROPERTY_REMOTE_REVERSE_CMD_ACTIVE        = 12, ///< (RW) Boolean value indicating whether the 'Remote Reverse Command' feature is enabled (1) or not (0).
    CTRLM_PROPERTY_MAC_POLLING_INTERVAL             = 13, ///< (RW) MAC polling polling interval, in milliseconds.
    CTRLM_PROPERTY_RCU_REVERSE_CMD_TIMEOUT          = 14, ///< (RW) Find My Remote RC response timeout, Factor of CTRLM_PROPERTY_MAC_POLLING_INTERVAL, min 2
-   CTRLM_PROPERTY_MAX                              = 15, ///< (NA) Maximum property enumeration value.
+   CTRLM_PROPERTY_AUTO_ACK                         = 15, ///< (RW) Boolean value indicating whether the 'Automatic Packet Acknowledgment' feature is enabled (1) or not (0).
+   CTRLM_PROPERTY_MAX                              = 16, ///< (NA) Maximum property enumeration value.
 } ctrlm_property_t;
 
 /// @brief Control Manager Events
