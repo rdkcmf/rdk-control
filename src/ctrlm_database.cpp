@@ -184,9 +184,6 @@ static bool     ctrlm_db_recovery();
 static void     ctrlm_db_cache();
 static gpointer ctrlm_db_thread(gpointer param);
 static void     ctrlm_db_queue_msg_destroy(gpointer msg);
-#ifdef DEEPSLEEP_CLOSE_DB
-static void     ctrlm_db_queue_msg_push_front(gpointer msg);
-#endif
 
 static bool ctrlm_db_table_exists(const char *table);
 static bool ctrlm_db_key_exists(const char *table, const char *key);
@@ -351,11 +348,9 @@ void ctrlm_db_queue_msg_push(gpointer msg) {
    g_async_queue_push(g_ctrlm_db.queue, msg);
 }
 
-#ifdef DEEPSLEEP_CLOSE_DB
 void ctrlm_db_queue_msg_push_front(gpointer msg) {
    g_async_queue_push_front(g_ctrlm_db.queue, msg);
 }
-#endif
 
 void ctrlm_db_queue_msg_destroy(gpointer msg) {
    if(msg) {

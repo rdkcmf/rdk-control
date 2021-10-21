@@ -31,6 +31,7 @@ gboolean ctrlm_db_init(const char *db_path);
 gboolean ctrlm_db_created_default(void);
 void     ctrlm_db_terminate(void);
 void     ctrlm_db_queue_msg_push(gpointer msg);
+void     ctrlm_db_queue_msg_push_front(gpointer msg);
 bool     ctrlm_db_backup();
 void     ctrlm_db_power_state_change(ctrlm_main_queue_power_state_change_t *dqm);
 

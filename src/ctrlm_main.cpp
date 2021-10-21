@@ -815,7 +815,7 @@ void ctrlm_thread_monitor_init(void) {
    g_ctrlm.monitor_threads.push_back(thread_monitor);
 
    thread_monitor.name        = "Ctrlm Database";
-   thread_monitor.queue_push  = ctrlm_db_queue_msg_push;
+   thread_monitor.queue_push  = ctrlm_db_queue_msg_push_front;
    thread_monitor.obj_network = NULL;
    thread_monitor.function    = NULL;
    thread_monitor.response    = CTRLM_THREAD_MONITOR_RESPONSE_ALIVE;
