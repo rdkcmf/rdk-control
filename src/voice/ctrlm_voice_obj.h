@@ -555,6 +555,7 @@ public:
     bool                     session_active_controller;
 
     bool                     is_session_by_text;
+    std::string              transcription_in;
 
     ctrlm_voice_session_timing_t session_timing;
 

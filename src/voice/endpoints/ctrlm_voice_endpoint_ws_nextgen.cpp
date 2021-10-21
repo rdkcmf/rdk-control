@@ -399,7 +399,7 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_end_callback_ws_nextgen(vo
     }
 
     // Check if WS was successful
-    if(stats->reason != XRSR_SESSION_END_REASON_EOS || (this->server_ret_code != 0 && this->server_ret_code != 200)) {
+    if((stats->reason != XRSR_SESSION_END_REASON_EOS && stats->reason != XRSR_SESSION_END_REASON_EOT) || (this->server_ret_code != 0 && this->server_ret_code != 200)) {
         success = false;
     }
 

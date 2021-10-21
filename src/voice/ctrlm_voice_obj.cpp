@@ -114,6 +114,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->end_reason                      = CTRLM_VOICE_SESSION_END_REASON_DONE;
     this->keyword_verified                = false;
     this->is_session_by_text              = false;
+    this->transcription_in                = "";
 
     #ifdef ENABLE_DEEP_SLEEP
     this->prefs.standby_params.connect_check_interval = JSON_INT_VALUE_VOICE_STANDBY_CONNECT_CHECK_INTERVAL;
@@ -1034,7 +1035,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
                                                                        ctrlm_voice_device_t device_type, ctrlm_voice_format_t format,
                                                                        voice_session_req_stream_params *stream_params,
                                                                        const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status,
-                                                                       ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe, const char *transcription_in) {
+                                                                       ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe, const char *l_transcription_in) {
     if(CTRLM_VOICE_STATE_SRC_INVALID == this->state_src) {
         LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
         this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_SERVER_NOT_READY);
@@ -1072,10 +1073,10 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
     }
 
-    bool l_session_by_text = (transcription_in != NULL);
+    bool l_session_by_text = (l_transcription_in != NULL);
     if (l_session_by_text) {
-        LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, transcription_in);
-        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), transcription_in)) {
+        LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, l_transcription_in);
+        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), l_transcription_in)) {
             LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
             return VOICE_SESSION_RESPONSE_BUSY;
         }
@@ -1122,6 +1123,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     }
 
     this->is_session_by_text        = l_session_by_text;
+    this->transcription_in          = l_session_by_text ? l_transcription_in : "";
     this->hal_input_object          = hal_input_object;
     this->state_src                 = CTRLM_VOICE_STATE_SRC_STREAMING;
     this->state_dst                 = CTRLM_VOICE_STATE_DST_REQUESTED;
@@ -1920,6 +1922,11 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         this->voice_device_status_change(this->voice_device, CTRLM_VOICE_DEVICE_STATUS_READY);
     }
     sem_post(&this->device_status_semaphore);
+
+    if (this->is_session_by_text) {
+        // if this is a text only session, we don't get an ASR message from vrex with the transcription so copy it here.
+        this->transcription = this->transcription_in;
+    }
 
     // Send Results IARM Event
     if(this->voice_ipc) {
