@@ -80,6 +80,10 @@
 #include "xr_fdc.h"
 #endif
 #include<features.h>
+#ifdef MEMORY_LOCK
+#include "clnl.h"
+#endif
+
 using namespace std;
 
 #ifndef CTRLM_VERSION
@@ -391,6 +395,22 @@ int main(int argc, char *argv[]) {
    #ifdef CPC_ENABLED
    LOG_INFO("ctrlm_main: name <%-24s> version <%-7s> branch <%-20s> commit <%s>\n", "ctrlm-cpc", CTRLM_CPC_VERSION, CTRLM_CPC_BRANCH, CTRLM_CPC_COMMIT_ID);
    #endif
+
+#ifdef MEMORY_LOCK
+   clnl_init();
+   if(clnl_lock("/usr/bin/controlMgr", SECTION_TEXT)) { // returns 1 on error, 0 on success
+      LOG_ERROR("%s: failed to lock controlMgr instructions to memory\n", __FUNCTION__);
+   } else {
+      LOG_INFO("%s: locked controlMgr instructions to memory\n", __FUNCTION__);
+   }
+#ifdef USE_VOICE_SDK
+   if(clnl_lock("/usr/lib/libxraudio-hal.so.0", SECTION_TEXT)) { // returns 1 on error, 0 on success
+      LOG_ERROR("%s: failed to lock xraudio-hal instructions to memory\n", __FUNCTION__);
+   } else {
+      LOG_INFO("%s: locked xraudio-hal instructions to memory\n", __FUNCTION__);
+   }
+#endif
+#endif
 
    ctrlm_signals_register();
 
@@ -761,6 +781,14 @@ int main(int argc, char *argv[]) {
 #endif
 
    sem_destroy(&g_ctrlm.ctrlm_utils_sem);
+
+#ifdef MEMORY_LOCK
+   clnl_unlock("/usr/bin/controlMgr", SECTION_TEXT);
+#ifdef USE_VOICE_SDK
+   clnl_unlock("/usr/lib/libxraudio-hal.so.0", SECTION_TEXT);
+#endif
+   clnl_destroy();
+#endif
 
    LOG_INFO("ctrlm_main: exit program\n");
    return (g_ctrlm.return_code);

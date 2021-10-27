@@ -214,8 +214,11 @@ typedef struct {
    ctrlm_controller_id_t  controller_id;
    guchar                 response[5];
    guchar                 response_len;
+   ctrlm_timestamp_t      timestamp_hal;
+   ctrlm_timestamp_t      timestamp_rsp_req;
    ctrlm_timestamp_t      timestamp_begin;
    ctrlm_timestamp_t      timestamp_end;
+   guint8                 retries;
 } ctrlm_rf4ce_voice_session_rsp_params_t;
 
 typedef void *(*ctrlm_hal_rf4ce_network_main_t)(ctrlm_hal_rf4ce_main_init_t *main_init);
