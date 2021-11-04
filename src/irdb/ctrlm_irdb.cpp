@@ -21,6 +21,9 @@
 #include "ctrlm_network.h"
 #include <algorithm>
 #include "ctrlm_utils.h"
+#if defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
+#include "ctrlm_thunder_controller.h"
+#endif
 
 class ctrlm_irdb_code_rank_t {
 public:
@@ -88,9 +91,37 @@ ctrlm_irdb_ir_entry_id_t ctrlm_irdb_ir_code_set_t::get_id() {
    return id_;
 }
 
+#if defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
+static int _on_thunder_ready_thread(void *data) {
+    ctrlm_irdb_t *irdb = (ctrlm_irdb_t *)data;
+    if(irdb) {
+        irdb->on_thunder_ready();
+    } else {
+        IRDB_LOG_ERROR("%s: irdb is null\n", __FUNCTION__);
+    }
+    return(0);
+} 
+
+static void _on_thunder_ready(void *data) {
+    g_idle_add(_on_thunder_ready_thread, data);
+}
+#endif
+
 ctrlm_irdb_t::ctrlm_irdb_t(ctrlm_irdb_mode_t mode) {
     this->mode = mode;
     this->ipc  = NULL;
+#if defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
+    Thunder::Controller::ctrlm_thunder_controller_t *controller = Thunder::Controller::ctrlm_thunder_controller_t::getInstance();
+    if(controller) {
+        if(controller->is_ready()) {
+            this->on_thunder_ready();
+        } else {
+            controller->add_ready_handler(_on_thunder_ready, (void *)this);
+        }
+    } else {
+        IRDB_LOG_ERROR("%s: Thunder controller is NULL\n", __FUNCTION__);
+    }
+#endif
 }
 
 ctrlm_irdb_t::~ctrlm_irdb_t() {
@@ -128,9 +159,27 @@ ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_t::get_ir_codes_by_autolookup() {
         IRDB_LOG_INFO("%s: No EDID data\n", __FUNCTION__);
     }
     // Check CEC data
-    // TODO when CEC Plugin is available
-
-
+    std::vector<Thunder::CEC::cec_device_t> cec_devices;
+    this->cec.get_cec_devices(cec_devices);
+    if(cec_devices.size() > 0) {
+        for(auto &itr : cec_devices) {
+            ctrlm_irdb_dev_type_t type = CTRLM_IRDB_DEV_TYPE_INVALID;
+            auto ir_codes = this->get_ir_codes_by_cec(type, itr.osd, (unsigned int)itr.vendor_id, itr.logical_address);
+            if(type != CTRLM_IRDB_DEV_TYPE_INVALID) {
+                if(ir_codes.size() > 0) {
+                    for(const auto &itr : ir_codes) {
+                        final_codes.update(type, itr.first, itr.second);
+                    }
+                } else {
+                    IRDB_LOG_WARN("%s: no code for cec device\n", __FUNCTION__);
+                }
+            } else {
+                IRDB_LOG_WARN("%s: cec dev type invalid\n", __FUNCTION__);
+            }
+        }
+    } else {
+        IRDB_LOG_INFO("%s: No CEC device data\n", __FUNCTION__);
+    }
 #elif defined(PLATFORM_TV) && defined(CTRLM_THUNDER)
     // Check Infoframe data
     std::map<int, std::vector<uint8_t> > infoframes;
@@ -155,7 +204,7 @@ ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_t::get_ir_codes_by_autolookup() {
         }
     }
     // Check CEC data
-    std::vector<Thunder::CECSink::cec_device_t> cec_devices;
+    std::vector<Thunder::CEC::cec_device_t> cec_devices;
     this->cec_sink.get_cec_devices(cec_devices);
     if(cec_devices.size() > 0) {
         for(auto &itr : cec_devices) {
@@ -176,8 +225,6 @@ ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_t::get_ir_codes_by_autolookup() {
     } else {
         IRDB_LOG_INFO("%s: No CEC device data\n", __FUNCTION__);
     }
-
-
 #endif
 
     if(!final_codes.tv_code.empty()) {
@@ -192,6 +239,25 @@ ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_t::get_ir_codes_by_autolookup() {
 bool ctrlm_irdb_t::can_get_ir_codes_by_autolookup() { 
     return(false);
 }
+
+#if defined(CTRLM_THUNDER)
+void ctrlm_irdb_t::on_thunder_ready() {
+    #if defined(PLATFORM_STB)
+    if(!this->cec.is_activated()) {
+        IRDB_LOG_INFO("%s: CEC Thunder Plugin not activated.. Activating..\n", __FUNCTION__);
+        if(this->cec.activate()) {
+            if(this->cec.enable(true)) {
+                IRDB_LOG_INFO("%s: CEC enabled\n", __FUNCTION__);
+            } else {
+                IRDB_LOG_WARN("%s: CEC failed to enable\n", __FUNCTION__);
+            }
+        } else {
+            IRDB_LOG_ERROR("%s: failed to activate CEC Plugin\n", __FUNCTION__);
+        }
+    }
+    #endif
+}
+#endif
 
 bool ctrlm_irdb_t::_set_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_ir_code_set_t &ir_codes) {
     bool ret = false;

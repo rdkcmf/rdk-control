@@ -30,6 +30,7 @@
 #include "ctrlm_irdb_log.h"
 #if   defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
 #include "ctrlm_thunder_plugin_display_settings.h"
+#include "ctrlm_thunder_plugin_cec.h"
 #elif defined (PLATFORM_TV) && defined(CTRLM_THUNDER)
 #include "ctrlm_thunder_plugin_hdmi_input.h"
 #include "ctrlm_thunder_plugin_cec_sink.h"
@@ -104,6 +105,11 @@ public:
     virtual bool                                 clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id)                                                                        = 0;
     virtual bool                                 can_get_ir_codes_by_autolookup();
 
+#if defined(CTRLM_THUNDER)
+public:
+    virtual void                                 on_thunder_ready();
+#endif
+
 protected:
     virtual ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len)                                                    = 0;
     virtual ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_edid(ctrlm_irdb_dev_type_t &type, unsigned char *edid, size_t edid_len)                                                                   = 0;
@@ -121,6 +127,7 @@ protected:
 private:
 #if   defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
     Thunder::DisplaySettings::ctrlm_thunder_plugin_display_settings_t display_settings;
+    Thunder::CEC::ctrlm_thunder_plugin_cec_t                          cec;
 #elif defined(PLATFORM_TV) && defined(CTRLM_THUNDER)
     Thunder::HDMIInput::ctrlm_thunder_plugin_hdmi_input_t             hdmi_input;
     Thunder::CECSink::ctrlm_thunder_plugin_cec_sink_t                 cec_sink;

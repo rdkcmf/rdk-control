@@ -41,13 +41,13 @@ public:
      * This function can be used to determine if a Thunder Plugin is activated.
      * @return True if the Plugin is activated, otherwise False.
      */
-    bool is_activated();
+    virtual bool is_activated();
 
     /**
      * This function can be used to activate a Thunder Plugin.
      * @return True if the Plugin is activated, otherwise False.
      */
-    bool activate();
+    virtual bool activate();
 
     /**
      * This function can be used to de-activate a Thunder Plugin.

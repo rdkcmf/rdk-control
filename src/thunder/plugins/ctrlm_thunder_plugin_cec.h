@@ -16,30 +16,48 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
 */
-#ifndef __CTRLM_THUNDER_PLUGIN_CEC_SINK_H__
-#define __CTRLM_THUNDER_PLUGIN_CEC_SINK_H__
+#ifndef __CTRLM_THUNDER_PLUGIN_CEC_H__
+#define __CTRLM_THUNDER_PLUGIN_CEC_H__
 #include "ctrlm_thunder_plugin.h"
 #include "ctrlm_thunder_plugin_cec_common.h"
 #include <semaphore.h>
 #include <map>
 
 namespace Thunder {
-namespace CECSink {
-
+namespace CEC {
 /**
- * This class is used within ControlMgr to interact with the CECSINK Thunder Plugin.
+ * This class is used within ControlMgr to interact with the CEC Thunder Plugin.
  */
-class ctrlm_thunder_plugin_cec_sink_t : public Thunder::Plugin::ctrlm_thunder_plugin_t {
+class ctrlm_thunder_plugin_cec_t : public Thunder::Plugin::ctrlm_thunder_plugin_t {
 public:
     /**
-     * CECSink Thunder Plugin Default Constructor
+     * CEC Thunder Plugin Default Constructor
      */
-    ctrlm_thunder_plugin_cec_sink_t();
+    ctrlm_thunder_plugin_cec_t();
 
     /**
-     * CECSINK Thunder Plugin Destructor
+     * CEC Thunder Plugin Destructor
      */
-    virtual ~ctrlm_thunder_plugin_cec_sink_t();
+    virtual ~ctrlm_thunder_plugin_cec_t();
+
+    /**
+     * This function checks if CEC Daemon is started and CEC Plugin is started.
+     * @return True if the CEC Daemon is running and the Plugin is activated, otherwise False.
+     */
+    bool is_activated();
+
+    /**
+     * This function can be used to activate a CEC Thunder Plugin.
+     * @return True if the CEC Daemon is running and plugin is activated, otherwise False.
+     */
+    bool activate();
+
+    /**
+     * This function is used to call the enable API.
+     * @param enable The boolean to enable/disable the CEC Thunder Plugin.
+     * @return True if the call is successful, otherwise False.
+     */
+    bool enable(bool enable);
 
     /**
      * This function is used to get the HDMI CEC device data from cache.
@@ -66,7 +84,7 @@ protected:
     virtual void on_initial_activation();
 
     /**
-     * This function actually calls the CEC SINK Thunder Plugin to get the CEC device data.
+     * This function actually calls the CEC Thunder Plugin to get the CEC device data.
      * @return True if the call was successful and there is data available, otherwise False.
      */
     bool _update_cec_devices();

@@ -22,6 +22,7 @@
 #include <WPEFramework/websocket/websocket.h>
 #include <WPEFramework/plugins/plugins.h>
 #include <secure_wrapper.h>
+#include "ctrlm_thunder_helpers.h"
 #include <glib.h>
 
 #define THUNDER_CONTROLLER_OPEN_RETRY_MAX      (15)
@@ -218,26 +219,7 @@ std::string ctrlm_thunder_controller_t::get_security_token() {
 }
 
 bool ctrlm_thunder_controller_t::is_thunder_active() {
-    bool ret = false;
-    FILE *pSystem = v_secure_popen("r", "systemctl status wpeframework");
-    if(pSystem) {
-        std::string pSystemOutput;
-        std::array<char, 256> pSystemBuffer;
-
-        while(fgets(pSystemBuffer.data(), 256, pSystem) != NULL) {
-            pSystemOutput += pSystemBuffer.data();
-        }
-        v_secure_pclose(pSystem);
-        if(pSystemOutput.find("Active: active (running)") != std::string::npos) {
-            THUNDER_LOG_INFO("%s: Thunder is active\n", __FUNCTION__);
-            ret = true;
-        } else {
-            THUNDER_LOG_WARN("%s: Thunder is not active yet\n", __FUNCTION__);
-        }
-    } else {
-        THUNDER_LOG_ERROR("%s: Failed to open systemctl\n", __FUNCTION__);
-    }
-   return ret;
+   return Thunder::Helpers::is_systemd_process_active("wpeframework");
 }
 
 bool ctrlm_thunder_controller_t::open_controller() {

@@ -26,6 +26,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/                     \
               -I$(top_srcdir)/src/voice/endpoints/ \
               -I$(top_srcdir)/src/voice/ipc/       \
               -I$(top_srcdir)/src/thunder/         \
+              -I$(top_srcdir)/src/thunder/helpers  \
               -I$(top_srcdir)/src/thunder/plugins
 
 AM_LDFLAGS = -larchive
@@ -120,9 +121,11 @@ AM_CPPFLAGS += -DTHUNDER_SECURITY
 endif
 controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin.cpp    \
                        thunder/ctrlm_thunder_controller.cpp \
+                       thunder/helpers/ctrlm_thunder_helpers.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_display_settings.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_hdmi_input.cpp \
-                       thunder/plugins/ctrlm_thunder_plugin_cec_sink.cpp
+                       thunder/plugins/ctrlm_thunder_plugin_cec_sink.cpp \
+                       thunder/plugins/ctrlm_thunder_plugin_cec.cpp
 endif
 
 if VOICE_KEYWORD_BEEP
