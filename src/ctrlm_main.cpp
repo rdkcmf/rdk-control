@@ -2484,7 +2484,7 @@ gpointer ctrlm_main_thread(gpointer param) {
              * again saying the wakeup reason was voice, because that was actually the last wake
              * from deep sleep reason. Using a unique power state to allow for correct transitions
              */
-            if((dqm->old_state == CTRLM_POWER_STATE_STANDBY && ctrlm_main_iarm_wakeup_reason_voice())) {
+            if((dqm->old_state == CTRLM_POWER_STATE_STANDBY && dqm->new_state == CTRLM_POWER_STATE_ON && ctrlm_main_iarm_wakeup_reason_voice())) {
                g_ctrlm.power_state = CTRLM_POWER_STATE_STANDBY_VOICE_SESSION;
                g_ctrlm.voice_session->voice_standby_session_request();
                //voice will transition power state to ON after voice transaction
