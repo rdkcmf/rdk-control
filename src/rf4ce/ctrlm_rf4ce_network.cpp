@@ -3030,6 +3030,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
            }
         }
      }
+     controller_polling_methods_[i] &= polling_methods_; // The controller polling_methods should only contain methods currently supported by target
    }
 }
 
