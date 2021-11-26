@@ -79,7 +79,7 @@ ctrlm_rf4ce_ir_rf_db_entry_t* ctrlm_rf4ce_ir_rf_db_entry_t::from_rib_binary(uint
             delete ret;
             ret = NULL;
         }
-        LOG_ERROR("%s: Error creating ir_rf_db_entry from rib binary: %s\n", __FUNCTION__, err.c_str());
+        LOG_WARN("%s: Unable to create ir_rf_db_entry from rib binary: %s\n", __FUNCTION__, err.c_str());
     }
     return(ret);
 }
@@ -101,7 +101,7 @@ ctrlm_rf4ce_ir_rf_db_entry_t* ctrlm_rf4ce_ir_rf_db_entry_t::from_raw_ir_code(ctr
             delete ret;
             ret = NULL;
         }
-        LOG_ERROR("%s: Error creating ir_rf_db_entry from raw ir code: %s\n", __FUNCTION__, err.c_str());
+        LOG_WARN("%s: Unable to create ir_rf_db_entry from raw ir code: %s\n", __FUNCTION__, err.c_str());
     }
     return(ret);
 }
