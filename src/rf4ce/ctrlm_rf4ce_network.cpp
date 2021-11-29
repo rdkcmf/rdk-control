@@ -3026,7 +3026,6 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
                  controller_polling_configuration_heartbeat_[i] = controller_polling_configuration;
               }
               LOG_INFO("%s: Controller Polling Configuration Read from TR181 <%s><%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str((ctrlm_rf4ce_controller_type_t)i),ctrlm_rf4ce_controller_polling_methods_str(controller_polling_methods_[i]));
-              continue;
            }
         }
      }
