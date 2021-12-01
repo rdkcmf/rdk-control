@@ -91,7 +91,7 @@
       "dpi_pattern"                      :         0,
       "polling" : {
          "target" : {
-            "methods"                    :         0,
+            "methods"                    :         1,
             "fmr_controllers_max"        :         1
          },
          "hb_generic_config" : {
