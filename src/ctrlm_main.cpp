@@ -410,6 +410,16 @@ int main(int argc, char *argv[]) {
       LOG_INFO("%s: locked xraudio-hal instructions to memory\n", __FUNCTION__);
    }
 #endif
+#ifdef CTRLM_NETWORK_RF4CE
+   const char *rf4ce_hal_lib = "/usr/lib/libctrlm_hal_rf4ce.so";
+   if(!ctrlm_file_exists(rf4ce_hal_lib)) {
+      LOG_INFO("%s: skipping ctrlm_hal_rf4ce library\n", __FUNCTION__);
+   } else if(clnl_lock(rf4ce_hal_lib, SECTION_TEXT)) { // returns 1 on error, 0 on success
+      LOG_ERROR("%s: failed to lock ctrlm_hal_rf4ce instructions to memory\n", __FUNCTION__);
+   } else {
+      LOG_INFO("%s: locked ctrlm_hal_rf4ce instructions to memory\n", __FUNCTION__);
+   }
+#endif
 #endif
 
    ctrlm_signals_register();
