@@ -3872,7 +3872,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
       ctrlm_timestamp_get(&voice_session_rsp_params_.timestamp_rsp_req);
    }
 
-   req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, dqm->controller_id, dqm->timestamp, response_len, response, NULL, NULL, false, false, cb_confirm_rf4ce, cb_confirm_param);
+   req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, dqm->controller_id, dqm->timestamp, response_len, response, NULL, NULL, false, true, cb_confirm_rf4ce, cb_confirm_param);
 
    LOG_INFO("%s: session response delivered\n", __FUNCTION__);
 
@@ -3926,7 +3926,7 @@ void ctrlm_obj_network_rf4ce_t::cfm_voice_session_rsp(void *data, int size) {
    if(dqm->result != CTRLM_HAL_RF4CE_RESULT_SUCCESS) {
        if(ctrlm_timestamp_until_ms(voice_session_rsp_params_.timestamp_end) > 0) { // Still within transmission window.  Retransmit the packet.
           voice_session_rsp_params_.retries++;
-          req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, voice_session_rsp_params_.controller_id, voice_session_rsp_params_.timestamp_begin, voice_session_rsp_params_.response_len, voice_session_rsp_params_.response, NULL, NULL, false, false, ctrlm_network_rf4ce_cfm_voice_session_rsp, voice_session_rsp_params_.network_id);
+          req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, voice_session_rsp_params_.controller_id, voice_session_rsp_params_.timestamp_begin, voice_session_rsp_params_.response_len, voice_session_rsp_params_.response, NULL, NULL, false, true, ctrlm_network_rf4ce_cfm_voice_session_rsp, voice_session_rsp_params_.network_id);
           LOG_ERROR("%s: result <%s> session response retransmitted\n", __FUNCTION__, ctrlm_hal_rf4ce_result_str(dqm->result));
           return;
        }
