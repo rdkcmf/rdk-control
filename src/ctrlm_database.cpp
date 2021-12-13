@@ -185,6 +185,8 @@ static void     ctrlm_db_cache();
 static gpointer ctrlm_db_thread(gpointer param);
 static void     ctrlm_db_queue_msg_destroy(gpointer msg);
 
+static const char *ctrlm_db_errmsg(int rc);
+
 static bool ctrlm_db_table_exists(const char *table);
 static bool ctrlm_db_key_exists(const char *table, const char *key);
 
@@ -242,11 +244,17 @@ bool ctrlm_db_open(const char *db_path) {
    // check for presence of database file and if not present, create it
    rc = sqlite3_open(db_path, &g_ctrlm_db.handle);
    if(rc) {
-      LOG_ERROR("%s: Can't open database: %s\n", __FUNCTION__, sqlite3_errmsg(g_ctrlm_db.handle));
+      LOG_ERROR("%s: Can't open database: rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_close(g_ctrlm_db.handle);
       sqlite3_shutdown();
       return(false);
    }
+
+   // Use extended result codes to get more information about error conditions
+   if(SQLITE_OK != sqlite3_extended_result_codes(g_ctrlm_db.handle, 1)) {
+      LOG_WARN("%s: sqlite unable to use extended result codes\n",__FUNCTION__);
+   }
+
    return(true);
 }
 
@@ -527,12 +535,12 @@ bool ctrlm_db_table_exists(const char *table) {
 
       rc = sqlite3_prepare(g_ctrlm_db.handle, sql.str().c_str(), -1, &p_stmt, 0);
       if(rc != SQLITE_OK){
-         LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sqlite3_errmsg(g_ctrlm_db.handle));
+         LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       } else {
          ret = true;
          rc = sqlite3_finalize(p_stmt);
          if(rc != SQLITE_OK){
-            LOG_ERROR("%s: Unable to finalize! %d <%s> msg %s\n", __FUNCTION__, rc, sql.str().c_str(), sqlite3_errmsg(g_ctrlm_db.handle));
+            LOG_ERROR("%s: Unable to finalize! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
          }
       }
    }
@@ -672,6 +680,13 @@ void ctrlm_db_ir_command_repeats_read(guchar **data, guint32 *length) {
    ctrlm_db_read_blob(CTRLM_DB_TABLE_CTRLMGR, CTRLM_DB_IR_COMMAND_REPEATS, data, length);
 }
 
+const char *ctrlm_db_errmsg(int rc) {
+   if(rc == SQLITE_ROW || rc == SQLITE_DONE) { // these are non-error result codes
+      return("");
+   }
+   return(sqlite3_errmsg(g_ctrlm_db.handle));
+}
+
 bool ctrlm_db_key_exists(const char *table, const char *key) {
    if(table == NULL || key == NULL) {
       LOG_WARN("%s: invalid parameters!\n", __FUNCTION__);
@@ -687,7 +702,7 @@ bool ctrlm_db_key_exists(const char *table, const char *key) {
 
    rc = sqlite3_prepare(g_ctrlm_db.handle, sql.str().c_str(), -1, &p_stmt, 0);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.str().c_str());
+      LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(false);
    }
 
@@ -711,13 +726,13 @@ bool ctrlm_db_key_exists(const char *table, const char *key) {
             break;
          }
       } else if(rc != SQLITE_DONE) {
-         LOG_ERROR("%s: Unable to step! %d <%s>\n", __FUNCTION__, rc, sql.str().c_str());
+         LOG_ERROR("%s: Unable to step! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       }
    } while(rc == SQLITE_ROW);
 
    rc = sqlite3_finalize(p_stmt);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to finalize! %d <%s> msg %s\n", __FUNCTION__, rc, sql.str().c_str(), sqlite3_errmsg(g_ctrlm_db.handle));
+      LOG_ERROR("%s: Unable to finalize! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(false);
    }
    return(found);
@@ -859,13 +874,13 @@ int ctrlm_db_insert_or_update(const char *table, const char *key, const int *val
 
    rc = sqlite3_prepare(g_ctrlm_db.handle, sql.str().c_str(), -1, &p_stmt, 0);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.str().c_str());
+      LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
 
    rc = sqlite3_bind_text(p_stmt, 1, key, -1, SQLITE_STATIC); // key name is the first variable
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to bind first parameter!\n", __FUNCTION__);
+      LOG_ERROR("%s: Unable to bind first parameter! rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
@@ -881,21 +896,21 @@ int ctrlm_db_insert_or_update(const char *table, const char *key, const int *val
    }
 
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to bind second parameter!\n", __FUNCTION__);
+      LOG_ERROR("%s: Unable to bind second parameter! rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_step(p_stmt);
    if(rc == SQLITE_ROW){
-      LOG_ERROR("%s: Unable to step! %d <%s>\n", __FUNCTION__, rc, sql.str().c_str());
+      LOG_ERROR("%s: Unable to step! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_finalize(p_stmt);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to finalize! %d <%s> msg %s\n", __FUNCTION__, rc, sql.str().c_str(), sqlite3_errmsg(g_ctrlm_db.handle));
+      LOG_ERROR("%s: Unable to finalize! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
    return(0);
@@ -923,13 +938,13 @@ int ctrlm_db_insert(const char *table, const char *key, const int *value_int, co
 
    rc = sqlite3_prepare(g_ctrlm_db.handle, sql.str().c_str(), -1, &p_stmt, 0);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.str().c_str());
+      LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
 
    rc = sqlite3_bind_text(p_stmt, 1, key, -1, SQLITE_STATIC); // key name is the first variable
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to bind first parameter!\n", __FUNCTION__);
+      LOG_ERROR("%s: Unable to bind first parameter! rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
@@ -943,21 +958,21 @@ int ctrlm_db_insert(const char *table, const char *key, const int *value_int, co
    }
 
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to bind second parameter!\n", __FUNCTION__);
+      LOG_ERROR("%s: Unable to bind second parameter! rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_step(p_stmt);
    if(rc == SQLITE_ROW){
-      LOG_ERROR("%s: Unable to step! %d <%s>\n", __FUNCTION__, rc, sql.str().c_str());
+      LOG_ERROR("%s: Unable to step! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_finalize(p_stmt);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to finalize! %d <%s> msg %s\n", __FUNCTION__, rc, sql.str().c_str(), sqlite3_errmsg(g_ctrlm_db.handle));
+      LOG_ERROR("%s: Unable to finalize! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
    return(0);
@@ -984,7 +999,7 @@ int ctrlm_db_update(const char *table, const char *key, const int *value_int, co
 
    rc = sqlite3_prepare(g_ctrlm_db.handle, sql.str().c_str(), -1, &p_stmt, 0);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.str().c_str());
+      LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
 
@@ -997,28 +1012,28 @@ int ctrlm_db_update(const char *table, const char *key, const int *value_int, co
    }
 
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to bind first parameter!\n", __FUNCTION__);
+      LOG_ERROR("%s: Unable to bind first parameter! rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_bind_text(p_stmt, 2, key, -1, SQLITE_STATIC); // key name is the second variable
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to bind second parameter!\n", __FUNCTION__);
+      LOG_ERROR("%s: Unable to bind second parameter! rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_step(p_stmt);
    if(rc == SQLITE_ROW){
-      LOG_ERROR("%s: Unable to step! %d <%s>\n", __FUNCTION__, rc, sql.str().c_str());
+      LOG_ERROR("%s: Unable to step! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       sqlite3_finalize(p_stmt);
       return(-1);
    }
 
    rc = sqlite3_finalize(p_stmt);
    if(rc != SQLITE_OK){
-      LOG_ERROR("%s: Unable to finalize! %d <%s>\n", __FUNCTION__, rc, sql.str().c_str());
+      LOG_ERROR("%s: Unable to finalize! <%s> rc <%d> <%s>\n", __FUNCTION__, sql.str().c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
 
@@ -1045,14 +1060,14 @@ int ctrlm_db_select_keys(const char *table, vector<char *> *keys_str, vector<ctr
    sqlite3_stmt *p_stmt = NULL;
    int rc =  sqlite3_prepare_v2(g_ctrlm_db.handle, sql.c_str(), sql.length(), &p_stmt, NULL);
    if(rc != SQLITE_OK) {
-      LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.c_str());
+      LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.c_str(), rc, ctrlm_db_errmsg(rc));
       return(-1);
    }
 
    do {
       rc = sqlite3_step(p_stmt);
       if(rc != SQLITE_ROW && rc != SQLITE_DONE) {
-         LOG_ERROR("%s: SQL step error: %d\n", __FUNCTION__, rc);
+         LOG_ERROR("%s: SQL step error: rc <%d> <%s>\n", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
          sqlite3_finalize(p_stmt);
          return(-1);
       }
@@ -1083,7 +1098,7 @@ int ctrlm_db_select_keys(const char *table, vector<char *> *keys_str, vector<ctr
 
    rc = sqlite3_finalize(p_stmt);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL finalize error: %d <%s>\n", __FUNCTION__, rc, sql.c_str());
+      LOG_INFO("%s: SQL finalize error: <%s> rc <%d> <%s>\n", __FUNCTION__, sql.c_str(), rc, ctrlm_db_errmsg(rc));
    }
 
    return(retval);
@@ -1111,13 +1126,15 @@ int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_u
    sqlite3_stmt *p_stmt = NULL;
    int rc =  sqlite3_prepare_v2(g_ctrlm_db.handle, sql.c_str(), sql.length(), &p_stmt, NULL);
    if(rc != SQLITE_OK) {
-      LOG_ERROR("%s: Unable to prepare sql statement <%s>!\n", __FUNCTION__, sql.c_str());
+      LOG_ERROR("%s: Unable to prepare sql statement <%s> rc <%d> <%s>!\n", __FUNCTION__, sql.c_str(), rc, ctrlm_db_errmsg(rc));
       return(retval);
    }
 
    rc = sqlite3_step(p_stmt);
    if(rc != SQLITE_ROW) {
-      LOG_ERROR("%s: SQL step error: %d\n", __FUNCTION__, rc);
+      if(rc != SQLITE_DONE) {  // log an error if the return code is not DONE
+         LOG_ERROR("%s: SQL step error: <%s> rc <%d> <%s>\n", __FUNCTION__, sql.c_str(), rc, ctrlm_db_errmsg(rc));
+      }
       sqlite3_finalize(p_stmt);
       return(retval);
    }
@@ -1174,7 +1191,7 @@ int ctrlm_db_select(const char *table, const char *key, int *value_int, sqlite_u
 
    rc = sqlite3_finalize(p_stmt);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL finalize error: %d <%s>\n", __FUNCTION__, rc, sql.c_str());
+      LOG_INFO("%s: SQL finalize error: <%s> rc <%d> <%s>\n", __FUNCTION__, sql.c_str(), rc, ctrlm_db_errmsg(rc));
    }
 
    return(retval);
@@ -1196,7 +1213,7 @@ int ctrlm_db_delete(const char *table, const char *key) {
 
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql.c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -1227,7 +1244,7 @@ void ctrlm_db_voice_create() {
       // Create the voice table
       int rc = sqlite3_exec(g_ctrlm_db.handle, "CREATE TABLE " CTRLM_DB_TABLE_VOICE "(key TEXT PRIMARY KEY, value TEXT);", NULL, NULL, &err_msg);
       if(rc != SQLITE_OK) {
-         LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+         LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
          if(err_msg) {
             sqlite3_free(err_msg);
          }
@@ -1244,7 +1261,7 @@ void ctrlm_db_default() {
    // Create the global table
    int rc = sqlite3_exec(g_ctrlm_db.handle, "CREATE TABLE " CTRLM_DB_TABLE_CTRLMGR "(key TEXT PRIMARY KEY, value TEXT);", NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -1461,7 +1478,7 @@ void ctrlm_db_rf4ce_network_create(ctrlm_network_id_t network_id) {
    sql_global << "CREATE TABLE IF NOT EXISTS " << table_name_global << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql_global.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -1473,7 +1490,7 @@ void ctrlm_db_rf4ce_network_create(ctrlm_network_id_t network_id) {
    sql_controllers << "CREATE TABLE IF NOT EXISTS " << table_name_controller_list << "(key TEXT PRIMARY KEY, value TEXT);";
    rc = sqlite3_exec(g_ctrlm_db.handle, sql_controllers.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, err_msg, rc, ctrlm_db_errmsg(rc));
       sqlite3_free(err_msg);
       return;
    }
@@ -1542,7 +1559,7 @@ bool ctrlm_db_verify_integrity() {
 bool ctrlm_db_recovery() {
    int rc = sqlite3_exec(g_ctrlm_db.handle, "VACUUM;", NULL, NULL, NULL);
    if(rc != SQLITE_OK) {
-      LOG_ERROR("%s: database recovery attempt failed (%d)", __FUNCTION__, rc);
+      LOG_ERROR("%s: database recovery attempt failed. rc <%d> <%s>", __FUNCTION__, rc, ctrlm_db_errmsg(rc));
    }
    return (rc == SQLITE_OK);
 }
@@ -2608,7 +2625,7 @@ void ctrlm_db_controller_destroy(ctrlm_network_id_t network_id, ctrlm_controller
    sql << "DROP TABLE IF EXISTS " << table_name_controller_entry << ";";
    rc = sqlite3_exec(g_ctrlm_db.handle, sql.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -2664,7 +2681,7 @@ void ctrlm_db_controller_create(ctrlm_network_id_t network_id, ctrlm_controller_
    sql << "CREATE TABLE IF NOT EXISTS " << table_name_controller_entry << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -2698,7 +2715,7 @@ void ctrlm_db_ip_network_create(ctrlm_network_id_t network_id) {
    sql_global << "CREATE TABLE IF NOT EXISTS " << table_name_global << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql_global.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -2710,7 +2727,7 @@ void ctrlm_db_ip_network_create(ctrlm_network_id_t network_id) {
    sql_controllers << "CREATE TABLE IF NOT EXISTS " << table_name_controller_list << "(key TEXT PRIMARY KEY, value TEXT);";
    rc = sqlite3_exec(g_ctrlm_db.handle, sql_controllers.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__,  (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       sqlite3_free(err_msg);
       return;
    }
@@ -2894,7 +2911,7 @@ void ctrlm_db_ble_network_create(ctrlm_network_id_t network_id) {
    sql_global << "CREATE TABLE IF NOT EXISTS " << table_name_global << "(key TEXT PRIMARY KEY, value TEXT);";
    int rc = sqlite3_exec(g_ctrlm_db.handle, sql_global.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, (err_msg ? err_msg : ""));
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       if(err_msg) {
          sqlite3_free(err_msg);
       }
@@ -2906,7 +2923,7 @@ void ctrlm_db_ble_network_create(ctrlm_network_id_t network_id) {
    sql_controllers << "CREATE TABLE IF NOT EXISTS " << table_name_controller_list << "(key TEXT PRIMARY KEY, value TEXT);";
    rc = sqlite3_exec(g_ctrlm_db.handle, sql_controllers.str().c_str(), NULL, NULL, &err_msg);
    if(rc != SQLITE_OK) {
-      LOG_INFO("%s: SQL error: %s\n", __FUNCTION__, err_msg);
+      LOG_INFO("%s: SQL error: errmsg <%s> rc <%d> <%s>\n", __FUNCTION__, (err_msg ? err_msg : ""), rc, ctrlm_db_errmsg(rc));
       sqlite3_free(err_msg);
       return;
    }
