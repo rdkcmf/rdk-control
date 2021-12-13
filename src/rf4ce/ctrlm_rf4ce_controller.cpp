@@ -1207,6 +1207,7 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
 void ctrlm_obj_controller_rf4ce_t::db_store() {
    // Store the database entries
    guchar data[CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE];
+   size_t length = 0;
    ctrlm_network_id_t    network_id    = network_id_get();
    ctrlm_controller_id_t controller_id = controller_id_get();
 
@@ -1293,12 +1294,14 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
       ctrlm_db_rf4ce_write_controller_irdb_status(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS);
    }
 
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME         == property_read_irdb_entry_id_name_tv(data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME)) {
-      ctrlm_db_rf4ce_write_irdb_entry_id_name_tv(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+   length = property_read_irdb_entry_id_name_tv(data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+   if(length > 0) {
+      ctrlm_db_rf4ce_write_irdb_entry_id_name_tv(network_id, controller_id, data, length);
    }
 
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME         == property_read_irdb_entry_id_name_avr(data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME)) {
-      ctrlm_db_rf4ce_write_irdb_entry_id_name_avr(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+   length = property_read_irdb_entry_id_name_avr(data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+   if(length > 0) {
+      ctrlm_db_rf4ce_write_irdb_entry_id_name_avr(network_id, controller_id, data, length);
    }
 
    if(CTRLM_RF4CE_LEN_VOICE_METRICS                       == property_read_voice_metrics(data, CTRLM_RF4CE_LEN_VOICE_METRICS)) {
@@ -4019,7 +4022,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_controller_irdb_status(guchar
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_irdb_entry_id_name_tv(guchar *data, guchar length) {
    gchar irdb_entry_id_name_tv[CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME];
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME) {
+   if(length <= 0) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
@@ -4030,89 +4033,84 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_irdb_entry_id_name_tv(guchar
    // Copy IRDB Code to data buf
    // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
    strncpy(irdb_entry_id_name_tv, (gchar *)data, length);
-   irdb_entry_id_name_tv[length-1] = 0;
+   irdb_entry_id_name_tv[sizeof(irdb_entry_id_name_tv)-1] = 0; // in case length == sizeof(irdb_entry_id_name_tv)
 
-   if(irdb_entry_id_name_tv_ != irdb_entry_id_name_tv) {
+   if(!strncmp(irdb_entry_id_name_tv_.c_str(), irdb_entry_id_name_tv, length)) {
       // Store the data on the controller object
-      irdb_entry_id_name_tv_ = irdb_entry_id_name_tv;
+      irdb_entry_id_name_tv_ = std::string(irdb_entry_id_name_tv, length);
       if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_irdb_entry_id_name_tv(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+         ctrlm_db_rf4ce_write_irdb_entry_id_name_tv(network_id_get(), controller_id_get(), data, length);
       }
    }
-
-   LOG_INFO("%s: TV IRDB Code <%s>\n", __FUNCTION__, irdb_entry_id_name_tv_.c_str());
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_irdb_entry_id_name_tv(guchar *data, guchar length) {
-   guchar len;
-
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   len = (irdb_entry_id_name_tv_.length() > length ? length : irdb_entry_id_name_tv_.length());
-
-   errno_t safec_rc = -1;
-   // Clear the array
-   safec_rc = memset_s(data, length, 0, length);
-   ERR_CHK(safec_rc);
-   // Copy IRDB Code to data buf
-   // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
-   strncpy((gchar *)data, irdb_entry_id_name_tv_.c_str(), len);
-   data[len-1] = 0;
 
    LOG_INFO("%s: TV IRDB Code <%s>\n", __FUNCTION__, irdb_entry_id_name_tv_.c_str());
    return(length);
 }
 
+guchar ctrlm_obj_controller_rf4ce_t::property_read_irdb_entry_id_name_tv(guchar *data, guchar length) {
+   guchar ret = 0;
+
+   if(irdb_entry_id_name_tv_.length() > 0) {
+      errno_t safec_rc = -1;
+      // Clear the array
+      safec_rc = memset_s(data, length, 0, length);
+      ERR_CHK(safec_rc);
+
+      ret = (irdb_entry_id_name_tv_.length() > length ? length : irdb_entry_id_name_tv_.length());
+      // Copy IRDB Code to data buf
+      // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
+      strncpy((gchar *)data, irdb_entry_id_name_tv_.c_str(), ret);
+      data[length-1] = 0; // in case irdb_entry_id_name_tv_.length() == length
+   }
+
+   LOG_INFO("%s: TV IRDB Code <%s>\n", __FUNCTION__, (irdb_entry_id_name_tv_.length() > 0 ? irdb_entry_id_name_tv_.c_str() : "NULL"));
+   return(length);
+}
+
 guchar ctrlm_obj_controller_rf4ce_t::property_write_irdb_entry_id_name_avr(guchar *data, guchar length) {
    gchar irdb_entry_id_name_avr[CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME];
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME) {
+   if(length <= 0) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
    errno_t safec_rc = -1;
-
    // Clear the array
    safec_rc = memset_s(irdb_entry_id_name_avr, length, 0, length);
    ERR_CHK(safec_rc);
    // Copy IRDB Code to data buf
    // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
    strncpy(irdb_entry_id_name_avr, (gchar *)data, length);
-   irdb_entry_id_name_avr[length-1] = 0;
+   irdb_entry_id_name_avr[sizeof(irdb_entry_id_name_avr)-1] = 0; // in case length == sizeof(irdb_entry_id_name_avr)
 
-   if(irdb_entry_id_name_avr_ != irdb_entry_id_name_avr) {
+   if(!strncmp(irdb_entry_id_name_avr_.c_str(), irdb_entry_id_name_avr, length)) {
       // Store the data on the controller object
-      irdb_entry_id_name_avr_ = irdb_entry_id_name_avr;
+      irdb_entry_id_name_avr_ = std::string(irdb_entry_id_name_avr, length);
       if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_irdb_entry_id_name_avr(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+         ctrlm_db_rf4ce_write_irdb_entry_id_name_avr(network_id_get(), controller_id_get(), data, length);
       }
    }
 
    LOG_INFO("%s: AVR IRDB Code <%s>\n", __FUNCTION__, irdb_entry_id_name_avr_.c_str());
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
+   return(length);
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_read_irdb_entry_id_name_avr(guchar *data, guchar length) {
-   guchar len;
+   guchar ret = 0;
 
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
+   if(irdb_entry_id_name_avr_.length() > 0) {
+      errno_t safec_rc = -1;
+      // Clear the array
+      safec_rc = memset_s(data, length, 0, length);
+      ERR_CHK(safec_rc);
+
+      ret = (irdb_entry_id_name_avr_.length() > length ? length : irdb_entry_id_name_avr_.length());
+      // Copy IRDB Code to data buf
+      // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
+      strncpy((gchar *)data, irdb_entry_id_name_avr_.c_str(), ret);
+      data[length-1] = 0; // in case irdb_entry_id_name_avr_.length() == length
    }
-   len = (irdb_entry_id_name_avr_.length() > length ? length : irdb_entry_id_name_avr_.length());
 
-   errno_t safec_rc = -1;
-   // Clear the array
-   safec_rc = memset_s(data, length, 0, length);
-   ERR_CHK(safec_rc);
-   // Copy IRDB Code to data buf
-   // Can't be replaced with safeC version of this, as safeC string functions have limitations on buffer sizes
-   strncpy((gchar *)data, irdb_entry_id_name_avr_.c_str(), len);
-   data[len-1] = 0;
-
-   LOG_INFO("%s: AVR IRDB Code <%s>\n", __FUNCTION__, irdb_entry_id_name_avr_.c_str());
+   LOG_INFO("%s: AVR IRDB Code <%s>\n", __FUNCTION__, (irdb_entry_id_name_avr_.length() > 0 ? irdb_entry_id_name_avr_.c_str() : "NULL"));
    return(length);
 }
 
