@@ -1096,15 +1096,17 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
 
     if (!l_session_by_text) {
         if (false == use_external_data_pipe) {
-            errno = 0;
-            if(pipe(fds) < 0) {
-                int errsv = errno;
-                LOG_ERROR("%s: Failed to create pipe <%s>\n", __FUNCTION__, strerror(errsv));
-                this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_FAILURE);
-                return(VOICE_SESSION_RESPONSE_FAILURE);
-            } // set to non-blocking
-            hal_input_params.fd = fds[PIPE_READ];
+            if(!is_standby_microphone()) {
+                errno = 0;
+                if(pipe(fds) < 0) {
+                    int errsv = errno;
+                    LOG_ERROR("%s: Failed to create pipe <%s>\n", __FUNCTION__, strerror(errsv));
+                    this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_FAILURE);
+                    return(VOICE_SESSION_RESPONSE_FAILURE);
+                } // set to non-blocking
+            }
 
+            hal_input_params.fd = fds[PIPE_READ];
             // request the xraudio session and begin
             hal_input_object = ctrlm_xraudio_hal_input_open(&hal_input_params);
         } else {
@@ -2750,7 +2752,6 @@ void ctrlm_voice_t::voice_standby_session_request(void) {
     ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_DSP;
     ctrlm_controller_id_t controller_id = CTRLM_MAIN_CONTROLLER_ID_DSP;
     ctrlm_voice_device_t device = CTRLM_VOICE_DEVICE_MICROPHONE;
-    ctrlm_voice_session_response_status_t voice_status;
     ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_PCM;
 
     #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
@@ -2761,11 +2762,8 @@ void ctrlm_voice_t::voice_standby_session_request(void) {
     }
     #endif
 
-    voice_status = voice_session_req(network_id, controller_id, device, format, NULL, "DSP", "1", "1", 0.0, false, NULL, NULL, NULL, false);
+    voice_session_req(network_id, controller_id, device, format, NULL, "DSP", "1",  "1",  0.0,  false,  NULL,  NULL,  NULL,  false, NULL);
 
-    if(VOICE_SESSION_RESPONSE_AVAILABLE != voice_status) {
-       LOG_ERROR("%s: Failed opening voice session in ctrlm_voice_t, error = <%d>\n", __FUNCTION__, voice_status);
-    }
 }
 #endif
 
