@@ -232,26 +232,27 @@ void ctrlm_obj_network_ble_t::hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t p
    version_               = params.version;
    state_                 = CTRLM_BLE_STATE_IDLE;
 
-   hal_api_start_threads_           = params.start_threads;
-   hal_api_get_devices_             = params.get_devices;
-   hal_api_get_all_rcu_props_       = params.get_all_rcu_props;
-   hal_api_discovery_start_         = params.start_discovery;
-   hal_api_pair_with_code_          = params.pair_with_code;
-   hal_api_unpair_                  = params.unpair;
-   hal_api_start_audio_stream_      = params.start_audio_stream;
-   hal_api_stop_audio_stream_       = params.stop_audio_stream;
-   hal_api_get_audio_stats_         = params.get_audio_stats;
-   hal_api_set_ir_codes_            = params.set_ir_codes;
-   hal_api_clear_ir_codes_          = params.clear_ir_codes;
-   hal_api_find_me_                 = params.find_me;
-   hal_api_get_daemon_log_levels_   = params.get_daemon_log_levels;
-   hal_api_set_daemon_log_levels_   = params.set_daemon_log_levels;
-   hal_api_fw_upgrade_              = params.fw_upgrade;
-   hal_api_get_rcu_unpair_reason_   = params.get_rcu_unpair_reason;
-   hal_api_get_rcu_reboot_reason_   = params.get_rcu_reboot_reason;
-   hal_api_get_rcu_last_wakeup_key_ = params.get_rcu_last_wakeup_key;
-   hal_api_send_rcu_action_         = params.send_rcu_action;
-   hal_api_handle_deepsleep_        = params.handle_deepsleep;
+   hal_api_start_threads_              = params.start_threads;
+   hal_api_get_devices_                = params.get_devices;
+   hal_api_get_all_rcu_props_          = params.get_all_rcu_props;
+   hal_api_discovery_start_            = params.start_discovery;
+   hal_api_pair_with_code_             = params.pair_with_code;
+   hal_api_unpair_                     = params.unpair;
+   hal_api_start_audio_stream_         = params.start_audio_stream;
+   hal_api_stop_audio_stream_          = params.stop_audio_stream;
+   hal_api_get_audio_stats_            = params.get_audio_stats;
+   hal_api_set_ir_codes_               = params.set_ir_codes;
+   hal_api_clear_ir_codes_             = params.clear_ir_codes;
+   hal_api_find_me_                    = params.find_me;
+   hal_api_get_daemon_log_levels_      = params.get_daemon_log_levels;
+   hal_api_set_daemon_log_levels_      = params.set_daemon_log_levels;
+   hal_api_fw_upgrade_                 = params.fw_upgrade;
+   hal_api_get_rcu_unpair_reason_      = params.get_rcu_unpair_reason;
+   hal_api_get_rcu_reboot_reason_      = params.get_rcu_reboot_reason;
+   hal_api_get_rcu_last_wakeup_key_    = params.get_rcu_last_wakeup_key;
+   hal_api_send_rcu_action_            = params.send_rcu_action;
+   hal_api_handle_deepsleep_           = params.handle_deepsleep;
+   hal_api_write_rcu_wakeup_config_    = params.write_rcu_wakeup_config;
 
    // Unblock the caller of hal_init
    g_mutex_lock(&mutex_);
@@ -286,18 +287,15 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
       vector<unsigned long long> hal_devices;
       if (CTRLM_HAL_RESULT_SUCCESS == hal_api_get_devices_(hal_devices)) {
          for(auto const &it : hal_devices) {
-            ctrlm_controller_id_t controller_id;
-            if (!getControllerId(it, &controller_id)) {
-               LOG_WARN("%s: Controller from HAL <0x%llX> doesn't exist in network, adding...\n", __PRETTY_FUNCTION__, it);
-               ctrlm_hal_ble_RcuStatusData_t rcu_props;
-               errno_t safec_rc = memset_s(&rcu_props, sizeof(rcu_props), 0, sizeof(rcu_props));
-               ERR_CHK(safec_rc);
-               rcu_props.rcu_data.ieee_address = it;
-               if (hal_api_get_all_rcu_props_) {
-                  hal_api_get_all_rcu_props_(rcu_props);
-               }
-               controller_add(rcu_props.rcu_data);
+            LOG_INFO("%s: Getting all properties from HAL for controller <0x%llX> ...\n", __PRETTY_FUNCTION__, it);
+            ctrlm_hal_ble_RcuStatusData_t rcu_props;
+            errno_t safec_rc = memset_s(&rcu_props, sizeof(rcu_props), 0, sizeof(rcu_props));
+            ERR_CHK(safec_rc);
+            rcu_props.rcu_data.ieee_address = it;
+            if (hal_api_get_all_rcu_props_) {
+               hal_api_get_all_rcu_props_(rcu_props);
             }
+            controller_add(rcu_props.rcu_data);
          }
          for(auto const &it : controllers_) {
             if (BLE_CONTROLLER_TYPE_IR != it.second->getControllerType() && 
@@ -875,6 +873,54 @@ void ctrlm_obj_network_ble_t::req_process_send_rcu_action(void *data, int size) 
    }
 }
 
+void ctrlm_obj_network_ble_t::req_process_write_rcu_wakeup_config(void *data, int size) {
+   LOG_DEBUG("%s: Enter...\n", __PRETTY_FUNCTION__);
+   THREAD_ID_VALIDATE();
+   ctrlm_main_queue_msg_write_advertising_config_t *dqm = (ctrlm_main_queue_msg_write_advertising_config_t *)data;
+
+   g_assert(dqm);
+   g_assert(size == sizeof(ctrlm_main_queue_msg_write_advertising_config_t));
+
+   dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR;
+   bool attempted = false;
+
+   if (!ready_) {
+      LOG_FATAL("%s: Network is not ready!\n", __PRETTY_FUNCTION__);
+   } 
+   else if ((dqm->params->config >= CTRLM_RCU_WAKEUP_CONFIG_INVALID) ||
+            (dqm->params->config == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM && dqm->params->customListSize == 0) ||
+            (dqm->params->config == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM && dqm->params->customList == NULL)) {
+      LOG_ERROR("%s: Invalid parameters!\n", __FUNCTION__);
+      dqm->params->result = CTRLM_IARM_CALL_RESULT_ERROR_INVALID_PARAMETER;
+   } 
+   else {
+      for (auto const &controller : controllers_) {
+         if (BLE_CONTROLLER_TYPE_IR != controller.second->getControllerType()) {
+            attempted = true;
+            ctrlm_hal_ble_WriteRcuWakeupConfig_params_t params;
+            params.ieee_address = controller.second->getMacAddress();
+            params.config = dqm->params->config;
+            params.customList = dqm->params->customList;
+            params.customListSize = dqm->params->customListSize;
+            params.wait_for_reply = true;
+            if (hal_api_write_rcu_wakeup_config_) {
+               if (CTRLM_HAL_RESULT_SUCCESS == hal_api_write_rcu_wakeup_config_(params)) {
+                  dqm->params->result = CTRLM_IARM_CALL_RESULT_SUCCESS;
+               }
+            } else {
+               LOG_FATAL("%s: hal_api_write_rcu_wakeup_config_ is NULL!\n", __FUNCTION__);
+            }
+         }
+      }
+      if (!attempted) {
+         LOG_ERROR("%s: No BLE paired and connected remotes!\n", __FUNCTION__);
+      }
+   }
+   if(dqm->semaphore) {
+      sem_post(dqm->semaphore);
+   }
+}
+
 void ctrlm_obj_network_ble_t::factory_reset(void) {
    THREAD_ID_VALIDATE();
 
@@ -1320,6 +1366,24 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   report_status = false;
                   print_status = false;
                   break;
+               case CTRLM_HAL_BLE_PROPERTY_WAKEUP_CONFIG:
+                  controller->setWakeupConfig(dqm->rcu_data.wakeup_config);
+                  LOG_INFO("%s: Controller (0x%llX) notified wakeup config = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, ctrlm_rcu_wakeup_config_str(controller->getWakeupConfig()));
+                  if (controller->getWakeupConfig() == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM) {
+                     // Don't report status yet if its a custom config.  Do that after we receive the custom list
+                     report_status = false;
+                     print_status = false;
+                  }
+                  break;
+               case CTRLM_HAL_BLE_PROPERTY_WAKEUP_CUSTOM_LIST:
+                  controller->setWakeupCustomList(dqm->rcu_data.wakeup_custom_list, dqm->rcu_data.wakeup_custom_list_size);
+                  LOG_INFO("%s: Controller (0x%llX) notified wakeup custom list = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, controller->wakeupCustomListToString().c_str());
+                  if (controller->getWakeupConfig() != CTRLM_RCU_WAKEUP_CONFIG_CUSTOM) {
+                     // Only report status if the config is set to custom
+                     report_status = false;
+                     print_status = false;
+                  }
+                  break;
                default:
                   LOG_WARN("%s: Unhandled Property: %d !!!!!!!!!!!!!!!!!!!!!!!!\n", __PRETTY_FUNCTION__, dqm->property_updated);
                   report_status = false;
@@ -1353,11 +1417,18 @@ void ctrlm_obj_network_ble_t::populate_rcu_status_message(ctrlm_iarm_RcuStatus_p
    errno_t safec_rc = -1;
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
       if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType()) {
-         msg->remotes[i].controller_id    = it->second->controller_id_get();
-         msg->remotes[i].deviceid         = it->second->getDeviceID();
-         msg->remotes[i].batterylevel     = it->second->getBatteryPercent();
-         msg->remotes[i].connected        = (it->second->getConnected()) ? 1 : 0;
-         msg->remotes[i].wakeup_key_code  = (CTRLM_KEY_CODE_INVALID == it->second->getLastWakeupKey()) ? -1 : it->second->getLastWakeupKey();
+         msg->remotes[i].controller_id             = it->second->controller_id_get();
+         msg->remotes[i].deviceid                  = it->second->getDeviceID();
+         msg->remotes[i].batterylevel              = it->second->getBatteryPercent();
+         msg->remotes[i].connected                 = (it->second->getConnected()) ? 1 : 0;
+         msg->remotes[i].wakeup_key_code           = (CTRLM_KEY_CODE_INVALID == it->second->getLastWakeupKey()) ? -1 : it->second->getLastWakeupKey();
+         msg->remotes[i].wakeup_config             = it->second->getWakeupConfig();
+         msg->remotes[i].wakeup_custom_list_size   = it->second->getWakeupCustomList().size();
+         int idx = 0;
+         for (auto const key : it->second->getWakeupCustomList()) {
+            msg->remotes[i].wakeup_custom_list[idx] = key;
+            idx++;
+         }
 
          safec_rc = strncpy_s(msg->remotes[i].ieee_address_str, sizeof(msg->remotes[i].ieee_address_str), ctrlm_convert_mac_long_to_string(it->second->getMacAddress()).c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
          safec_rc = strncpy_s(msg->remotes[i].btlswver, sizeof(msg->remotes[i].btlswver), it->second->getFwRevision().c_str(), CTRLM_MAX_PARAM_STR_LEN-1); ERR_CHK(safec_rc);
@@ -1419,6 +1490,8 @@ ctrlm_controller_id_t ctrlm_obj_network_ble_t::controller_add(ctrlm_hal_ble_rcu_
       controller->setAudioCodecs(rcu_data.audio_codecs);
       controller->setBatteryPercent(rcu_data.battery_level);
       controller->setConnected(rcu_data.connected);
+      controller->setWakeupConfig(rcu_data.wakeup_config);
+      controller->setWakeupCustomList(rcu_data.wakeup_custom_list, rcu_data.wakeup_custom_list_size);
       controller->db_store();
    }
    return id;

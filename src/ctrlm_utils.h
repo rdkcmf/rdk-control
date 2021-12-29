@@ -117,6 +117,7 @@ const char *ctrlm_power_state_str(ctrlm_power_state_t state);
 #ifdef ENABLE_DEEP_SLEEP
 const char *ctrlm_wakeup_reason_str(DeepSleep_WakeupReason_t wakeup_reason);
 #endif
+const char *ctrlm_rcu_wakeup_config_str(ctrlm_rcu_wakeup_config_t config);
 
 bool        ctrlm_file_copy(const char* src, const char* dst, bool overwrite);
 bool        ctrlm_file_exists(const char* path);

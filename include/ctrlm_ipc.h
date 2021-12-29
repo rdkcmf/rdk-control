@@ -129,10 +129,11 @@
 #define CTRLM_MAIN_IARM_CALL_IR_CLEAR_CODE                       "Main_IRClear"           ///< IARM Call to clear all IR Codes from a specified BLE remote
 
 // For Remote Plugin, only used for BLE currently, refactoring needed in other networks to use this interface
-#define CTRLM_MAIN_IARM_CALL_GET_RCU_STATUS                      "Main_GetRcuStatus"      ///< IARM Call get the RCU status info (same as what's provided by CTRLM_RCU_IARM_EVENT_RCU_STATUS)
-#define CTRLM_MAIN_IARM_CALL_START_PAIRING                       "Main_StartPairing"      ///< IARM Call to initiate searching for a remote to pair with
-#define CTRLM_MAIN_IARM_CALL_START_PAIR_WITH_CODE                "Main_StartPairWithCode" ///< IARM Call to initiate searching for a remote to pair with
-#define CTRLM_MAIN_IARM_CALL_FIND_MY_REMOTE                      "Main_FindMyRemote"      ///< IARM Call to trigger the Find My Remote alarm on a specified remote
+#define CTRLM_MAIN_IARM_CALL_GET_RCU_STATUS                      "Main_GetRcuStatus"            ///< IARM Call get the RCU status info (same as what's provided by CTRLM_RCU_IARM_EVENT_RCU_STATUS)
+#define CTRLM_MAIN_IARM_CALL_START_PAIRING                       "Main_StartPairing"            ///< IARM Call to initiate searching for a remote to pair with
+#define CTRLM_MAIN_IARM_CALL_START_PAIR_WITH_CODE                "Main_StartPairWithCode"       ///< IARM Call to initiate searching for a remote to pair with
+#define CTRLM_MAIN_IARM_CALL_FIND_MY_REMOTE                      "Main_FindMyRemote"            ///< IARM Call to trigger the Find My Remote alarm on a specified remote
+#define CTRLM_MAIN_IARM_CALL_WRITE_RCU_WAKEUP_CONFIG             "Main_WriteAdvertisingConfig"  ///< IARM Call to write the advertising configuration on all connected remotes
 
 
 #define CTRLM_MAIN_NETWORK_ID_INVALID                          (0xFF) ///< An invalid network identifier
@@ -212,6 +213,8 @@
 #define CTRLM_IEEE_ADDR_LEN               (18)
 #define CTRLM_MAX_PARAM_STR_LEN           (64)
 #define CTRLM_MAX_IRDB_RESPONSE_STR_LEN   (10240)
+
+#define CTRLM_WAKEUP_CONFIG_LIST_MAX_SIZE (256)
 
 /// @}
 
@@ -433,6 +436,13 @@ typedef enum {
    CTRLM_POWER_STATE_INVALID                = 5 
 }ctrlm_power_state_t;
 
+typedef enum {
+   CTRLM_RCU_WAKEUP_CONFIG_ALL = 0,
+   CTRLM_RCU_WAKEUP_CONFIG_CUSTOM,
+   CTRLM_RCU_WAKEUP_CONFIG_NONE,
+   CTRLM_RCU_WAKEUP_CONFIG_INVALID
+} ctrlm_rcu_wakeup_config_t;
+
 /// @brief Network Id Type
 /// @details During initialization, of the HAL network, Control Manager will assign a unique id to the network.  It must be used in all
 /// subsequent communication with the Control Manager.
@@ -650,8 +660,8 @@ typedef struct {
    unsigned char                open_chime_enabled;                             ///< Boolean value to enable (non-zero) or disable (zero) open chime
    unsigned char                close_chime_enabled;                            ///< Boolean value to enable (non-zero) or disable (zero) close chime
    unsigned char                privacy_chime_enabled;                          ///< Boolean value to enable (non-zero) or disable (zero) privacy chime
-   unsigned char                conversational_mode        ;                    ///< Boolean value to set conversational mode (0-6)
-  ctrlm_chime_volume_t          chime_volume;                                   ///< The chime volume
+   unsigned char                conversational_mode;                            ///< Boolean value to set conversational mode (0-6)
+   ctrlm_chime_volume_t         chime_volume;                                   ///< The chime volume
    unsigned char                ir_command_repeats;                             ///< The ir command repeats (1 - 10)
 } ctrlm_main_iarm_call_control_service_settings_t;
 
@@ -694,21 +704,24 @@ typedef struct {
 
 
 typedef struct {
-   ctrlm_controller_id_t   controller_id;                               ///< identifier of the controller, used for calls to a specific RCU
-   char                    ieee_address_str[CTRLM_MAX_PARAM_STR_LEN];
-   char                    serialno[CTRLM_MAX_PARAM_STR_LEN];
-   int                     deviceid;
-   char                    make[CTRLM_MAX_PARAM_STR_LEN];
-   char                    model[CTRLM_MAX_PARAM_STR_LEN];
-   char                    name[CTRLM_MAX_PARAM_STR_LEN];
-   char                    btlswver[CTRLM_MAX_PARAM_STR_LEN];
-   char                    hwrev[CTRLM_MAX_PARAM_STR_LEN];
-   char                    rcuswver[CTRLM_MAX_PARAM_STR_LEN];
-   char                    tv_code[CTRLM_MAX_PARAM_STR_LEN];
-   char                    avr_code[CTRLM_MAX_PARAM_STR_LEN];
-   unsigned char           connected;
-   int                     batterylevel;
-   int                     wakeup_key_code;
+   ctrlm_controller_id_t      controller_id;                               ///< identifier of the controller, used for calls to a specific RCU
+   char                       ieee_address_str[CTRLM_MAX_PARAM_STR_LEN];
+   char                       serialno[CTRLM_MAX_PARAM_STR_LEN];
+   int                        deviceid;
+   char                       make[CTRLM_MAX_PARAM_STR_LEN];
+   char                       model[CTRLM_MAX_PARAM_STR_LEN];
+   char                       name[CTRLM_MAX_PARAM_STR_LEN];
+   char                       btlswver[CTRLM_MAX_PARAM_STR_LEN];
+   char                       hwrev[CTRLM_MAX_PARAM_STR_LEN];
+   char                       rcuswver[CTRLM_MAX_PARAM_STR_LEN];
+   char                       tv_code[CTRLM_MAX_PARAM_STR_LEN];
+   char                       avr_code[CTRLM_MAX_PARAM_STR_LEN];
+   unsigned char              connected;
+   int                        batterylevel;
+   int                        wakeup_key_code;
+   ctrlm_rcu_wakeup_config_t  wakeup_config;
+   int                        wakeup_custom_list[CTRLM_WAKEUP_CONFIG_LIST_MAX_SIZE];
+   int                        wakeup_custom_list_size;
 } ctrlm_rcu_data_t;
 
 // This struct is used for the event (CTRLM_RCU_IARM_EVENT_RCU_STATUS) and get (CTRLM_MAIN_IARM_CALL_GET_RCU_STATUS)
@@ -798,6 +811,16 @@ typedef struct {
    char                     response[CTRLM_MAX_IRDB_RESPONSE_STR_LEN];  ///< OUT - result of the operation. Formatted in JSON
    ctrlm_iarm_call_result_t result;                                     ///< OUT - return code of the operation
 } ctrlm_iarm_call_IRClear_params_t;
+
+typedef struct {
+   unsigned char                 api_revision;
+   ctrlm_network_id_t            network_id;
+   ctrlm_controller_id_t         controller_id;
+   ctrlm_rcu_wakeup_config_t     config;
+   int                           customList[CTRLM_WAKEUP_CONFIG_LIST_MAX_SIZE];
+   int                           customListSize;
+   ctrlm_iarm_call_result_t      result;
+} ctrlm_iarm_call_WriteRcuWakeupConfig_params_t;
 
 /// @brief Chip Status Structure
 /// @details The Chip Status structure is used in the CTRLM_MAIN_IARM_CALL_CHIP_STATUS_GET call. See the @link CTRLM_IPC_MAIN_CALLS Calls@endlink section for more details on invoking this call.

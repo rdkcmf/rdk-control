@@ -1810,3 +1810,13 @@ ctrlm_power_state_t ctrlm_iarm_power_state_map(IARM_Bus_PowerState_t iarm_power_
 
     return ctrlm_power_state;
 }
+
+const char *ctrlm_rcu_wakeup_config_str(ctrlm_rcu_wakeup_config_t config) {
+    switch(config) {
+        case CTRLM_RCU_WAKEUP_CONFIG_ALL:       return("ALL_KEYS");
+        case CTRLM_RCU_WAKEUP_CONFIG_CUSTOM:    return("CUSTOM_KEY_LIST");
+        case CTRLM_RCU_WAKEUP_CONFIG_NONE:      return("NO_KEYS");
+        case CTRLM_RCU_WAKEUP_CONFIG_INVALID:   return("INVALID");
+        default:                                return("INVALID__TYPE");
+    }
+}

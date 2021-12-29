@@ -34,6 +34,10 @@
 #include "../ctrlm_controller.h"
 #include "ctrlm_hal_ip.h"
 
+#include <sstream>
+#include <iterator>
+#include <iostream>
+
 using namespace std;
 
 // End Includes
@@ -58,6 +62,8 @@ ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t(ctrlm_controller_id_t con
    last_key_status_(CTRLM_KEY_STATUS_INVALID),
    last_key_code_(CTRLM_KEY_CODE_INVALID),
    last_wakeup_key_code_(CTRLM_KEY_CODE_INVALID),
+   wakeup_config_(CTRLM_RCU_WAKEUP_CONFIG_INVALID),
+   wakeup_custom_list_(),
    battery_percent_(0),
    voice_cmd_count_today_(0),
    voice_cmd_count_yesterday_(0),
@@ -451,6 +457,41 @@ guint16 ctrlm_obj_controller_ble_t::getLastWakeupKey() {
    return last_wakeup_key_code_;
 }
 
+void ctrlm_obj_controller_ble_t::setWakeupConfig(uint8_t config) {
+   if (config > CTRLM_RCU_WAKEUP_CONFIG_INVALID) {
+      wakeup_config_ = CTRLM_RCU_WAKEUP_CONFIG_INVALID;
+   } else {
+      wakeup_config_ = (ctrlm_rcu_wakeup_config_t)config;
+   }
+}
+ctrlm_rcu_wakeup_config_t ctrlm_obj_controller_ble_t::getWakeupConfig() {
+   return wakeup_config_;
+}
+
+void ctrlm_obj_controller_ble_t::setWakeupCustomList(int *list, int size) {
+   if (NULL == list) {
+      LOG_ERROR("%s: list is NULL\n", __FUNCTION__);
+      return;
+   }
+   wakeup_custom_list_.clear();
+   for (int i = 0; i < size; i++) {
+      wakeup_custom_list_.push_back(list[i]);
+   }
+}
+vector<uint16_t> ctrlm_obj_controller_ble_t::getWakeupCustomList() {
+   return wakeup_custom_list_;
+}
+//EGTODO: move to utils
+std::string ctrlm_obj_controller_ble_t::wakeupCustomListToString() {
+  std::ostringstream oss;
+  if (!wakeup_custom_list_.empty()) {
+    std::copy(wakeup_custom_list_.begin(), wakeup_custom_list_.end()-1, std::ostream_iterator<int>(oss, ","));
+    // add the last element now to avoid trailing comma
+    oss << wakeup_custom_list_.back();
+  }
+  return oss.str();
+}
+
 void ctrlm_obj_controller_ble_t::process_event_key(ctrlm_key_status_t key_status, guint16 key_code) {
    last_key_status_ = key_status;
    last_key_code_   = key_code;
@@ -717,6 +758,10 @@ void ctrlm_obj_controller_ble_t::print_status() {
    LOG_INFO("%s: Last Key Code   : 0x%X\n", __FUNCTION__, last_key_code_);
    LOG_INFO("%s: Last Key Time   : %s\n", __FUNCTION__, time_last_key_str);
    LOG_INFO("%s: Last Wakeup Key : 0x%X\n", __FUNCTION__, last_wakeup_key_code_);
+   LOG_INFO("%s: Wakeup Config   : %s\n", __FUNCTION__, ctrlm_rcu_wakeup_config_str(wakeup_config_));
+   if (wakeup_config_ == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM) {
+      LOG_INFO("%s: Wakeup Config Custom List   : %s\n", __FUNCTION__, wakeupCustomListToString().c_str());
+   }
    LOG_INFO("%s: Voice Cmd Count Today        : %lu\n", __FUNCTION__, voice_cmd_count_today_);
    LOG_INFO("%s: Voice Packets Sent Today     : %lu\n", __FUNCTION__, voice_packets_sent_today_);
    LOG_INFO("%s: Voice Packets Lost Today     : %lu\n", __FUNCTION__, voice_packets_lost_today_);

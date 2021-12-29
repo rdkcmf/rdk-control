@@ -134,6 +134,12 @@ public:
    void                          setLastWakeupKey(guint16 code);
    guint16                       getLastWakeupKey();
 
+   void                          setWakeupConfig(uint8_t config);
+   ctrlm_rcu_wakeup_config_t     getWakeupConfig();
+   void                          setWakeupCustomList(int *list, int size);
+   std::vector<uint16_t>         getWakeupCustomList();
+   std::string                   wakeupCustomListToString();
+
    void                          update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost);
    void                          property_write_voice_metrics(void);
    guchar                        property_parse_voice_metrics(guchar *data, guchar length);
@@ -176,6 +182,9 @@ private:
    ctrlm_key_status_t               last_key_status_;
    guint16                          last_key_code_;
    guint16                          last_wakeup_key_code_;
+
+   ctrlm_rcu_wakeup_config_t        wakeup_config_;
+   std::vector<uint16_t>            wakeup_custom_list_;
 
    int                              battery_percent_;
 

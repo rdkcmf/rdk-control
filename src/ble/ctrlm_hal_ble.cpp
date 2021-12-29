@@ -100,7 +100,9 @@ static void ctrlm_hal_ble_DBusOnPropertyChangedCB (GDBusProxy *proxy,
                                                     GVariant   *changed_properties,
                                                     GStrv       invalidated_properties,
                                                     gpointer    user_data);
-static uint16_t ctrlm_hal_ble_ConvertHIDUsageCodeToLinux(ctrlm_hal_ble_USBKeyboardKeyCode_t hid_code);
+
+static uint16_t ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(unsigned char usb_code);
+static unsigned char ctrlm_hal_ble_ConvertLinuxCodeToUsbKdb(uint16_t linux_code);
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_StartThreads(void);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_PropertyGet(ctrlm_hal_network_property_t property, void **value);
@@ -129,7 +131,11 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_Get
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_GetRcuRebootReason_params_t *params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params);
 static void ctrlm_hal_ble_RcuAction_ResultCB(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
+static void ctrlm_hal_ble_AdvertisingConfig_ResultCB(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
+
 static ctrlm_hal_result_t ctrlm_hal_ble_req_SendRcuAction(ctrlm_hal_ble_SendRcuAction_params_t params);
+static ctrlm_hal_result_t ctrlm_hal_ble_req_WriteAdvertisingConfig(ctrlm_hal_ble_WriteRcuWakeupConfig_params_t params);
+
 static ctrlm_hal_result_t ctrlm_hal_ble_req_HandleDeepsleep(ctrlm_hal_ble_HandleDeepsleep_params_t params);
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_Terminate(void);
@@ -449,6 +455,7 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
         params.get_rcu_reboot_reason = ctrlm_hal_ble_req_GetRcuRebootReason;
         params.get_rcu_last_wakeup_key = ctrlm_hal_ble_req_GetRcuLastWakeupKey;
         params.send_rcu_action = ctrlm_hal_ble_req_SendRcuAction;
+        params.write_rcu_wakeup_config = ctrlm_hal_ble_req_WriteAdvertisingConfig;
         params.handle_deepsleep = ctrlm_hal_ble_req_HandleDeepsleep;
 
         g_ctrlm_hal_ble->main_init.cfm_init(g_ctrlm_hal_ble->main_init.network_id, params);
@@ -1185,43 +1192,18 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_Get
     return ret;
 }
 
-static uint16_t ctrlm_hal_ble_ConvertHIDUsageCodeToLinux(ctrlm_hal_ble_USBKeyboardKeyCode_t hid_code) {
-    switch (hid_code) {
-        case CTRLM_HAL_BLE_HID_USAGE_ID_1          : return KEY_1;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_2          : return KEY_2;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_3          : return KEY_3;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_4          : return KEY_4;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_5          : return KEY_5;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_6          : return KEY_6;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_7          : return KEY_7;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_8          : return KEY_8;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_9          : return KEY_9;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_0          : return KEY_0;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_ENTER      : return KEY_ENTER;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_ESCAPE     : return KEY_ESC;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F1         : return KEY_F1;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F2         : return KEY_F2;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F4         : return KEY_F4;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F5         : return KEY_F5;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F8         : return KEY_F8;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F9         : return KEY_F9;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_INSERT     : return KEY_INSERT;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_HOME       : return KEY_HOME;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_DELETE     : return KEY_DELETE;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_END        : return KEY_END;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_RIGHT      : return KEY_RIGHT;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_LEFT       : return KEY_LEFT;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_DOWN       : return KEY_DOWN;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_UP         : return KEY_UP;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_KPASTERISK : return KEY_KPASTERISK;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_KPMINUS    : return KEY_KPMINUS;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_KPPLUS     : return KEY_KPPLUS;
-        case CTRLM_HAL_BLE_HID_USAGE_ID_F15        : return KEY_F15;
-        default:
-            LOG_ERROR("%s: Unhandled keycode received: 0x%X\n", __FUNCTION__, hid_code);
-            return CTRLM_KEY_CODE_INVALID;
-    }
+static uint16_t ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(unsigned char usb_code) {
+    return usb_kbd_keycode[usb_code];
 }
+static unsigned char ctrlm_hal_ble_ConvertLinuxCodeToUsbKdb(uint16_t linux_code) {
+    for (unsigned int i = 0; i < sizeof(usb_kbd_keycode)/sizeof(usb_kbd_keycode[0]); i++) {
+        if (usb_kbd_keycode[i] == linux_code) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params)
 {
     LOG_INFO("%s: Enter...\n", __FUNCTION__);
@@ -1252,7 +1234,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_Ge
             GVariant  *v = NULL;
             g_variant_get (reply, "(v)", &v);
             g_variant_get (v, "y", &key_);
-            params->key = ctrlm_hal_ble_ConvertHIDUsageCodeToLinux((ctrlm_hal_ble_USBKeyboardKeyCode_t)key_);
+            params->key = ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(key_);
             if (NULL != v) { g_variant_unref(v); }
         }
     }
@@ -1310,6 +1292,71 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_SendRcuAction(ctrlm_hal_ble_SendRcuA
                                                 CTRLM_BLE_G_DBUS_CALL_TIMEOUT_DEFAULT,
                                                 NULL, NULL,
                                                 true, (GAsyncReadyCallback)ctrlm_hal_ble_RcuAction_ResultCB);
+    }
+    if (NULL != reply) { g_variant_unref(reply); }
+    return ret;
+}
+
+static void ctrlm_hal_ble_AdvertisingConfig_ResultCB(GDBusProxy   *proxy,
+                                             GAsyncResult *res,
+                                             gpointer      user_data)
+{
+    LOG_DEBUG ("%s, Enter...\n", __FUNCTION__);
+    GError *error = NULL;
+    GVariant *reply;
+
+    reply = g_dbus_proxy_call_finish (proxy, res, &error);
+    if (NULL == reply) {
+        // Will return NULL if there's an error reported
+        if (NULL != error) {
+            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
+        }
+        g_clear_error (&error);
+        LOG_ERROR("%s, Advertising Config FAILED to send to RCU!!\n", __FUNCTION__);
+    } else {
+        LOG_INFO("%s, Adverting Config sent SUCCESSFULLY.\n", __FUNCTION__);
+    }
+    if (NULL != reply) { g_variant_unref(reply); }
+}
+static ctrlm_hal_result_t ctrlm_hal_ble_req_WriteAdvertisingConfig(ctrlm_hal_ble_WriteRcuWakeupConfig_params_t params)
+{
+    LOG_INFO("%s: Enter... writing advertising config = <%s>\n", __FUNCTION__, ctrlm_rcu_wakeup_config_str(params.config));
+    ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
+
+    GVariantBuilder key_array_builder;
+    //g_dbus_proxy_call requires that variant parameter be wrapped in a tuple
+    g_variant_builder_init(&key_array_builder, G_VARIANT_TYPE("(yay)"));
+    g_variant_builder_add(&key_array_builder, "y", (guint8)params.config);
+    g_variant_builder_open(&key_array_builder, G_VARIANT_TYPE("ay"));
+    if (params.config == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM && params.customList != NULL) {
+        for (int i = 0; i < params.customListSize; i++) {
+            unsigned int usb_code = ctrlm_hal_ble_ConvertLinuxCodeToUsbKdb(params.customList[i]);
+            LOG_INFO("%s: usb code = 0x%X, linux code = %d\n", __FUNCTION__, usb_code, params.customList[i]);
+            g_variant_builder_add(&key_array_builder, "y", usb_code);
+            g_variant_builder_add(&key_array_builder, "y", 0);  // 0 to send directed advertisment for the key
+        }
+    }
+    g_variant_builder_close(&key_array_builder);
+
+    GVariant  *reply = NULL;
+    if (params.wait_for_reply) {
+        // Since this could be called from a factory reset script, we want to wait long enough for the remote to receive 
+        // the message.  If not, the factory reset script could delete bluez remote cache before the remote checks in.
+        // In practice, I've seen this call take up to 8 seconds to return.
+        ret = ctrlm_hal_ble_dbusSendMethodCall (g_ctrlm_hal_ble->getDbusDeviceIfceProxy(params.ieee_address),
+                                                "WriteAdvertisingConfig",
+                                                g_variant_builder_end(&key_array_builder),
+                                                &reply,
+                                                CTRLM_BLE_G_DBUS_CALL_TIMEOUT_LONG);
+        if (CTRLM_HAL_RESULT_SUCCESS == ret) { LOG_INFO("%s, RCU advertising config sent SUCCESSFULLY.\n", __FUNCTION__); }
+    } else {
+        ret = ctrlm_hal_ble_dbusSendMethodCall (g_ctrlm_hal_ble->getDbusDeviceIfceProxy(params.ieee_address),
+                                                "WriteAdvertisingConfig",
+                                                g_variant_builder_end(&key_array_builder),
+                                                &reply,
+                                                CTRLM_BLE_G_DBUS_CALL_TIMEOUT_DEFAULT,
+                                                NULL, NULL,
+                                                true, (GAsyncReadyCallback)ctrlm_hal_ble_AdvertisingConfig_ResultCB);
     }
     if (NULL != reply) { g_variant_unref(reply); }
     return ret;
@@ -1379,43 +1426,43 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         LOG_WARN("%s: Item '%s' = <%s>, IGNORED...\n", __FUNCTION__, prop.c_str(), str_variant);
     } else if (0 == prop.compare("Manufacturer")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.manufacturer, sizeof(rcu_status.rcu_data.manufacturer), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_MANUFACTURER;
     } else if (0 == prop.compare("Model")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.model, sizeof(rcu_status.rcu_data.model), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_MODEL;
     } else if (0 == prop.compare("Name")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.name, sizeof(rcu_status.rcu_data.name), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_NAME;
     } else if (0 == prop.compare("SerialNumber")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.serial_number, sizeof(rcu_status.rcu_data.serial_number), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_SERIAL_NUMBER;
     } else if (0 == prop.compare("HardwareRevision")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.hw_revision, sizeof(rcu_status.rcu_data.hw_revision), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_HW_REVISION;
     } else if (0 == prop.compare("FirmwareRevision")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.fw_revision, sizeof(rcu_status.rcu_data.fw_revision), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_FW_REVISION;
     } else if (0 == prop.compare("SoftwareRevision")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.sw_revision, sizeof(rcu_status.rcu_data.sw_revision), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_SW_REVISION;
@@ -1426,7 +1473,7 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_BATTERY_LEVEL;
     } else if (0 == prop.compare("Connected")) {
         g_variant_get (value, "b", &bool_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), bool_variant ? "TRUE":"FALSE");
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), bool_variant ? "TRUE":"FALSE");
         rcu_status.rcu_data.connected = bool_variant;
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_CONNECTED;
     } else if (0 == prop.compare("AudioGainLevel")) {
@@ -1441,7 +1488,7 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_AUDIO_CODECS;
     } else if (0 == prop.compare("AudioStreaming")) {
         g_variant_get (value, "b", &bool_variant);
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), bool_variant ? "TRUE":"FALSE");
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), bool_variant ? "TRUE":"FALSE");
         rcu_status.rcu_data.audio_streaming = bool_variant;
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_AUDIO_STREAMING;
     } else if (0 == prop.compare("Controller")) {
@@ -1476,7 +1523,7 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
     } else if (0 == prop.compare("State")) {
         g_variant_get (value, "u", &uint_variant);
         rcu_status.state = (ctrlm_ble_state_t)uint_variant;
-        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), ctrlm_ble_utils_RcuStateToString(rcu_status.state));
+        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), ctrlm_ble_utils_RcuStateToString(rcu_status.state));
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_STATE;
     } else if (0 == prop.compare("Upgrading")) {
         g_variant_get (value, "b", &bool_variant);
@@ -1501,8 +1548,35 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
     } else if (0 == prop.compare("LastKeypress")) {
         g_variant_get (value, "y", &char_variant);
         LOG_DEBUG("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
-        rcu_status.rcu_data.last_wakeup_key = ctrlm_hal_ble_ConvertHIDUsageCodeToLinux((ctrlm_hal_ble_USBKeyboardKeyCode_t)char_variant);
+        rcu_status.rcu_data.last_wakeup_key = ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(char_variant);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY;
+    } else if (0 == prop.compare("AdvertisingConfig")) {
+        g_variant_get (value, "y", &char_variant);
+        LOG_DEBUG("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
+        rcu_status.rcu_data.wakeup_config = char_variant;
+        rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_WAKEUP_CONFIG;
+    } else if (0 == prop.compare("AdvertisingConfigCustomList")) {
+        LOG_DEBUG("%s: Item '%s' received\n", __FUNCTION__, prop.c_str());
+        GVariantIter *iter;
+        guchar key;
+        vector<uint16_t> customList;
+        g_variant_get (value, "ay", &iter);
+        int i = 0, codeIdx = 0;
+        while (g_variant_iter_loop (iter, "y", &key)) {
+            // Format of this list is the keycode followed by config byte.  We only care about the keycodes (even bytes)
+            if (i%2 == 0) {
+                // The entire array on the remote gets returned, and keycode of 0 is undefined so ignore them.
+                if (key != 0) {
+                    rcu_status.rcu_data.wakeup_custom_list[codeIdx] = ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(key);
+                    codeIdx++;
+                }
+            }
+            i++;
+        }
+        g_variant_iter_free (iter);
+
+        rcu_status.rcu_data.wakeup_custom_list_size = codeIdx;
+        rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_WAKEUP_CUSTOM_LIST;
     } else {
         LOG_WARN("%s: Item '%s' with type '%s' is unhandled signal!!!!!!!\n", __FUNCTION__, prop.c_str(), g_variant_get_type_string (value));
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_UNKNOWN;

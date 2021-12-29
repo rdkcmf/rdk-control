@@ -28,6 +28,7 @@ static IARM_Result_t ctrlm_main_iarm_call_get_rcu_unpair_reason(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_get_rcu_reboot_reason(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_get_rcu_last_wakeup_key(void *arg);
 static IARM_Result_t ctrlm_main_iarm_call_send_rcu_action(void *arg);
+static IARM_Result_t ctrlm_main_iarm_call_write_rcu_wakeup_config(void *arg);
 
 typedef struct {
    const char *   name;
@@ -41,7 +42,8 @@ ctrlm_ble_iarm_call_t ctrlm_ble_iarm_calls[] = {
    {CTRLM_BLE_IARM_CALL_GET_RCU_UNPAIR_REASON,               ctrlm_main_iarm_call_get_rcu_unpair_reason},
    {CTRLM_BLE_IARM_CALL_GET_RCU_REBOOT_REASON,               ctrlm_main_iarm_call_get_rcu_reboot_reason},
    {CTRLM_BLE_IARM_CALL_GET_LAST_WAKEUP_KEY,                 ctrlm_main_iarm_call_get_rcu_last_wakeup_key},
-   {CTRLM_BLE_IARM_CALL_SEND_RCU_ACTION,                     ctrlm_main_iarm_call_send_rcu_action}
+   {CTRLM_BLE_IARM_CALL_SEND_RCU_ACTION,                     ctrlm_main_iarm_call_send_rcu_action},
+   {CTRLM_MAIN_IARM_CALL_WRITE_RCU_WAKEUP_CONFIG,            ctrlm_main_iarm_call_write_rcu_wakeup_config},
 };
 
 // Keep state since we do not want to service calls on termination
@@ -84,7 +86,7 @@ IARM_Result_t ctrlm_main_iarm_call_get_ble_log_levels(void *arg) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return(IARM_RESULT_INVALID_PARAM);
    }
-   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
 
    // Signal completion of the operation
    sem_t semaphore;
@@ -119,7 +121,7 @@ IARM_Result_t ctrlm_main_iarm_call_set_ble_log_levels(void *arg) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return(IARM_RESULT_INVALID_PARAM);
    }
-   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
 
    // Signal completion of the operation
    sem_t semaphore;
@@ -153,7 +155,7 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_unpair_reason(void *arg) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return(IARM_RESULT_INVALID_PARAM);
    }
-   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
 
    // Signal completion of the operation
    sem_t semaphore;
@@ -187,7 +189,7 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_reboot_reason(void *arg) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return(IARM_RESULT_INVALID_PARAM);
    }
-   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
 
    // Signal completion of the operation
    sem_t semaphore;
@@ -221,7 +223,7 @@ IARM_Result_t ctrlm_main_iarm_call_get_rcu_last_wakeup_key(void *arg) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return(IARM_RESULT_INVALID_PARAM);
    }
-   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
 
    // Signal completion of the operation
    sem_t semaphore;
@@ -255,7 +257,7 @@ IARM_Result_t ctrlm_main_iarm_call_send_rcu_action(void *arg) {
       LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
       return(IARM_RESULT_INVALID_PARAM);
    }
-   LOG_INFO("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
 
    // Signal completion of the operation
    sem_t semaphore;
@@ -270,6 +272,40 @@ IARM_Result_t ctrlm_main_iarm_call_send_rcu_action(void *arg) {
    msg.semaphore         = &semaphore;
 
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::req_process_send_rcu_action, &msg, sizeof(msg), NULL, params->network_id);
+
+   // Wait for the result condition to be signaled
+   sem_wait(&semaphore);
+   sem_destroy(&semaphore);
+   return(IARM_RESULT_SUCCESS);
+}
+
+IARM_Result_t ctrlm_main_iarm_call_write_rcu_wakeup_config(void *arg) {
+   LOG_INFO("%s: Enter...\n", __PRETTY_FUNCTION__);
+   ctrlm_iarm_call_WriteRcuWakeupConfig_params_t *params = (ctrlm_iarm_call_WriteRcuWakeupConfig_params_t *)arg;
+
+   if(0 == g_atomic_int_get(&running)) {
+      LOG_ERROR("%s: IARM Call received when IARM component in stopped/terminated state, reply with ERROR\n", __FUNCTION__);
+      return(IARM_RESULT_INVALID_STATE);
+   }
+   if(params == NULL) {
+      LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
+      return(IARM_RESULT_INVALID_PARAM);
+   }
+   LOG_DEBUG("%s: params->network_id = <%d>\n", __FUNCTION__, params->network_id);
+
+   // Signal completion of the operation
+   sem_t semaphore;
+   sem_init(&semaphore, 0, 0);
+
+   // Allocate a message and send it to Control Manager's queue
+   ctrlm_main_queue_msg_write_advertising_config_t msg;
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
+   msg.params            = params;
+   msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
+   msg.semaphore         = &semaphore;
+
+   ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::req_process_write_rcu_wakeup_config, &msg, sizeof(msg), NULL, params->network_id);
 
    // Wait for the result condition to be signaled
    sem_wait(&semaphore);

@@ -68,6 +68,12 @@ typedef struct {
 } ctrlm_main_queue_msg_send_rcu_action_t;
 
 typedef struct {
+   ctrlm_main_queue_msg_header_t                  header;
+   ctrlm_iarm_call_WriteRcuWakeupConfig_params_t *params;
+   sem_t *                                        semaphore;
+} ctrlm_main_queue_msg_write_advertising_config_t;
+
+typedef struct {
    ctrlm_ble_controller_type_t   controller_type;
    std::string                   path;
    std::string                   image_filename;
@@ -127,6 +133,7 @@ public:
    void                          req_process_get_rcu_reboot_reason(void *data, int size);
    void                          req_process_get_rcu_last_wakeup_key(void *data, int size);
    void                          req_process_send_rcu_action(void *data, int size);
+   void                          req_process_write_rcu_wakeup_config(void *data, int size);
 
    virtual void                  req_process_network_managed_upgrade(void *data, int size);
    virtual void                  req_process_network_continue_upgrade(void *data, int size);
@@ -154,29 +161,30 @@ public:
 
 private:
    ctrlm_obj_network_ble_t();
-   ctrlm_hal_ble_network_main_t            hal_api_main_;
-   ctrlm_hal_req_term_t                    hal_api_term_;
+   ctrlm_hal_ble_network_main_t                 hal_api_main_;
+   ctrlm_hal_req_term_t                         hal_api_term_;
 
-   ctrlm_hal_ble_req_StartThreads_t        hal_api_start_threads_;
-   ctrlm_hal_ble_req_GetDevices_t          hal_api_get_devices_;
-   ctrlm_hal_ble_req_GetAllRcuProps_t      hal_api_get_all_rcu_props_;
-   ctrlm_hal_ble_req_StartDiscovery_t      hal_api_discovery_start_;
-   ctrlm_hal_ble_req_PairWithCode_t        hal_api_pair_with_code_;
-   ctrlm_hal_ble_req_Unpair_t              hal_api_unpair_;
-   ctrlm_hal_ble_req_StartAudioStream_t    hal_api_start_audio_stream_;
-   ctrlm_hal_ble_req_StopAudioStream_t     hal_api_stop_audio_stream_;
-   ctrlm_hal_ble_req_GetAudioStats_t       hal_api_get_audio_stats_;
-   ctrlm_hal_ble_req_IRSetCode_t           hal_api_set_ir_codes_;
-   ctrlm_hal_ble_req_IRClear_t             hal_api_clear_ir_codes_;
-   ctrlm_hal_ble_req_FindMe_t              hal_api_find_me_;
-   ctrlm_hal_ble_req_GetDaemonLogLevels_t  hal_api_get_daemon_log_levels_;
-   ctrlm_hal_ble_req_SetDaemonLogLevels_t  hal_api_set_daemon_log_levels_;
-   ctrlm_hal_ble_req_FwUpgrade_t           hal_api_fw_upgrade_;
-   ctrlm_hal_ble_req_GetRcuUnpairReason_t  hal_api_get_rcu_unpair_reason_;
-   ctrlm_hal_ble_req_GetRcuRebootReason_t  hal_api_get_rcu_reboot_reason_;
-   ctrlm_hal_ble_req_GetRcuLastWakeupKey_t hal_api_get_rcu_last_wakeup_key_;
-   ctrlm_hal_ble_req_SendRcuAction_t       hal_api_send_rcu_action_;
-   ctrlm_hal_ble_req_HandleDeepsleep_t     hal_api_handle_deepsleep_;
+   ctrlm_hal_ble_req_StartThreads_t             hal_api_start_threads_;
+   ctrlm_hal_ble_req_GetDevices_t               hal_api_get_devices_;
+   ctrlm_hal_ble_req_GetAllRcuProps_t           hal_api_get_all_rcu_props_;
+   ctrlm_hal_ble_req_StartDiscovery_t           hal_api_discovery_start_;
+   ctrlm_hal_ble_req_PairWithCode_t             hal_api_pair_with_code_;
+   ctrlm_hal_ble_req_Unpair_t                   hal_api_unpair_;
+   ctrlm_hal_ble_req_StartAudioStream_t         hal_api_start_audio_stream_;
+   ctrlm_hal_ble_req_StopAudioStream_t          hal_api_stop_audio_stream_;
+   ctrlm_hal_ble_req_GetAudioStats_t            hal_api_get_audio_stats_;
+   ctrlm_hal_ble_req_IRSetCode_t                hal_api_set_ir_codes_;
+   ctrlm_hal_ble_req_IRClear_t                  hal_api_clear_ir_codes_;
+   ctrlm_hal_ble_req_FindMe_t                   hal_api_find_me_;
+   ctrlm_hal_ble_req_GetDaemonLogLevels_t       hal_api_get_daemon_log_levels_;
+   ctrlm_hal_ble_req_SetDaemonLogLevels_t       hal_api_set_daemon_log_levels_;
+   ctrlm_hal_ble_req_FwUpgrade_t                hal_api_fw_upgrade_;
+   ctrlm_hal_ble_req_GetRcuUnpairReason_t       hal_api_get_rcu_unpair_reason_;
+   ctrlm_hal_ble_req_GetRcuRebootReason_t       hal_api_get_rcu_reboot_reason_;
+   ctrlm_hal_ble_req_GetRcuLastWakeupKey_t      hal_api_get_rcu_last_wakeup_key_;
+   ctrlm_hal_ble_req_SendRcuAction_t            hal_api_send_rcu_action_;
+   ctrlm_hal_ble_req_WriteRcuWakeupConfig_t     hal_api_write_rcu_wakeup_config_;
+   ctrlm_hal_ble_req_HandleDeepsleep_t          hal_api_handle_deepsleep_;
 
    ctrlm_ble_state_t                      state_;
    ctrlm_ir_state_t                       ir_state_;

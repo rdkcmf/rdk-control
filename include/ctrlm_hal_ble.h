@@ -48,40 +48,26 @@
 /// @details The Control Manager HAL provides enumerated types for logical groups of values.
 
 
-/// @brief keymapping for USB Keyboard usage page 0x07.  These are the keycodes sent from
-/// the remote, that are mapped to linux codes in USB HID driver
-typedef enum {
-   CTRLM_HAL_BLE_HID_USAGE_ID_1           = 0x1E,
-   CTRLM_HAL_BLE_HID_USAGE_ID_2           = 0x1F,
-   CTRLM_HAL_BLE_HID_USAGE_ID_3           = 0x20,
-   CTRLM_HAL_BLE_HID_USAGE_ID_4           = 0x21,
-   CTRLM_HAL_BLE_HID_USAGE_ID_5           = 0x22,
-   CTRLM_HAL_BLE_HID_USAGE_ID_6           = 0x23,
-   CTRLM_HAL_BLE_HID_USAGE_ID_7           = 0x24,
-   CTRLM_HAL_BLE_HID_USAGE_ID_8           = 0x25,
-   CTRLM_HAL_BLE_HID_USAGE_ID_9           = 0x26,
-   CTRLM_HAL_BLE_HID_USAGE_ID_0           = 0x27,
-   CTRLM_HAL_BLE_HID_USAGE_ID_ENTER       = 0x28,
-   CTRLM_HAL_BLE_HID_USAGE_ID_ESCAPE      = 0x29,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F1          = 0x3A,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F2          = 0x3B,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F4          = 0x3D,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F5          = 0x3E,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F8          = 0x41,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F9          = 0x42,
-   CTRLM_HAL_BLE_HID_USAGE_ID_INSERT      = 0x49,
-   CTRLM_HAL_BLE_HID_USAGE_ID_HOME        = 0x4A,
-   CTRLM_HAL_BLE_HID_USAGE_ID_DELETE      = 0x4C,
-   CTRLM_HAL_BLE_HID_USAGE_ID_END         = 0x4D,
-   CTRLM_HAL_BLE_HID_USAGE_ID_RIGHT       = 0x4F,
-   CTRLM_HAL_BLE_HID_USAGE_ID_LEFT        = 0x50,
-   CTRLM_HAL_BLE_HID_USAGE_ID_DOWN        = 0x51,
-   CTRLM_HAL_BLE_HID_USAGE_ID_UP          = 0x52,
-   CTRLM_HAL_BLE_HID_USAGE_ID_KPASTERISK  = 0x55,
-   CTRLM_HAL_BLE_HID_USAGE_ID_KPMINUS     = 0x56,
-   CTRLM_HAL_BLE_HID_USAGE_ID_KPPLUS      = 0x57,
-   CTRLM_HAL_BLE_HID_USAGE_ID_F15         = 0x6A,
-} ctrlm_hal_ble_USBKeyboardKeyCode_t;
+/// @brief keymapping for USB Keyboard usage page 0x07.  Index is the keyboard
+/// code sent from the remote, and the value is the linux code
+const unsigned char usb_kbd_keycode[256] = {
+      0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
+      50, 49, 24, 25, 16, 19, 31, 20, 22, 47, 17, 45, 21, 44,  2,  3,
+      4,  5,  6,  7,  8,  9, 10, 11, 28,  1, 14, 15, 57, 12, 13, 26,
+      27, 43, 43, 39, 40, 41, 51, 52, 53, 58, 59, 60, 61, 62, 63, 64,
+      65, 66, 67, 68, 87, 88, 99, 70,119,110,102,104,111,107,109,106,
+      105,108,103, 69, 98, 55, 74, 78, 96, 79, 80, 81, 75, 76, 77, 71,
+      72, 73, 82, 83, 86,127,116,117,183,184,185,186,187,188,189,190,
+      191,192,193,194,134,138,130,132,128,129,131,137,133,135,136,113,
+      115,114,  0,  0,  0,121,  0, 89, 93,124, 92, 94, 95,  0,  0,  0,
+      122,123, 90, 91, 85,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+      29, 42, 56,125, 97, 54,100,126,164,166,165,163,161,115,114,113,
+      150,158,159,128,136,177,178,176,142,152,173,140
+};
 
 
 /// @brief BleRcuDaemon IR Key Code types (CDI format)
@@ -128,6 +114,8 @@ typedef enum {
    CTRLM_HAL_BLE_PROPERTY_UNPAIR_REASON,
    CTRLM_HAL_BLE_PROPERTY_REBOOT_REASON,
    CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY,
+   CTRLM_HAL_BLE_PROPERTY_WAKEUP_CONFIG,
+   CTRLM_HAL_BLE_PROPERTY_WAKEUP_CUSTOM_LIST,
    CTRLM_HAL_BLE_PROPERTY_UNKNOWN
 } ctrlm_hal_ble_RcuProperty_t;
 /// @}
@@ -160,6 +148,9 @@ typedef struct {
    ctrlm_ble_RcuUnpairReason_t   unpair_reason;
    ctrlm_ble_RcuRebootReason_t   reboot_reason;
    uint16_t                      last_wakeup_key;
+   uint8_t                       wakeup_config;
+   int                           wakeup_custom_list[CTRLM_WAKEUP_CONFIG_LIST_MAX_SIZE];
+   int                           wakeup_custom_list_size;
 } ctrlm_hal_ble_rcu_data_t;
 
 typedef struct {
@@ -245,19 +236,30 @@ typedef struct {
    unsigned long long            ieee_address;
    ctrlm_ble_RcuUnpairReason_t   reason;
 } ctrlm_hal_ble_GetRcuUnpairReason_params_t;
+
 typedef struct {
    unsigned long long            ieee_address;
    ctrlm_ble_RcuRebootReason_t   reason;
 } ctrlm_hal_ble_GetRcuRebootReason_params_t;
+
 typedef struct {
    unsigned long long            ieee_address;
    uint16_t                      key;
 } ctrlm_hal_ble_GetRcuLastWakeupKey_params_t;
+
 typedef struct {
    unsigned long long      ieee_address;
    ctrlm_ble_RcuAction_t   action;
    bool                    wait_for_reply;
 } ctrlm_hal_ble_SendRcuAction_params_t;
+
+typedef struct {
+   unsigned long long              ieee_address;
+   ctrlm_rcu_wakeup_config_t       config;
+   int                            *customList;
+   int                             customListSize;
+   bool                            wait_for_reply;
+} ctrlm_hal_ble_WriteRcuWakeupConfig_params_t;
 
 typedef struct {
    bool                    waking_up;
@@ -370,6 +372,10 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_GetRcuLastWakeupKey_t)(ctrlm_hal_
 /// @param[in] ieee_address - MAC address of the controller
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_SendRcuAction_t)(ctrlm_hal_ble_SendRcuAction_params_t params);
 
+/// @brief Send an action for the RCU to perform
+/// @param[in] ieee_address - MAC address of the controller
+typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_WriteRcuWakeupConfig_t)(ctrlm_hal_ble_WriteRcuWakeupConfig_params_t params);
+
 /// @brief notify the HAL of a deepsleep transition
 /// @param[in] waking_up - true if waking from deepsleep, false if going into deepsleep
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_HandleDeepsleep_t)(ctrlm_hal_ble_HandleDeepsleep_params_t params);
@@ -383,31 +389,32 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_HandleDeepsleep_t)(ctrlm_hal_ble_
 /// @brief BLE Confirm Init Parameters Structure
 /// @details The structure which is passed from the HAL Network device in the BLE initialization confirmation.
 typedef struct {
-   ctrlm_hal_result_t                      result;
-   char                                    version[CTRLM_HAL_NETWORK_VERSION_STRING_SIZE];
-   ctrlm_hal_req_term_t                    term;
-   ctrlm_hal_req_property_get_t            property_get;                                   ///< Network Property Get Request
-   ctrlm_hal_req_property_set_t            property_set;                                   ///< Network Property Set Request
-   ctrlm_hal_ble_req_StartThreads_t        start_threads;
-   ctrlm_hal_ble_req_GetDevices_t          get_devices;
-   ctrlm_hal_ble_req_GetAllRcuProps_t      get_all_rcu_props;
-   ctrlm_hal_ble_req_StartDiscovery_t      start_discovery;
-   ctrlm_hal_ble_req_PairWithCode_t        pair_with_code;
-   ctrlm_hal_ble_req_Unpair_t              unpair;
-   ctrlm_hal_ble_req_StartAudioStream_t    start_audio_stream;
-   ctrlm_hal_ble_req_StopAudioStream_t     stop_audio_stream;
-   ctrlm_hal_ble_req_GetAudioStats_t       get_audio_stats;
-   ctrlm_hal_ble_req_IRSetCode_t           set_ir_codes;
-   ctrlm_hal_ble_req_IRClear_t             clear_ir_codes;
-   ctrlm_hal_ble_req_FindMe_t              find_me;
-   ctrlm_hal_ble_req_GetDaemonLogLevels_t  get_daemon_log_levels;
-   ctrlm_hal_ble_req_SetDaemonLogLevels_t  set_daemon_log_levels;
-   ctrlm_hal_ble_req_FwUpgrade_t           fw_upgrade;
-   ctrlm_hal_ble_req_GetRcuUnpairReason_t  get_rcu_unpair_reason;
-   ctrlm_hal_ble_req_GetRcuRebootReason_t  get_rcu_reboot_reason;
-   ctrlm_hal_ble_req_GetRcuLastWakeupKey_t get_rcu_last_wakeup_key;
-   ctrlm_hal_ble_req_SendRcuAction_t       send_rcu_action;
-   ctrlm_hal_ble_req_HandleDeepsleep_t     handle_deepsleep;
+   ctrlm_hal_result_t                           result;
+   char                                         version[CTRLM_HAL_NETWORK_VERSION_STRING_SIZE];
+   ctrlm_hal_req_term_t                         term;
+   ctrlm_hal_req_property_get_t                 property_get;                                   ///< Network Property Get Request
+   ctrlm_hal_req_property_set_t                 property_set;                                   ///< Network Property Set Request
+   ctrlm_hal_ble_req_StartThreads_t             start_threads;
+   ctrlm_hal_ble_req_GetDevices_t               get_devices;
+   ctrlm_hal_ble_req_GetAllRcuProps_t           get_all_rcu_props;
+   ctrlm_hal_ble_req_StartDiscovery_t           start_discovery;
+   ctrlm_hal_ble_req_PairWithCode_t             pair_with_code;
+   ctrlm_hal_ble_req_Unpair_t                   unpair;
+   ctrlm_hal_ble_req_StartAudioStream_t         start_audio_stream;
+   ctrlm_hal_ble_req_StopAudioStream_t          stop_audio_stream;
+   ctrlm_hal_ble_req_GetAudioStats_t            get_audio_stats;
+   ctrlm_hal_ble_req_IRSetCode_t                set_ir_codes;
+   ctrlm_hal_ble_req_IRClear_t                  clear_ir_codes;
+   ctrlm_hal_ble_req_FindMe_t                   find_me;
+   ctrlm_hal_ble_req_GetDaemonLogLevels_t       get_daemon_log_levels;
+   ctrlm_hal_ble_req_SetDaemonLogLevels_t       set_daemon_log_levels;
+   ctrlm_hal_ble_req_FwUpgrade_t                fw_upgrade;
+   ctrlm_hal_ble_req_GetRcuUnpairReason_t       get_rcu_unpair_reason;
+   ctrlm_hal_ble_req_GetRcuRebootReason_t       get_rcu_reboot_reason;
+   ctrlm_hal_ble_req_GetRcuLastWakeupKey_t      get_rcu_last_wakeup_key;
+   ctrlm_hal_ble_req_SendRcuAction_t            send_rcu_action;
+   ctrlm_hal_ble_req_HandleDeepsleep_t          handle_deepsleep;
+   ctrlm_hal_ble_req_WriteRcuWakeupConfig_t     write_rcu_wakeup_config;
 } ctrlm_hal_ble_cfm_init_params_t;
 
 /// @brief Network Init Confirmation Function
