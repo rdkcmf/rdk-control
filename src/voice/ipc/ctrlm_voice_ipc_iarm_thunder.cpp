@@ -570,7 +570,8 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription(v
                             CTRLM_MAIN_NETWORK_ID_INVALID, CTRLM_MAIN_CONTROLLER_ID_INVALID, 
                             device, format, NULL, "APPLICATION", "0.0.0.0", "0.0.0.0", 0.0, 
                             false, NULL, NULL, NULL, false, (const char*)str_transcription.c_str() );
-                    if (VOICE_SESSION_RESPONSE_AVAILABLE != voice_status) {
+                    if (voice_status != VOICE_SESSION_RESPONSE_AVAILABLE && 
+                        voice_status != VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
                         LOG_ERROR("%s: Failed opening voice session in ctrlm_voice_t, error = <%d>\n", __FUNCTION__, voice_status);
                         result = false;
                     }
