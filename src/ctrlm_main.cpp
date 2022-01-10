@@ -899,7 +899,7 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
       LOG_DEBUG("%s: Checking %s\n", __FUNCTION__, it->name);
 
       //ctrlm thread may run while db thread is stopped
-      if((ctrlm_db_queue_msg_push == it->queue_push) &&
+      if(((ctrlm_db_queue_msg_push_front == it->queue_push) || (ctrlm_db_queue_msg_push == it->queue_push)) &&
         ((CTRLM_POWER_STATE_STANDBY      == g_ctrlm.power_state) ||
         (CTRLM_POWER_STATE_DEEP_SLEEP    == g_ctrlm.power_state))) {
             continue;
