@@ -25,7 +25,7 @@
 #include <vector>
 #include <string>
 #include <string.h>
-#include "ctrlm_config.h"
+#include "ctrlm_config_default.h"
 #include "ctrlm_hal.h"
 #include "ctrlm_hal_rf4ce.h"
 #include "ctrlm_hal_ble.h"

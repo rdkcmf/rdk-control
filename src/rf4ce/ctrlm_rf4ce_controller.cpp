@@ -24,6 +24,7 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <functional>
 #include <uuid/uuid.h>
 #include "../ctrlm.h"
 #include "../ctrlm_utils.h"
@@ -31,7 +32,7 @@
 #include "ctrlm_rf4ce_network.h"
 #include "../ctrlm_voice.h"
 #include "../ctrlm_device_update.h"
-#include "../ctrlm_database.h"
+#include "ctrlm_database.h"
 #include "../ctrlm_validation.h"
 #ifdef ASB
 #include "../cpc/asb/advanced_secure_binding.h"
@@ -53,12 +54,6 @@ static char samsung_0x34[] = {0x88, 0x00, 0x29, 0x04, 0x11, 0x04, 0x00, 0x22, 0x
 
 #endif
 
-#define CTRLM_BATTERY_75_PERCENT_THRESHOLD 75
-#define CTRLM_BATTERY_50_PERCENT_THRESHOLD 50
-#define CTRLM_BATTERY_25_PERCENT_THRESHOLD 25
-#define CTRLM_BATTERY_5_PERCENT_THRESHOLD  5
-#define CTRLM_BATTERY_0_PERCENT_THRESHOLD  0
-
 #define NUM_XR11V2_HARDWARE_VERSIONS       1
 #define NUM_XR15V1_HARDWARE_VERSIONS       1
 #define NUM_XR15V2_HARDWARE_VERSIONS       2
@@ -71,42 +66,10 @@ static char samsung_0x34[] = {0x88, 0x00, 0x29, 0x04, 0x11, 0x04, 0x00, 0x22, 0x
 #define XR15V2_IEEE_PREFIX_UP_TO_FEB_2018  0x48D0CF0000000000
 #define XR15V2_IEEE_PREFIX_THIRD           0x00CC3F0000000000
 
-#define NUM_OF_PRODUCT_NAME_TYPES (sizeof(Product_name_pair_type__table)/sizeof(Product_name_pair_type__table[0]))
 
 const guchar xr11v2_hardware_versions[NUM_XR11V2_HARDWARE_VERSIONS][CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING] = { {0x22, 0x01, 0x00, 0x00}                           };
 const guchar xr15v1_hardware_versions[NUM_XR15V1_HARDWARE_VERSIONS][CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING] = { {0x23, 0x01, 0x00, 0x00}                           };
 const guchar xr15v2_hardware_versions[NUM_XR15V2_HARDWARE_VERSIONS][CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING] = { {0x23, 0x02, 0x00, 0x00}, {0x13, 0x02, 0x00, 0x00} };
-
-/* Below structure table and helper function used for better optinamization of multiple if- else cases */
-/* table with Product name with corresponding type */
-ctrlm_rf4ce_product_name_pair_t Product_name_pair_type__table[] = {
-  { "XR2-",    XR2,    RF4CE_CONTROLLER_TYPE_XR2    },
-  { "XR5-",    XR5,    RF4CE_CONTROLLER_TYPE_XR5    },
-  { "XR11-",   XR11,   RF4CE_CONTROLLER_TYPE_XR11   },
-  { "XR15-1",  XR15_1, RF4CE_CONTROLLER_TYPE_XR15   },
-  { "XR15-2",  XR15_2, RF4CE_CONTROLLER_TYPE_XR15V2 },
-  { "XR16-",   XR16,   RF4CE_CONTROLLER_TYPE_XR16   },
-  { "XR18-",   XR18,   RF4CE_CONTROLLER_TYPE_XR18   },
-  { "XR19-",   XR19,   RF4CE_CONTROLLER_TYPE_XR19   },
-  { "XRA-",    XRA,    RF4CE_CONTROLLER_TYPE_XRA    },
-};
-
-/* Function to get the corresponding product name type from the given product name */
-bool ctrlm_rf4ce_get_product_type_from_product_name(const char *name, ctrlm_rf4ce_product_name_t *product_type, ctrlm_rf4ce_controller_type_t *controller_type) {
-  unsigned int i = 0;
-
-  if((name == NULL) || (product_type == NULL) || (controller_type == NULL) )
-     return false;
-
-  for (i = 0 ; i < NUM_OF_PRODUCT_NAME_TYPES ; ++i) {
-      if(0 == strncmp(name, Product_name_pair_type__table[i].name, strlen(Product_name_pair_type__table[i].name))) {
-         *product_type = Product_name_pair_type__table[i].product_type;
-         *controller_type = Product_name_pair_type__table[i].controller_type;
-         return true;
-      }
-  }
-  return false;
-}
 
 ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_rf4ce_t &network, unsigned long long ieee_address, ctrlm_rf4ce_result_validation_t result_validation, ctrlm_rcu_configuration_result_t result_configuration) :
    ctrlm_obj_controller_t(controller_id, network),
@@ -114,49 +77,44 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    loading_db_(false),
    stored_in_db_(false),
    pairing_data_(NULL),
-   ieee_address_(ieee_address),
+   ieee_address_(&network, controller_id, ieee_address),
    short_address_(0),
    validation_result_(result_validation),
    configuration_result_(result_configuration),
-   version_software_{0,0,0,0},
-   version_dsp_{0,0,0,0},
-   version_keyword_model_{0,0,0,0},
-   version_arm_{0,0,0,0},
-   version_irdb_{0,0,0,0},
-   version_hardware_{0,0,0,0},
-   battery_status_{0,0,RF4CE_BATTERY_STATUS_VOLTAGE_LOADED_DEFAULT,RF4CE_BATTERY_STATUS_VOLTAGE_UNLOADED_DEFAULT,0,0,RF4CE_BATTERY_STATUS_VOLTAGE_PERCENTAGE_DEFAULT},
-   voice_command_length_(VOICE_COMMAND_LENGTH_VALUE),
-   voice_cmd_count_today_(0),
-   voice_cmd_count_yesterday_(0),
-   voice_cmd_short_today_(0),
-   voice_cmd_short_yesterday_(0),
-   today_(time(NULL) / (60 * 60 * 24)),
-   voice_packets_sent_today_(0),
-   voice_packets_sent_yesterday_(0),
-   voice_packets_lost_today_(0),
-   voice_packets_lost_yesterday_(0),
-   utterances_exceeding_packet_loss_threshold_today_(0),
-   utterances_exceeding_packet_loss_threshold_yesterday_(0),
+   rib_(),
+   version_software_(&network, controller_id),
+   version_dsp_(&network, controller_id),
+   version_keyword_model_(&network, controller_id),
+   version_arm_(&network, controller_id),
+   version_irdb_(&network, controller_id),
+   version_bootloader_(&network, controller_id),
+   version_golden_(&network, controller_id),
+   version_audio_data_(&network, controller_id),
+   version_hardware_(&network, this, controller_id),
+   version_build_id_(&network, controller_id),
+   version_dsp_build_id_(&network, controller_id),
+   battery_status_(&network, this, controller_id),
+   battery_milestones_(&network, controller_id),
+   voice_command_status_(this),
+   voice_command_length_(),
+   voice_metrics_(&network, controller_id),
    firmware_updated_(RF4CE_FIRMWARE_UPDATED_NO),
-   audio_profiles_ctrl_(VOICE_AUDIO_PROFILE_NONE),
-   voice_statistics_{0,0},
-   rib_entries_updated_(RIB_ENTRIES_UPDATED_TRUE),
-   version_bootloader_{0,0,0,0},
-   version_golden_{0,0,0,0},
-   version_audio_data_{0,0,0,0},
-   product_name_{RF4CE_PRODUCT_NAME_UNKNOWN},
-   manufacturer_(),
-   chipset_(),
+   audio_profiles_ctrl_(&network, controller_id),
+   voice_statistics_(&network, controller_id),
+   voice_session_statistics_(network.network_id_get(), controller_id),
+   rib_entries_updated_(),
+   product_name_(&network, controller_id),
    controller_type_(RF4CE_CONTROLLER_TYPE_UNKNOWN),
+   capabilities_(&network, controller_id),
    download_rate_(DOWNLOAD_RATE_BACKGROUND),
-   controller_irdb_status_{CONTROLLER_IRDB_STATUS_FLAGS_NO_IR_PROGRAMMED,0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+   controller_irdb_status_(&network, controller_id),
    controller_irdb_status_is_new_(false),
+   ir_rf_database_status_(this),
    reboot_reason_(CONTROLLER_REBOOT_OTHER),
    reboot_voltage_level_(0),
    reboot_assert_number_(0),
    memory_available_(0),
    memory_largest_(0),
-   ir_rf_database_status_(IR_RF_DATABASE_STATUS_DEFAULT),
    download_in_progress_(false),
    download_image_id_(RF4CE_DOWNLOAD_IMAGE_ID_INVALID),
    autobind_in_progress_(false),
@@ -176,9 +134,7 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    manual_poll_firmware_(false),
    manual_poll_audio_data_(false),
    audio_theme_(RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID),
-   crash_dump_buf_(NULL),
-   crash_dump_size_(0),
-   crash_dump_expected_size_(0),
+   memory_dump_(this),
    configuration_complete_failure_(false),
    privacy_(0),
    time_metrics_(0),
@@ -192,7 +148,6 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    needs_reset_(false),
    did_reset_(false),
 #endif
-   fmr_supported_(false),
    mfg_test_result_(1),
    ota_failures_(0)
 {
@@ -223,44 +178,22 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    property_write_ir_rf_database(0x34, samsung_0x34, sizeof(samsung_0x34));
    #endif
 
-   // Clear out build_id
-   errno_t safec_rc = memset_s(&version_build_id_, sizeof(version_build_id_), 0, sizeof(version_build_id_));
-   ERR_CHK(safec_rc);
-   safec_rc = memset_s(&version_dsp_build_id_, sizeof(version_dsp_build_id_), 0, sizeof(version_dsp_build_id_));
-   ERR_CHK(safec_rc);
-
    print_firmware_on_button_press = true;
 
    has_battery_                                               = false;
    has_dsp_                                                   = false;
-   battery_milestones_.battery_changed_timestamp              = 0;
-   battery_milestones_.battery_changed_actual_percent         = 0;
-   battery_milestones_.battery_75_percent_timestamp           = 0;
-   battery_milestones_.battery_75_percent_actual_percent      = 0;
-   battery_milestones_.battery_50_percent_timestamp           = 0;
-   battery_milestones_.battery_50_percent_actual_percent      = 0;
-   battery_milestones_.battery_25_percent_timestamp           = 0;
-   battery_milestones_.battery_25_percent_actual_percent      = 0;
-   battery_milestones_.battery_5_percent_timestamp            = 0;
-   battery_milestones_.battery_5_percent_actual_percent       = 0;
-   battery_milestones_.battery_0_percent_timestamp            = 0;
-   battery_milestones_.battery_0_percent_actual_percent       = 0;
-   battery_last_good_timestamp_                               = 0;
-   battery_last_good_percent_                                 = 0;
-   battery_last_good_loaded_voltage_                          = 0;
-   battery_last_good_unloaded_voltage_                        = 0;
-   battery_changed_unloaded_voltage_                          = 0;
-   battery_75_percent_unloaded_voltage_                       = 0;
-   battery_50_percent_unloaded_voltage_                       = 0;
-   battery_25_percent_unloaded_voltage_                       = 0;
-   battery_5_percent_unloaded_voltage_                        = 0;
-   battery_0_percent_unloaded_voltage_                        = 0;
-   battery_voltage_large_jump_counter_                        = 0;
-   battery_voltage_large_decline_detected_                    = false;
-   battery_first_write_                                       = true;
+   
+   // Battery milestones change when battery status is updated
+   battery_status_.set_updated_listener(std::bind(&ctrlm_rf4ce_battery_milestones_t::battery_status_updated, &battery_milestones_, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+   // target IRDB status needs to be updated when controller IRDB status changes
+   controller_irdb_status_.set_updated_listener(std::bind(&ctrlm_obj_controller_rf4ce_t::controller_irdb_status_updated, this, std::placeholders::_1));
+   // controller needs to update some internal variables dependent on product name
+   product_name_.set_updated_listener(std::bind(&ctrlm_obj_controller_rf4ce_t::controller_product_name_updated, this, std::placeholders::_1));
+   // rib entries updated gets changed when voice command length is updated
+   voice_command_length_.set_updated_listener(std::bind(&ctrlm_rf4ce_rib_entries_updated_t::voice_command_length_updated, &rib_entries_updated_, std::placeholders::_1));
 
    // Far Field
-   safec_rc = memset_s(&ff_metrics_, sizeof(ff_metrics_), 0, sizeof(ff_metrics_));
+   errno_t safec_rc = memset_s(&ff_metrics_, sizeof(ff_metrics_), 0, sizeof(ff_metrics_));
    ERR_CHK(safec_rc);
    safec_rc = memset_s(&dsp_metrics_, sizeof(dsp_metrics_), 0, sizeof(dsp_metrics_));
    ERR_CHK(safec_rc);
@@ -279,9 +212,11 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    safec_rc = memset_s(&checkin_time_, sizeof(checkin_time_), 0, sizeof(checkin_time_));
    ERR_CHK(safec_rc);
 
-   // Clear Voice Command Status
-   safec_rc = memset_s(voice_command_status_, sizeof(voice_command_status_), 0, sizeof(voice_command_status_));
-   ERR_CHK(safec_rc);
+   // Read from config file (will seperate to seperate function if list grows)
+   voice_metrics_.read_config();
+
+   // Configure RIB
+   this->configure_rib();
 }
 
 ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t() {
@@ -293,10 +228,6 @@ ctrlm_obj_controller_rf4ce_t::~ctrlm_obj_controller_rf4ce_t() {
 
    if(pairing_data_ != NULL) {
       ctrlm_hal_free(pairing_data_);
-   }
-   // check if ctrlm_db_rf4ce_write_file() was never called and free crash_dump_buf_
-   if(crash_dump_buf_ != NULL) {
-      ctrlm_hal_free(crash_dump_buf_);
    }
    if(polling_actions_ != NULL) {
       g_async_queue_unref(polling_actions_);
@@ -325,7 +256,7 @@ voice_command_encryption_t ctrlm_obj_controller_rf4ce_t::voice_command_encryptio
 #endif
 guint16                    ctrlm_obj_controller_rf4ce_t::audio_profiles_targ_get(void)          { return(obj_network_rf4ce_->audio_profiles_targ_get());          }
 
-unsigned long long ctrlm_obj_controller_rf4ce_t::ieee_address_get(void) {
+ctrlm_ieee_addr_t ctrlm_obj_controller_rf4ce_t::ieee_address_get(void) {
    return(ieee_address_);
 }
 void ctrlm_obj_controller_rf4ce_t::stats_update(void) {
@@ -348,59 +279,54 @@ ctrlm_timestamp_t ctrlm_obj_controller_rf4ce_t::last_mac_poll_checkin_time_get()
    return checkin_time_;
 }
 
+ctrlm_rf4ce_controller_type_t rf4ce_controller_type_from_product_name(std::string product_name) {
+   ctrlm_rf4ce_controller_type_t ret = RF4CE_CONTROLLER_TYPE_UNKNOWN;
+   if(product_name.find("XR2-")    != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR2;
+   } else if(product_name.find("XR5-")   != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR5;
+   } else if(product_name.find("XR11-")  != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR11;
+   } else if(product_name.find("XR15-1") != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR15;
+   } else if(product_name.find("XR15-2") != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR15V2;
+   } else if(product_name.find("XR16-")  != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR16;
+   } else if(product_name.find("XR18-")  != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR18;
+   } else if(product_name.find("XR19-")  != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XR19;
+   } else if(product_name.find("XRA-")   != std::string::npos) {
+      ret = RF4CE_CONTROLLER_TYPE_XRA;
+   } else {
+      LOG_ERROR("%s: Unsupported controller type <%s>\n", __FUNCTION__, product_name.c_str());
+   }
+   return(ret);
+}
+
 
 void ctrlm_obj_controller_rf4ce_t::user_string_set(guchar *user_string) {
-   controller_type_ = obj_network_rf4ce_->controller_type_from_user_string(user_string);
-
-   errno_t safec_rc = strcpy_s(product_name_, sizeof(product_name_),(char *)user_string);
-   ERR_CHK(safec_rc);
+   std::string name = std::string((char *)user_string);
+   controller_type_ = obj_network_rf4ce_->controller_type_from_user_string((uint8_t *)name.c_str());
 
    // If string is comcast, assume XR2
-   if(0 == strncmp((const char *)&user_string[7], "COMCAST", 7)) {
+   if(name.find("COMCAST") != std::string::npos) {
       LOG_WARN("%s: Assuming XR2.\n", __FUNCTION__);
-      safec_rc = strcpy_s(product_name_, sizeof(product_name_),"XR2-10");
-      ERR_CHK(safec_rc);
-   } else if (controller_type_ == RF4CE_CONTROLLER_TYPE_UNKNOWN) {
+      name = "XR2-10";
+   } else if(controller_type_ == RF4CE_CONTROLLER_TYPE_UNKNOWN) {
       LOG_WARN("%s: Assuming XR5.\n", __FUNCTION__);
-      safec_rc = strcpy_s(product_name_, sizeof(product_name_),"XR5-40");
-      ERR_CHK(safec_rc);
+      name = "XR5-40";
    }
 
-   controller_chipset_from_product_name();
-
-   has_battery_ = ctrlm_rf4ce_has_battery(controller_type_);
-   has_dsp_     = ctrlm_rf4ce_has_dsp(controller_type_);
+   product_name_.set_product_name(name);
 }
 
-void ctrlm_obj_controller_rf4ce_t::controller_chipset_from_product_name(void) {
-   ctrlm_rf4ce_product_name_t product_type;
-   ctrlm_rf4ce_controller_type_t ctrlm_type;
-   errno_t safec_rc = -1;
-
-   // Convert the string to controller type
-   if(ctrlm_rf4ce_get_product_type_from_product_name(product_name_,&product_type,&ctrlm_type)) {
-      controller_type_ = ctrlm_type;
-
-      if(product_type == XR2 || product_type == XR5 || product_type == XR11 ) {
-         // XR2-30, XR2-10, XR5-10, XR5-40 , // XR11-20
-         safec_rc = strcpy_s(chipset_, sizeof(chipset_), "TI");
-         ERR_CHK(safec_rc);
-      } else if(product_type == XR15_1 || product_type == XR15_2 || product_type == XR16 || product_type == XR18 || product_type == XR19 || product_type == XRA) {
-         // XR15-10 , // XR15-20 , // XR16-10 , // XR18-10 , // XR19-10, // XRA
-         safec_rc = strcpy_s(chipset_, sizeof(chipset_), "QORVO");
-         ERR_CHK(safec_rc);
-      }
-   }
-   else {
-      LOG_ERROR("%s: Unsupported controller type <%s>\n", __FUNCTION__, product_name_);
-   }
+std::string ctrlm_obj_controller_rf4ce_t::product_name_get(void) const {
+   return (product_name_.get_value());
 }
 
-const char *ctrlm_obj_controller_rf4ce_t::product_name_get(void) const {
-   return (product_name_);
-}
-
-const battery_status_t& ctrlm_obj_controller_rf4ce_t::battery_status_get() const {
+const ctrlm_rf4ce_battery_status_t& ctrlm_obj_controller_rf4ce_t::battery_status_get() const {
    return battery_status_;
 }
 
@@ -542,116 +468,90 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
       return;
    }
 
-   errno_t safec_rc = -1;
+   errno_t safec_rc = memset_s(status, sizeof(ctrlm_controller_status_t), 0, sizeof(ctrlm_controller_status_t));
+   ERR_CHK(safec_rc);
 
    //If the day has changed, store the values related to today and yesterday
-   if(handle_day_change()) {
-      property_write_voice_metrics();
-   }
+   voice_metrics_.process_time(true);
 
-   status->ieee_address                                         = ieee_address_;
+   status->ieee_address                                         = ieee_address_.to_uint64();
    status->short_address                                        = short_address_;
    status->time_binding                                         = time_binding_;
    status->binding_type                                         = binding_type_;
    status->validation_type                                      = validation_type_;
    status->security_type                                        = binding_security_type_;
-   status->command_count                                        = battery_status_.codes_txd_rf;
+   status->command_count                                        = battery_status_.get_codes_txd_rf();
    status->link_quality                                         = 0;
    status->link_quality_percent                                 = (status->link_quality * 100) / 255;
    status->time_last_key                                        = time_last_key_;
    status->last_key_status                                      = last_key_status_;
    status->last_key_code                                        = last_key_code_;
-   status->voice_cmd_count_today                                = voice_cmd_count_today_;
-   status->voice_cmd_count_yesterday                            = voice_cmd_count_yesterday_;
-   status->voice_cmd_short_today                                = voice_cmd_short_today_;
-   status->voice_cmd_short_yesterday                            = voice_cmd_short_yesterday_;
-   status->voice_packets_sent_today                             = voice_packets_sent_today_;
-   status->voice_packets_sent_yesterday                         = voice_packets_sent_yesterday_;
-   status->voice_packets_lost_today                             = voice_packets_lost_today_;
-   status->voice_packets_lost_yesterday                         = voice_packets_lost_yesterday_;
-   if(voice_packets_sent_today_>0) {
-      status->voice_packet_loss_average_today                   = (float)((float)voice_packets_lost_today_/(float)voice_packets_sent_today_) * 100.0;
-   } else {
-      status->voice_packet_loss_average_today = 0;
-   }
-   if(voice_packets_sent_yesterday_>0) {
-      status->voice_packet_loss_average_yesterday               = (float)((float)voice_packets_lost_yesterday_/(float)voice_packets_sent_yesterday_) * 100.0;
-   } else {
-      status->voice_packet_loss_average_yesterday = 0;
-   }
-   status->utterances_exceeding_packet_loss_threshold_today     = utterances_exceeding_packet_loss_threshold_today_;
-   status->utterances_exceeding_packet_loss_threshold_yesterday = utterances_exceeding_packet_loss_threshold_yesterday_;
+   status->voice_cmd_count_today                                = voice_metrics_.get_commands_today();
+   status->voice_cmd_count_yesterday                            = voice_metrics_.get_commands_yesterday();
+   status->voice_cmd_short_today                                = voice_metrics_.get_short_commands_today();
+   status->voice_cmd_short_yesterday                            = voice_metrics_.get_short_commands_yesterday();
+   status->voice_packets_sent_today                             = voice_metrics_.get_packets_sent_today();
+   status->voice_packets_sent_yesterday                         = voice_metrics_.get_packets_sent_yesterday();
+   status->voice_packets_lost_today                             = voice_metrics_.get_packets_lost_today();
+   status->voice_packets_lost_yesterday                         = voice_metrics_.get_packets_lost_yesterday();
+   status->voice_packet_loss_average_today                      = voice_metrics_.get_average_packet_loss_today();
+   status->voice_packet_loss_average_yesterday                  = voice_metrics_.get_average_packet_loss_yesterday();
+   status->utterances_exceeding_packet_loss_threshold_today     = voice_metrics_.get_packet_loss_exceeding_threshold_today();
+   status->utterances_exceeding_packet_loss_threshold_yesterday = voice_metrics_.get_packet_loss_exceeding_threshold_yesterday();
    status->firmware_updated                                     = firmware_updated_;
 
-   safec_rc = strcpy_s(status->manufacturer, sizeof(status->manufacturer),manufacturer_);
+   safec_rc = strcpy_s(status->manufacturer, sizeof(status->manufacturer), version_hardware_.get_manufacturer_name().c_str());
    ERR_CHK(safec_rc);
 
-   safec_rc = strcpy_s(status->chipset, sizeof(status->chipset),chipset_);
+   safec_rc = strcpy_s(status->chipset, sizeof(status->chipset), product_name_.get_predicted_chipset().c_str());
    ERR_CHK(safec_rc);
 
-   safec_rc = strncpy_s(status->version_build_id, sizeof(status->version_build_id),version_build_id_.build_id,CTRLM_RCU_VERSION_LENGTH);
+   safec_rc = strcpy_s(status->version_build_id, sizeof(status->version_build_id), version_build_id_.get_value().c_str());
    ERR_CHK(safec_rc);
    status->version_build_id[CTRLM_RCU_VERSION_LENGTH-1] = '\0';
 
-   safec_rc = strcpy_s(status->version_dsp_build_id, sizeof(status->version_dsp_build_id),version_dsp_build_id_.build_id);
+   safec_rc = strcpy_s(status->version_dsp_build_id, sizeof(status->version_dsp_build_id), version_dsp_build_id_.get_value().c_str());
+   ERR_CHK(safec_rc);
+   status->version_dsp_build_id[CTRLM_RCU_VERSION_LENGTH-1] = '\0';
+
+   safec_rc = strcpy_s(status->version_software, sizeof(status->version_software), version_software_.get_value().c_str());
    ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_software, sizeof(status->version_software), "%u.%u.%u.%u", version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_dsp, sizeof(status->version_dsp), version_dsp_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_dsp, sizeof(status->version_dsp), "%u.%u.%u.%u", version_dsp_.major, version_dsp_.minor, version_dsp_.revision, version_dsp_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_keyword_model, sizeof(status->version_keyword_model), version_keyword_model_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_keyword_model, sizeof(status->version_keyword_model), "%u.%u.%u.%u", version_keyword_model_.major, version_keyword_model_.minor, version_keyword_model_.revision, version_keyword_model_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_arm, sizeof(status->version_arm), version_arm_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_arm, sizeof(status->version_arm), "%u.%u.%u.%u", version_arm_.major, version_arm_.minor, version_arm_.revision, version_arm_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_hardware, sizeof(status->version_arm), version_hardware_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_hardware, sizeof(status->version_hardware), "%u.%u.%u.%u", version_hardware_.manufacturer, version_hardware_.model, version_hardware_.hw_revision, version_hardware_.lot_code);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_irdb, sizeof(status->version_irdb), version_irdb_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_irdb, sizeof(status->version_irdb), "%u.%u.%u.%u", version_irdb_.major, version_irdb_.minor, version_irdb_.revision, version_irdb_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_bootloader, sizeof(status->version_bootloader), version_bootloader_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_bootloader, sizeof(status->version_bootloader), "%u.%u.%u.%u", version_bootloader_.major, version_bootloader_.minor, version_bootloader_.revision, version_bootloader_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_golden, sizeof(status->version_golden), version_golden_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_golden, sizeof(status->version_golden), "%u.%u.%u.%u", version_golden_.major, version_golden_.minor, version_golden_.revision, version_golden_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
+   safec_rc = strcpy_s(status->version_audio_data, sizeof(status->version_audio_data), version_audio_data_.get_value().c_str());
+   ERR_CHK(safec_rc);
 
-   safec_rc = sprintf_s(status->version_audio_data, sizeof(status->version_audio_data), "%u.%u.%u.%u", version_audio_data_.major, version_audio_data_.minor, version_audio_data_.revision, version_audio_data_.patch);
-   if(safec_rc < EOK) {
-     ERR_CHK(safec_rc);
-   }
-
-   safec_rc = strncpy_s(status->type, sizeof(status->type),product_name_, CTRLM_RCU_MAX_USER_STRING_LENGTH-1);
+   safec_rc = strncpy_s(status->type, sizeof(status->type),product_name_.get_value().c_str(), CTRLM_RCU_MAX_USER_STRING_LENGTH-1);
    ERR_CHK(safec_rc);
    status->type[CTRLM_RCU_MAX_USER_STRING_LENGTH - 1] = '\0';
 
-   if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_TYPE) {
+   if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::IR_DB_TYPE)) {
       status->ir_db_type = CTRLM_RCU_IR_DB_TYPE_REMOTEC;
    } else {
       status->ir_db_type = CTRLM_RCU_IR_DB_TYPE_UEI;
    }
 
-   if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_5_DIGIT_CODE_LOAD_SUPPORTED) {
+   if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::LOAD_5_DIGIT_CODE_SUPPORT)) {
       status->ir_db_code_download_supported = true;
    } else {
       status->ir_db_code_download_supported = false;
@@ -663,24 +563,25 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
    safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),"00000");
    ERR_CHK(safec_rc);
 
-   if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_NO_IR_PROGRAMMED) {
+   if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::NO_IR_PROGRAMMED)) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_NO_CODES;
-   } else if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_RF_DB) {
+   } else if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::IR_RF_DB)) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_IR_RF_DB_CODES;
-   } else if((controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV) && (controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR)) {
+   } else if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::IR_DB_CODE_TV) &&
+             controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::IR_DB_CODE_AVR)) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_TV_AVR_CODES;
-      safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),controller_irdb_status_.irdb_string_tv);
+      safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),controller_irdb_status_.get_tv_code_str().c_str());
       ERR_CHK(safec_rc);
 
-      safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),controller_irdb_status_.irdb_string_avr);
+      safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),controller_irdb_status_.get_avr_code_str().c_str());
       ERR_CHK(safec_rc);
-   } else if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV) {
+   } else if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::IR_DB_CODE_TV)) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_TV_CODE;
-      safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),controller_irdb_status_.irdb_string_tv);
+      safec_rc = strcpy_s(status->ir_db_code_tv, sizeof(status->ir_db_code_tv),controller_irdb_status_.get_tv_code_str().c_str());
       ERR_CHK(safec_rc);
-   } else if(controller_irdb_status_.flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR) {
+   } else if(controller_irdb_status_.is_flag_set(ctrlm_rf4ce_controller_irdb_status_t::flag::IR_DB_CODE_AVR)) {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_AVR_CODE;
-      safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),controller_irdb_status_.irdb_string_avr);
+      safec_rc = strcpy_s(status->ir_db_code_avr, sizeof(status->ir_db_code_avr),controller_irdb_status_.get_avr_code_str().c_str());
       ERR_CHK(safec_rc);
    } else {
       status->ir_db_state = CTRLM_RCU_IR_DB_STATE_NO_CODES;
@@ -700,32 +601,32 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_controller_status(ctrlm_controller_stat
 
    //Battery members
    status->has_battery                            = has_battery_;
-   status->battery_voltage_loaded                 = (battery_last_good_loaded_voltage_   * 4.0) / 255;
-   status->battery_voltage_unloaded               = (battery_last_good_unloaded_voltage_ * 4.0) / 255;
-   status->battery_level_percent                  = battery_last_good_percent_;
+   status->battery_voltage_loaded                 = VOLTAGE_CALC(battery_milestones_.get_loaded_voltage_battery_last_good());
+   status->battery_voltage_unloaded               = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_last_good());
+   status->battery_level_percent                  = battery_milestones_.get_actual_battery_percent_last_good();
    get_last_battery_event(status->battery_event, status->time_battery_update);
 
-   status->time_battery_changed                   = battery_milestones_.battery_changed_timestamp;
-   status->battery_changed_actual_percentage      = battery_milestones_.battery_changed_actual_percent;
-   status->battery_changed_unloaded_voltage       = (battery_changed_unloaded_voltage_   * 4.0) / 255;
-   status->time_battery_75_percent                = battery_milestones_.battery_75_percent_timestamp;
-   status->battery_75_percent_actual_percentage   = battery_milestones_.battery_75_percent_actual_percent;
-   status->battery_75_percent_unloaded_voltage    = (battery_75_percent_unloaded_voltage_   * 4.0) / 255;
-   status->time_battery_50_percent                = battery_milestones_.battery_50_percent_timestamp;
-   status->battery_50_percent_actual_percentage   = battery_milestones_.battery_50_percent_actual_percent;
-   status->battery_50_percent_unloaded_voltage    = (battery_50_percent_unloaded_voltage_   * 4.0) / 255;
-   status->time_battery_25_percent                = battery_milestones_.battery_25_percent_timestamp;
-   status->battery_25_percent_actual_percentage   = battery_milestones_.battery_25_percent_actual_percent;
-   status->battery_25_percent_unloaded_voltage    = (battery_25_percent_unloaded_voltage_   * 4.0) / 255;
-   status->time_battery_5_percent                 = battery_milestones_.battery_5_percent_timestamp;
-   status->battery_5_percent_actual_percentage    = battery_milestones_.battery_5_percent_actual_percent;
-   status->battery_5_percent_unloaded_voltage     = (battery_5_percent_unloaded_voltage_   * 4.0) / 255;
-   status->time_battery_0_percent                 = battery_milestones_.battery_0_percent_timestamp;
-   status->battery_0_percent_actual_percentage    = battery_milestones_.battery_0_percent_actual_percent;
-   status->battery_0_percent_unloaded_voltage     = (battery_0_percent_unloaded_voltage_   * 4.0) / 255;
+   status->time_battery_changed                   = battery_milestones_.get_timestamp_battery_changed();
+   status->battery_changed_actual_percentage      = battery_milestones_.get_actual_battery_changed();
+   status->battery_changed_unloaded_voltage       = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_changed());
+   status->time_battery_75_percent                = battery_milestones_.get_timestamp_battery_percent75();
+   status->battery_75_percent_actual_percentage   = battery_milestones_.get_actual_battery_percent75();
+   status->battery_75_percent_unloaded_voltage    = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_percent75());
+   status->time_battery_50_percent                = battery_milestones_.get_timestamp_battery_percent50();
+   status->battery_50_percent_actual_percentage   = battery_milestones_.get_actual_battery_percent50();
+   status->battery_50_percent_unloaded_voltage    = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_percent50());
+   status->time_battery_25_percent                = battery_milestones_.get_timestamp_battery_percent25();
+   status->battery_25_percent_actual_percentage   = battery_milestones_.get_actual_battery_percent25();
+   status->battery_25_percent_unloaded_voltage    = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_percent25());
+   status->time_battery_5_percent                 = battery_milestones_.get_timestamp_battery_percent5();
+   status->battery_5_percent_actual_percentage    = battery_milestones_.get_actual_battery_percent5();
+   status->battery_5_percent_unloaded_voltage     = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_percent5());
+   status->time_battery_0_percent                 = battery_milestones_.get_timestamp_battery_percent0();
+   status->battery_0_percent_actual_percentage    = battery_milestones_.get_actual_battery_percent0();
+   status->battery_0_percent_unloaded_voltage     = VOLTAGE_CALC(battery_milestones_.get_unloaded_voltage_battery_percent0());
 
-   status->battery_voltage_large_jump_counter     = battery_voltage_large_jump_counter_;
-   status->battery_voltage_large_decline_detected = battery_voltage_large_decline_detected_;
+   status->battery_voltage_large_jump_counter     = battery_milestones_.get_battery_voltage_large_jump_counter();
+   status->battery_voltage_large_decline_detected = battery_milestones_.get_battery_voltage_large_decline_detected();
 
    //DSP members
    status->has_dsp                              = has_dsp_;
@@ -797,33 +698,6 @@ void ctrlm_obj_controller_rf4ce_t::restore_pairing(void) {
    }
 }
 
-int ctrlm_obj_controller_rf4ce_t::version_compare(version_software_t first, version_software_t second) {
-   guint32 version_first, version_second;
-
-   version_first  = (first.major << 24)  | (first.minor << 16)  | (first.revision << 8)  | (first.patch);
-   version_second = (second.major << 24) | (second.minor << 16) | (second.revision << 8) | (second.patch);
-
-   if(version_first > version_second) {
-      return(1);
-   } else if(version_first < version_second) {
-      return(-1);
-   }
-   return(0);
-}
-
-int ctrlm_obj_controller_rf4ce_t::version_compare(version_hardware_t first, version_hardware_t second) {
-   if((first.manufacturer != second.manufacturer) || (first.model != second.model)) {
-      LOG_WARN("%s: Manufacturer and model don't match. (%u, %u) (%u, %u)\n", __FUNCTION__, first.manufacturer, second.manufacturer, first.model, second.model);
-   }
-
-   if(first.hw_revision > second.hw_revision) {
-      return(1);
-   } else if(first.hw_revision < second.hw_revision) {
-      return(-1);
-   }
-   return(0);
-}
-
 void ctrlm_obj_controller_rf4ce_t::db_create() {
    // Create the database entry
    ctrlm_db_rf4ce_controller_create(network_id_get(), controller_id_get());
@@ -846,7 +720,8 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
    ctrlm_network_id_t    network_id    = network_id_get();
    ctrlm_controller_id_t controller_id = controller_id_get();
    
-   ctrlm_db_rf4ce_read_ieee_address(network_id, controller_id, &ieee_address_);
+   ctrlm_db_attr_read(&ieee_address_);
+
    ctrlm_db_rf4ce_read_binding_type(network_id, controller_id, &binding_type_);
    ctrlm_db_rf4ce_read_validation_type(network_id, controller_id, &validation_type_);
    ctrlm_db_rf4ce_read_time_binding(network_id, controller_id, &time_binding_);
@@ -874,161 +749,26 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
       data = NULL;
    }
 
-   ctrlm_db_rf4ce_read_product_name(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Product Name\n", __FUNCTION__);
-      // Set controller type to XR2.  Will turn it to an XR5 based on the software revision below.
-      controller_type_ = RF4CE_CONTROLLER_TYPE_XR2;
-   } else {
-      property_write_product_name(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_version_irdb(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Version IRDB\n", __FUNCTION__);
-   } else {
-      property_write_version_irdb(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_version_software(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Version Software\n", __FUNCTION__);
-   } else {
-      property_write_version_software(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-   
-   ctrlm_db_rf4ce_read_version_hardware(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Version Hardware\n", __FUNCTION__);
-   } else {
-      //For XR11 and XR15, check for valid hardware version needed to be able to do device updates
-      if((strncmp(product_name_, "XR11", 4) == 0) || (strncmp(product_name_, "XR15", 4) == 0)) {
-         if(!version_hardware_valid(data)) {
-            controller_fix_hardware_version_by_mac_address(data);
-         }
-      }
-      property_write_version_hardware(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_version_build_id(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Build ID\n", __FUNCTION__);
-   } else {
-      property_write_version_build_id(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_version_dsp_build_id(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - DSP Build ID\n", __FUNCTION__);
-   } else {
-      property_write_version_dsp_build_id(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_battery_status(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Battery Status\n", __FUNCTION__);
-   } else {
-      property_write_battery_status(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-      ctrlm_db_rf4ce_read_time_battery_status(network_id, controller_id, &battery_status_.update_time);
-   }
-
-   ctrlm_db_rf4ce_read_battery_milestones(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Battery Milestones\n", __FUNCTION__);
-   } else {
-      property_write_battery_milestones(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-   //battery_last_good... must be set to the last battery_status_... in case they are not currently in the database.
-   battery_last_good_timestamp_         = battery_status_.update_time;
-   battery_last_good_percent_           = battery_status_.percent;
-   battery_last_good_loaded_voltage_    = battery_status_.voltage_loaded;
-   battery_last_good_unloaded_voltage_  = battery_status_.voltage_unloaded;
-   //If the battery_last_good_timestamp_ is 0 then we have not written battery info yet
-   if(battery_last_good_timestamp_ != 0) {
-      battery_first_write_ = false;
-   }
-   ctrlm_db_rf4ce_read_battery_last_good_timestamp(network_id, controller_id, battery_last_good_timestamp_);
-   ctrlm_db_rf4ce_read_battery_last_good_percent(network_id, controller_id, battery_last_good_percent_);
-   ctrlm_db_rf4ce_read_battery_last_good_loaded_voltage(network_id, controller_id, battery_last_good_loaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_last_good_unloaded_voltage(network_id, controller_id, battery_last_good_unloaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_voltage_large_jump_counter(network_id, controller_id, battery_voltage_large_jump_counter_);
-   ctrlm_db_rf4ce_read_battery_voltage_large_decline_detected(network_id, controller_id, battery_voltage_large_decline_detected_);
-   ctrlm_db_rf4ce_read_battery_changed_unloaded_voltage(network_id, controller_id, battery_changed_unloaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_75_percent_unloaded_voltage(network_id, controller_id, battery_75_percent_unloaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_50_percent_unloaded_voltage(network_id, controller_id, battery_50_percent_unloaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_25_percent_unloaded_voltage(network_id, controller_id, battery_25_percent_unloaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_5_percent_unloaded_voltage(network_id, controller_id, battery_5_percent_unloaded_voltage_);
-   ctrlm_db_rf4ce_read_battery_0_percent_unloaded_voltage(network_id, controller_id, battery_0_percent_unloaded_voltage_);
-
-   ctrlm_db_rf4ce_read_audio_profiles(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Ctrl Audio profiles\n", __FUNCTION__);
-   } else {
-      property_write_voice_ctrl_audio_profiles(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-   
-   ctrlm_db_rf4ce_read_voice_statistics(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Voice Statistics\n", __FUNCTION__);
-   } else {
-      property_write_voice_statistics(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-   
-   ctrlm_db_rf4ce_read_update_version_bootloader(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Update version bootloader\n", __FUNCTION__);
-   } else {
-      property_write_update_version_bootloader(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-   
-   ctrlm_db_rf4ce_read_update_version_golden(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Update version golden image\n", __FUNCTION__);
-   } else {
-      property_write_update_version_golden(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-   
-   ctrlm_db_rf4ce_read_update_version_audio_data(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Update version audio data\n", __FUNCTION__);
-   } else {
-      property_write_update_version_audio_data(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_controller_irdb_status(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - IR Database Status\n", __FUNCTION__);
-   } else {
-      property_write_controller_irdb_status(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
+   ctrlm_db_attr_read(&product_name_); // This also sets the controller type etc
+   ctrlm_db_attr_read(&version_software_);
+   ctrlm_db_attr_read(&version_dsp_);
+   ctrlm_db_attr_read(&version_keyword_model_);
+   ctrlm_db_attr_read(&version_arm_);
+   ctrlm_db_attr_read(&version_irdb_);
+   ctrlm_db_attr_read(&version_bootloader_);
+   ctrlm_db_attr_read(&version_golden_);
+   ctrlm_db_attr_read(&version_audio_data_);
+   ctrlm_db_attr_read(&version_hardware_);
+   ctrlm_db_attr_read(&version_build_id_);
+   ctrlm_db_attr_read(&version_dsp_build_id_);
+   ctrlm_db_attr_read(&battery_status_);
+   battery_milestones_.update_last_good(battery_status_); // Update Last Good variables with data from battery status
+   ctrlm_db_attr_read(&battery_milestones_);
+   ctrlm_db_attr_read(&audio_profiles_ctrl_);
+   ctrlm_db_attr_read(&voice_statistics_);
+   ctrlm_db_attr_read(&controller_irdb_status_);
+   ctrlm_db_attr_read(&voice_metrics_);
+   ctrlm_db_attr_read(&capabilities_);
 
    ctrlm_db_rf4ce_read_irdb_entry_id_name_tv(network_id, controller_id, &data, &length);
    if(data == NULL) {
@@ -1044,15 +784,6 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
       LOG_WARN("%s: Not read from DB - IRDB ENTRY ID NAME AVR\n", __FUNCTION__);
    } else {
       property_write_irdb_entry_id_name_avr(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_voice_metrics(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Voice Metrics\n", __FUNCTION__);
-   } else {
-      property_write_voice_metrics(data, length);
       ctrlm_db_free(data);
       data = NULL;
    }
@@ -1111,47 +842,11 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
       data = NULL;
    }
 
-   ctrlm_db_rf4ce_read_version_dsp(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Version Dsp\n", __FUNCTION__);
-   } else {
-      property_write_version_dsp(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_version_keyword_model(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Version Keyword Model\n", __FUNCTION__);
-   } else {
-      property_write_version_keyword_model(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_version_arm(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Version ARM\n", __FUNCTION__);
-   } else {
-      property_write_version_arm(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
    ctrlm_db_rf4ce_read_privacy(network_id, controller_id, &data, &length);
    if(data == NULL) {
       LOG_WARN("%s: Not read from DB - Privacy\n", __FUNCTION__);
    } else {
       property_write_privacy(data, length);
-      ctrlm_db_free(data);
-      data = NULL;
-   }
-
-   ctrlm_db_rf4ce_read_controller_capabilities(network_id, controller_id, &data, &length);
-   if(data == NULL) {
-      LOG_WARN("%s: Not read from DB - Controller Capabilities\n", __FUNCTION__);
-   } else {
-      property_write_controller_capabilities(data, length);
       ctrlm_db_free(data);
       data = NULL;
    }
@@ -1221,9 +916,10 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
    ctrlm_network_id_t    network_id    = network_id_get();
    ctrlm_controller_id_t controller_id = controller_id_get();
 
-   LOG_INFO("%s: controller id %u ieee address 0x%016llX\n", __FUNCTION__, controller_id, ieee_address_);
+   LOG_INFO("%s: controller id %u ieee address 0x%016llX\n", __FUNCTION__, controller_id, ieee_address_.to_uint64());
 
-   ctrlm_db_rf4ce_write_ieee_address(network_id, controller_id, ieee_address_);
+   ctrlm_db_attr_write(&ieee_address_);
+
    ctrlm_db_rf4ce_write_binding_type(network_id, controller_id, binding_type_);
    ctrlm_db_rf4ce_write_validation_type(network_id, controller_id, validation_type_);
    ctrlm_db_rf4ce_write_time_binding(network_id, controller_id, time_binding_);
@@ -1240,69 +936,27 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
    if(CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS              == property_read_rf_statistics(data, CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS)) {
       ctrlm_db_rf4ce_write_rf_statistics(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS);
    }
+   
+   rf4ce_rib_export_api_t export_api(std::bind(&ctrlm_obj_network_rf4ce_t::req_process_rib_export, this->obj_network_rf4ce_, this->controller_id_get(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_4, std::placeholders::_3));
 
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING                 == property_read_version_irdb(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)) {
-      ctrlm_db_rf4ce_write_version_irdb(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_VERSIONING_IRDB, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING                 == property_read_version_hardware(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)) {
-      ctrlm_db_rf4ce_write_version_hardware(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_VERSIONING_HARDWARE, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING, data);   
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING                 == property_read_version_software(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)) {
-      ctrlm_db_rf4ce_write_version_software(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_VERSIONING_SOFTWARE, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID        == property_read_version_build_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID)) {
-      ctrlm_db_rf4ce_write_version_build_id(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID    == property_read_version_dsp_build_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID)) {
-      ctrlm_db_rf4ce_write_version_dsp_build_id(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS             == property_read_battery_status(data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS)) {
-      ctrlm_db_rf4ce_write_battery_status(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS);
-      ctrlm_db_rf4ce_write_time_battery_status(network_id, controller_id, battery_status_.update_time);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_BATTERY_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES  == property_read_voice_ctrl_audio_profiles(data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES)) {
-      ctrlm_db_rf4ce_write_audio_profiles(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_VOICE_CTRL_AUDIO_PROFILES, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS           == property_read_voice_statistics(data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS)) {
-      ctrlm_db_rf4ce_write_voice_statistics(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_VOICE_STATISTICS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING          == property_read_update_version_bootloader(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING)) {
-      ctrlm_db_rf4ce_write_update_version_bootloader(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_UPDATE_VERSIONING_BOOTLOADER, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING          == property_read_update_version_golden(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING)) {
-      ctrlm_db_rf4ce_write_update_version_golden(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_UPDATE_VERSIONING_GOLDEN, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING          == property_read_update_version_audio_data(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING)) {
-      ctrlm_db_rf4ce_write_update_version_audio_data(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_UPDATE_VERSIONING_AUDIO_DATA, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME               == property_read_product_name(data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME)) {
-      ctrlm_db_rf4ce_write_product_name(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-      obj_network_rf4ce_->req_process_rib_export(controller_id, CTRLM_HAL_RF4CE_RIB_ATTR_ID_PRODUCT_NAME, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME, data);
-   }
-
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS     == property_read_controller_irdb_status(data, CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS)) {
-      ctrlm_db_rf4ce_write_controller_irdb_status(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS);
-   }
+   ctrlm_db_attr_write(&version_software_); version_software_.export_rib(export_api);
+   ctrlm_db_attr_write(&version_dsp_);
+   ctrlm_db_attr_write(&version_keyword_model_);
+   ctrlm_db_attr_write(&version_arm_);
+   ctrlm_db_attr_write(&version_irdb_);          version_irdb_.export_rib(export_api);
+   ctrlm_db_attr_write(&version_bootloader_);    version_bootloader_.export_rib(export_api);
+   ctrlm_db_attr_write(&version_golden_);        version_golden_.export_rib(export_api);
+   ctrlm_db_attr_write(&version_audio_data_);    version_audio_data_.export_rib(export_api);
+   ctrlm_db_attr_write(&version_hardware_);      version_hardware_.export_rib(export_api);
+   ctrlm_db_attr_write(&version_build_id_);
+   ctrlm_db_attr_write(&version_dsp_build_id_);
+   ctrlm_db_attr_write(&battery_status_);        battery_status_.export_rib(export_api);
+   ctrlm_db_attr_write(&audio_profiles_ctrl_);   audio_profiles_ctrl_.export_rib(export_api);
+   ctrlm_db_attr_write(&voice_statistics_);      voice_statistics_.export_rib(export_api);
+   ctrlm_db_attr_write(&product_name_);          product_name_.export_rib(export_api);
+   ctrlm_db_attr_write(&controller_irdb_status_);
+   ctrlm_db_attr_write(&voice_metrics_);
+   ctrlm_db_attr_write(&capabilities_);
 
    length = property_read_irdb_entry_id_name_tv(data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
    if(length > 0) {
@@ -1312,10 +966,6 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
    length = property_read_irdb_entry_id_name_avr(data, CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME);
    if(length > 0) {
       ctrlm_db_rf4ce_write_irdb_entry_id_name_avr(network_id, controller_id, data, length);
-   }
-
-   if(CTRLM_RF4CE_LEN_VOICE_METRICS                       == property_read_voice_metrics(data, CTRLM_RF4CE_LEN_VOICE_METRICS)) {
-      ctrlm_db_rf4ce_write_voice_metrics(network_id, controller_id, data, CTRLM_RF4CE_LEN_VOICE_METRICS);
    }
 
    if(CTRLM_RF4CE_LEN_FIRMWARE_UPDATED                    == property_read_firmware_updated(data, CTRLM_RF4CE_LEN_FIRMWARE_UPDATED)) {
@@ -1350,10 +1000,6 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
       ctrlm_db_rf4ce_write_privacy(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_PRIVACY);
    }
 
-   if(CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES == property_read_controller_capabilities(data, CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES)) {
-      ctrlm_db_rf4ce_write_controller_capabilities(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES);
-   }
-
    if(CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS == property_read_far_field_metrics(data, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS)) {
       ctrlm_db_rf4ce_write_far_field_metrics(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS);
    }
@@ -1374,6 +1020,34 @@ void ctrlm_obj_controller_rf4ce_t::db_store() {
    if(CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT == property_read_mfg_test_result(data, CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT)) {
       ctrlm_db_rf4ce_write_mfg_test_result(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT);
    }
+}
+
+void ctrlm_obj_controller_rf4ce_t::configure_rib() {
+   // Versioning
+   this->rib_.add_attribute(&version_software_);
+   this->rib_.add_attribute(&version_dsp_);
+   this->rib_.add_attribute(&version_keyword_model_);
+   this->rib_.add_attribute(&version_arm_);
+   this->rib_.add_attribute(&version_irdb_);
+   this->rib_.add_attribute(&version_bootloader_);
+   this->rib_.add_attribute(&version_golden_);
+   this->rib_.add_attribute(&version_audio_data_);
+   this->rib_.add_attribute(&version_hardware_);
+   this->rib_.add_attribute(&version_build_id_);
+   this->rib_.add_attribute(&version_dsp_build_id_);
+
+   this->rib_.add_attribute(&battery_status_);
+   this->rib_.add_attribute(&controller_irdb_status_);
+   this->rib_.add_attribute(&memory_dump_);
+   this->rib_.add_attribute(&audio_profiles_ctrl_);
+   this->rib_.add_attribute(&voice_statistics_);
+   this->rib_.add_attribute(&voice_session_statistics_);
+   this->rib_.add_attribute(&product_name_);
+   this->rib_.add_attribute(&ir_rf_database_status_);
+   this->rib_.add_attribute(&voice_command_status_);
+   this->rib_.add_attribute(&voice_command_length_);
+   this->rib_.add_attribute(&rib_entries_updated_);
+   this->rib_.add_attribute(&capabilities_);
 }
 
 void ctrlm_obj_controller_rf4ce_t::validation_result_set(ctrlm_rcu_binding_type_t binding_type, ctrlm_rcu_validation_type_t validation_type, ctrlm_rf4ce_result_validation_t result, time_t time_binding, time_t time_last_key) {
@@ -1517,626 +1191,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_rf_statistics(guchar *data, g
    return(0);
 }
 
-void ctrlm_obj_controller_rf4ce_t::property_write_version_irdb(guchar major, guchar minor, guchar revision, guchar patch) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING];
-   data[0] = major;
-   data[1] = minor;
-   data[2] = revision;
-   data[3] = patch;
-
-   property_write_version_irdb(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_irdb(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   if(version_irdb_.major    != data[0] ||
-      version_irdb_.minor    != data[1] ||
-      version_irdb_.revision != data[2] ||
-      version_irdb_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_irdb_.major    = data[0];
-      version_irdb_.minor    = data[1];
-      version_irdb_.revision = data[2];
-      version_irdb_.patch    = data[3];
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_irdb(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_VERSIONING_IRDB, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING, data);
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_irdb_.major, version_irdb_.minor, version_irdb_.revision, version_irdb_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_irdb(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_irdb_.major;
-   data[1] = version_irdb_.minor;
-   data[2] = version_irdb_.revision;
-   data[3] = version_irdb_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_irdb_.major, version_irdb_.minor, version_irdb_.revision, version_irdb_.patch);
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_version_hardware(guchar manufacturer, guchar model, guchar hw_revision, guint16 lot_code) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING];
-   data[0] = (manufacturer << 4) | (model & 0xF);
-   data[1] = hw_revision;
-   data[2] = (lot_code >> 8) & 0xF;
-   data[3] = (guchar)lot_code;
-
-   property_write_version_hardware(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_hardware(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   guchar  manufacturer = (data[0] >> 4);
-   guchar  model        = (data[0] & 0xF);
-   guchar  hw_revision  = data[1];
-   guint16 lot_code     = ((data[2] & 0xF) << 8) | data[3];
-   
-   if(version_hardware_.manufacturer != manufacturer ||
-      version_hardware_.model        != model        ||
-      version_hardware_.hw_revision  != hw_revision  ||
-      version_hardware_.lot_code     != lot_code) {
-      // Store the data on the controller object
-      version_hardware_.manufacturer = manufacturer;
-      version_hardware_.model        = model;
-      version_hardware_.hw_revision  = hw_revision;
-      version_hardware_.lot_code     = lot_code;
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_hardware(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_VERSIONING_HARDWARE, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING, data);
-      }
-   }
-   //Set the manufacturer string from version_hardware
-   errno_t safec_rc = strcpy_s(manufacturer_, sizeof(manufacturer_),ctrlm_rf4ce_controller_manufacturer(version_hardware_.manufacturer));
-   ERR_CHK(safec_rc);
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_hardware_.manufacturer, version_hardware_.model, version_hardware_.hw_revision, version_hardware_.lot_code);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_hardware(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = (version_hardware_.manufacturer << 4) | (version_hardware_.model & 0xF);
-   data[1] = version_hardware_.hw_revision;
-   data[2] = version_hardware_.lot_code >> 8;
-   data[3] = (char)version_hardware_.lot_code;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_hardware_.manufacturer, version_hardware_.model, version_hardware_.hw_revision, version_hardware_.lot_code);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_version_software(guchar major, guchar minor, guchar revision, guchar patch) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING];
-   data[0] = major;
-   data[1] = minor;
-   data[2] = revision;
-   data[3] = patch;
-   property_write_version_software(data, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_software(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   if(version_software_.major    != data[0] ||
-      version_software_.minor    != data[1] ||
-      version_software_.revision != data[2] ||
-      version_software_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_software_.major    = data[0];
-      version_software_.minor    = data[1];
-      version_software_.revision = data[2];
-      version_software_.patch    = data[3];
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_software(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_VERSIONING_SOFTWARE, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING, data);
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_software(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_software_.major;
-   data[1] = version_software_.minor;
-   data[2] = version_software_.revision;
-   data[3] = version_software_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_dsp(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   if(version_dsp_.major    != data[0] ||
-      version_dsp_.minor    != data[1] ||
-      version_dsp_.revision != data[2] ||
-      version_dsp_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_dsp_.major    = data[0];
-      version_dsp_.minor    = data[1];
-      version_dsp_.revision = data[2];
-      version_dsp_.patch    = data[3];
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_dsp(network_id_get(), controller_id_get(), data, length);
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_dsp_.major, version_dsp_.minor, version_dsp_.revision, version_dsp_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_dsp(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_dsp_.major;
-   data[1] = version_dsp_.minor;
-   data[2] = version_dsp_.revision;
-   data[3] = version_dsp_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_dsp_.major, version_dsp_.minor, version_dsp_.revision, version_dsp_.patch);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_keyword_model(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   if(version_keyword_model_.major    != data[0] ||
-      version_keyword_model_.minor    != data[1] ||
-      version_keyword_model_.revision != data[2] ||
-      version_keyword_model_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_keyword_model_.major    = data[0];
-      version_keyword_model_.minor    = data[1];
-      version_keyword_model_.revision = data[2];
-      version_keyword_model_.patch    = data[3];
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_keyword_model(network_id_get(), controller_id_get(), data, length);
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_keyword_model_.major, version_keyword_model_.minor, version_keyword_model_.revision, version_keyword_model_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_keyword_model(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_keyword_model_.major;
-   data[1] = version_keyword_model_.minor;
-   data[2] = version_keyword_model_.revision;
-   data[3] = version_keyword_model_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_keyword_model_.major, version_keyword_model_.minor, version_keyword_model_.revision, version_keyword_model_.patch);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_arm(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   if(version_arm_.major    != data[0] ||
-      version_arm_.minor    != data[1] ||
-      version_arm_.revision != data[2] ||
-      version_arm_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_arm_.major    = data[0];
-      version_arm_.minor    = data[1];
-      version_arm_.revision = data[2];
-      version_arm_.patch    = data[3];
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_arm(network_id_get(), controller_id_get(), data, length);
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_arm_.major, version_arm_.minor, version_arm_.revision, version_arm_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_arm(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   // Load the data from the controller object
-   data[0] = version_arm_.major;
-   data[1] = version_arm_.minor;
-   data[2] = version_arm_.revision;
-   data[3] = version_arm_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_arm_.major, version_arm_.minor, version_arm_.revision, version_arm_.patch);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_build_id(guchar *data, guchar length) {
-   if(data == NULL || length > CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   errno_t safec_rc = -1;
-   int ind = -1;
-   bool IsValid = false;
-
-   (length != version_build_id_.length)? (IsValid= true): (safec_rc = memcmp_s(version_build_id_.build_id, sizeof(version_build_id_.build_id), data, length, &ind));
-   if((IsValid) || ((safec_rc == EOK) && (ind != 0))) {
-      // Store the data on the controller object
-      safec_rc = memcpy_s(version_build_id_.build_id, sizeof(version_build_id_.build_id), data, length);
-      ERR_CHK(safec_rc);
-      version_build_id_.length = length;
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_build_id(network_id_get(), controller_id_get(), data, length);
-      }
-   } else if (safec_rc != EOK) {
-     ERR_CHK(safec_rc);
-   }
-
-   LOG_INFO("%s: %.*s\n", __FUNCTION__, version_build_id_.length, version_build_id_.build_id);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_build_id(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   // Load the data from the controller object
-   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, version_build_id_.build_id, version_build_id_.length);
-   ERR_CHK(safec_rc);
-
-   LOG_INFO("%s: %.*s\n", __FUNCTION__, version_build_id_.length, version_build_id_.build_id);
-
-   return(version_build_id_.length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_version_dsp_build_id(guchar *data, guchar length) {
-   if(data == NULL || length > CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   errno_t safec_rc = -1;
-   int ind = -1;
-   bool IsValid = false;
-
-   (length != version_dsp_build_id_.length)? (IsValid= true): (safec_rc = memcmp_s(version_dsp_build_id_.build_id, sizeof(version_dsp_build_id_.build_id), data, length, &ind));
-   if((IsValid) || ((safec_rc == EOK) && (ind != 0))) {
-      // Store the data on the controller object
-      safec_rc =  memset_s(version_dsp_build_id_.build_id, sizeof(version_dsp_build_id_.build_id), 0, CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID);
-      ERR_CHK(safec_rc);
-      safec_rc = memcpy_s(version_dsp_build_id_.build_id, sizeof(version_dsp_build_id_.build_id), data, length);
-      ERR_CHK(safec_rc);
-      version_dsp_build_id_.length = length;
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_version_dsp_build_id(network_id_get(), controller_id_get(), data, length);
-      }
-   }
-   else if(safec_rc != EOK) {
-     ERR_CHK(safec_rc);
-   }
-
-   LOG_INFO("%s: %.*s\n", __FUNCTION__, version_dsp_build_id_.length, version_dsp_build_id_.build_id);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_version_dsp_build_id(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   // Load the data from the controller object
-   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, version_dsp_build_id_.build_id, version_dsp_build_id_.length);
-   ERR_CHK(safec_rc);
-
-   LOG_INFO("%s: %.*s\n", __FUNCTION__, version_dsp_build_id_.length, version_dsp_build_id_.build_id);
-
-   return(version_dsp_build_id_.length);
-}
-
-
-void ctrlm_obj_controller_rf4ce_t::property_write_battery_status(guchar flags, guchar voltage_loaded, guint32 codes_txd_rf, guint32 codes_txd_ir, guchar voltage_unloaded) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS];
-   data[0]  = flags;
-   data[1]  = voltage_loaded;
-   data[2]  = (guchar)(codes_txd_rf);
-   data[3]  = (guchar)(codes_txd_rf >> 8);
-   data[4]  = (guchar)(codes_txd_rf >> 16);
-   data[5]  = (guchar)(codes_txd_rf >> 24);
-   data[6]  = (guchar)(codes_txd_ir);
-   data[7]  = (guchar)(codes_txd_ir >> 8);
-   data[8]  = (guchar)(codes_txd_ir >> 16);
-   data[9]  = (guchar)(codes_txd_ir >> 24);
-   data[10] = voltage_unloaded;
-
-   property_write_battery_status(data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_status(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   bool    update_milestones = true;
-   bool    batteries_changed = false;
-   guchar  flags             = data[0];
-   guchar  voltage_loaded    = data[1];
-   guint32 codes_txd_rf      = ((data[5] << 24) | (data[4] << 16) | (data[3] << 8) | data[2]);
-   guint32 codes_txd_ir      = ((data[9] << 24) | (data[8] << 16) | (data[7] << 8) | data[6]);
-   guchar  voltage_unloaded  = data[10];
-
-   if(flags) {
-      //We ignore the flags but log them if any are set
-      LOG_WARN("%s: Flags 0x%02X Voltage (old:%4.2fv, new:%4.2fv) Battery Replacement <%u>, Battery Charging <%u>, Impending Doom <%u>\n", 
-	  __FUNCTION__, flags, battery_status_.voltage_unloaded * 4.0 / 255, voltage_unloaded * 4.0 / 255, 
-	  (flags & BATTERY_STATUS_FLAGS_REPLACEMENT), (flags & BATTERY_STATUS_FLAGS_CHARGING), (flags & BATTERY_STATUS_FLAGS_IMPENDING_DOOM));
-   }
-
-   if(!loading_db_) {
-      //If this is the first battery status write, this could be a newly paired remote so treat this as batteries changed
-      if(battery_first_write_) {
-         LOG_WARN("%s: This is the first battery status write so this could be a newly paired remote.  Voltage (%4.2fv)\n", __FUNCTION__, voltage_unloaded * 4.0 / 255);
-         batteries_changed = true;
-         battery_first_write_ = false;
-      } else if((voltage_unloaded > battery_last_good_unloaded_voltage_) || (voltage_loaded > battery_last_good_loaded_voltage_)) {
-         if(is_batteries_changed(voltage_unloaded)) {
-            LOG_WARN("%s: It appears the batteries have been changed. Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, battery_status_.voltage_unloaded * 4.0 / 255, voltage_unloaded * 4.0 / 255);
-            batteries_changed = true;
-         } else if(is_batteries_large_voltage_jump(voltage_unloaded)) {
-            LOG_WARN("%s: The battery voltage haa a large increase but we don't consider the batteries to have changed.  Milestones not updated.  Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, battery_status_.voltage_unloaded * 4.0 / 255, voltage_unloaded * 4.0 / 255);
-            update_milestones = false;
-            battery_voltage_large_jump_counter_++;
-            ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(network_id_get(), controller_id_get(), battery_voltage_large_jump_counter_);
-         } else if(((voltage_unloaded < battery_status_.voltage_unloaded) && (battery_status_.voltage_unloaded > battery_last_good_unloaded_voltage_)) ||
-                   ((voltage_loaded < battery_status_.voltage_loaded) && (battery_status_.voltage_loaded > battery_last_good_loaded_voltage_))) {
-            LOG_WARN("%s: The battery voltage went up previously, has now gone down, but not to it's lowest point.  Milestones not updated.\n", __FUNCTION__);
-            update_milestones = false;
-         } else {
-            LOG_WARN("%s: The battery voltage has gone up but we don't consider the batteries to have changed.  Milestones not updated.  Unloaded Voltage (old:%4.2fv, new:%4.2fv)  Loaded Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, battery_last_good_unloaded_voltage_ * 4.0 / 255, voltage_unloaded * 4.0 / 255, battery_last_good_loaded_voltage_ * 4.0 / 255, voltage_loaded * 4.0 / 255);
-            update_milestones = false;
-         }
-      }
-   }
-   
-   if(battery_status_.flags            != flags          ||
-      battery_status_.voltage_loaded   != voltage_loaded ||
-      battery_status_.codes_txd_rf     != codes_txd_rf   ||
-      battery_status_.codes_txd_ir     != codes_txd_ir   ||
-      battery_status_.voltage_unloaded != voltage_unloaded) {
-      // Store the data on the controller object
-      battery_status_.update_time      = time(NULL);
-      battery_status_.flags            = flags;
-      battery_status_.voltage_loaded   = voltage_loaded;
-      battery_status_.codes_txd_rf     = codes_txd_rf;
-      battery_status_.codes_txd_ir     = codes_txd_ir;
-      battery_status_.voltage_unloaded = voltage_unloaded;
-      battery_status_.percent          = battery_level_percent(battery_status_.voltage_unloaded);
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_battery_status(network_id_get(), controller_id_get(), data, length);
-         ctrlm_db_rf4ce_write_time_battery_status(network_id_get(), controller_id_get(), battery_status_.update_time);
-         if(update_milestones) {
-            property_write_battery_milestones(batteries_changed, voltage_loaded, voltage_unloaded, battery_status_.percent, battery_status_.update_time);
-         }
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_BATTERY_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS, data);
-      }
-   }
-
-   LOG_INFO("%s: Flags 0x%02X Voltage (%4.2fv, %4.2fv) Codes Txd (RF,IR) (%u,%u)\n", __FUNCTION__, battery_status_.flags, battery_status_.voltage_loaded * 4.0 / 255, battery_status_.voltage_unloaded * 4.0 / 255, battery_status_.codes_txd_rf, battery_status_.codes_txd_ir);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   errno_t safec_rc = memcpy_s(&battery_milestones_, sizeof(battery_milestones_), data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
-   ERR_CHK(safec_rc);
-   LOG_INFO("%s: battery_changed <%ld>, <%d%%> battery_75_percent_ <%ld>, <%d%%> battery_50_percent_ <%ld>, <%d%%> battery_25_percent_ <%ld>, <%d%%> battery_5_percent_ <%ld>, <%d%%> battery_0_percent_ <%ld>, <%d%%> \n",
-   __FUNCTION__, battery_milestones_.battery_changed_timestamp, battery_milestones_.battery_changed_actual_percent, battery_milestones_.battery_75_percent_timestamp, battery_milestones_.battery_75_percent_actual_percent, battery_milestones_.battery_50_percent_timestamp, battery_milestones_.battery_50_percent_actual_percent,
-   battery_milestones_.battery_25_percent_timestamp, battery_milestones_.battery_25_percent_actual_percent, battery_milestones_.battery_5_percent_timestamp, battery_milestones_.battery_5_percent_actual_percent, battery_milestones_.battery_0_percent_timestamp, battery_milestones_.battery_0_percent_actual_percent);
-   return(length);
-}
-void ctrlm_obj_controller_rf4ce_t::property_write_battery_milestones(bool batteries_changed, guchar voltage_loaded, guchar voltage_unloaded, guchar percent, time_t timestamp) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES];
-   ctrlm_rcu_battery_event_t battery_event = CTRLM_RCU_BATTERY_EVENT_NONE;
-   ctrlm_network_id_t network_id           = network_id_get();
-   ctrlm_controller_id_t controller_id     = controller_id_get();
-   guchar threshold_counter                = 0;
-   errno_t safec_rc                        = -1;
-
-   if(!loading_db_) { // send the event
-      gboolean send_event = false;
-      if(batteries_changed) {
-         battery_milestones_.battery_changed_actual_percent       = percent;
-         battery_milestones_.battery_changed_timestamp            = timestamp;
-         battery_milestones_.battery_75_percent_actual_percent    = 0;
-         battery_milestones_.battery_75_percent_timestamp         = 0;
-         battery_milestones_.battery_50_percent_actual_percent    = 0;
-         battery_milestones_.battery_50_percent_timestamp         = 0;
-         battery_milestones_.battery_25_percent_actual_percent    = 0;
-         battery_milestones_.battery_25_percent_timestamp         = 0;
-         battery_milestones_.battery_5_percent_actual_percent     = 0;
-         battery_milestones_.battery_5_percent_timestamp          = 0;
-         battery_milestones_.battery_0_percent_actual_percent     = 0;
-         battery_milestones_.battery_0_percent_timestamp          = 0;
-         battery_changed_unloaded_voltage_                        = voltage_unloaded;
-         battery_75_percent_unloaded_voltage_                     = 0;
-         battery_50_percent_unloaded_voltage_                     = 0;
-         battery_25_percent_unloaded_voltage_                     = 0;
-         battery_5_percent_unloaded_voltage_                      = 0;
-         battery_0_percent_unloaded_voltage_                      = 0;
-         battery_voltage_large_jump_counter_                      = 0;
-         battery_voltage_large_decline_detected_                  = false;
-         threshold_counter                                        = 0;
-         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_REPLACED;
-         send_event                                               = true;
-         //Need to clear battery_voltage_large_jump_counter_ in the database
-         ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(network_id_get(), controller_id_get(), battery_voltage_large_jump_counter_);
-      }
-      //These check variables are to help us transition from images prior to RDK-32347
-      unsigned long battery_75_percent_old_image_check = battery_milestones_.battery_50_percent_timestamp + battery_milestones_.battery_25_percent_timestamp + battery_milestones_.battery_5_percent_timestamp + battery_milestones_.battery_0_percent_timestamp;
-      unsigned long battery_50_percent_old_image_check = battery_milestones_.battery_25_percent_timestamp + battery_milestones_.battery_5_percent_timestamp + battery_milestones_.battery_0_percent_timestamp;
-      unsigned long battery_25_percent_old_image_check = battery_milestones_.battery_5_percent_timestamp + battery_milestones_.battery_0_percent_timestamp;
-      unsigned long battery_5_percent_old_image_check  = battery_milestones_.battery_0_percent_timestamp;
-      if((percent <= CTRLM_BATTERY_75_PERCENT_THRESHOLD) && (battery_milestones_.battery_75_percent_timestamp == 0) && (battery_75_percent_old_image_check == 0)) {
-         battery_milestones_.battery_75_percent_actual_percent    = percent;
-         battery_milestones_.battery_75_percent_timestamp         = timestamp;
-         battery_75_percent_unloaded_voltage_                     = voltage_unloaded;
-         threshold_counter++;
-         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_75_PERCENT;
-         send_event                                               = true;
-      }
-      if((percent <= CTRLM_BATTERY_50_PERCENT_THRESHOLD) && (battery_milestones_.battery_50_percent_timestamp == 0) && (battery_50_percent_old_image_check == 0)) {
-         battery_milestones_.battery_50_percent_actual_percent    = percent;
-         battery_milestones_.battery_50_percent_timestamp         = timestamp;
-         battery_50_percent_unloaded_voltage_                     = voltage_unloaded;
-         threshold_counter++;
-         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_50_PERCENT;
-         send_event                                               = true;
-      }
-      if((percent <= CTRLM_BATTERY_25_PERCENT_THRESHOLD) && (battery_milestones_.battery_25_percent_timestamp == 0) && (battery_25_percent_old_image_check == 0)) {
-         battery_milestones_.battery_25_percent_actual_percent    = percent;
-         battery_milestones_.battery_25_percent_timestamp         = timestamp;
-         battery_25_percent_unloaded_voltage_                     = voltage_unloaded;
-         threshold_counter++;
-         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_25_PERCENT;
-         send_event                                               = true;
-      }
-      if((percent <= CTRLM_BATTERY_5_PERCENT_THRESHOLD) && (battery_milestones_.battery_5_percent_timestamp == 0) && (battery_5_percent_old_image_check == 0)) {
-         battery_milestones_.battery_5_percent_actual_percent     = percent;
-         battery_milestones_.battery_5_percent_timestamp          = timestamp;
-         battery_5_percent_unloaded_voltage_                      = voltage_unloaded;
-         threshold_counter++;
-         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
-         send_event                                               = true;
-      }
-      if((percent == CTRLM_BATTERY_0_PERCENT_THRESHOLD)           && (battery_milestones_.battery_0_percent_timestamp == 0)) {
-         battery_milestones_.battery_0_percent_actual_percent     = percent;
-         battery_milestones_.battery_0_percent_timestamp          = timestamp;
-         battery_0_percent_unloaded_voltage_                      = voltage_unloaded;
-         threshold_counter++;
-         battery_event                                            = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
-         send_event                                               = true;
-      }
-      battery_last_good_loaded_voltage_                           = voltage_loaded;
-      battery_last_good_unloaded_voltage_                         = voltage_unloaded;
-      battery_last_good_percent_                                  = percent;
-      battery_last_good_timestamp_                                = timestamp;
-      if(!batteries_changed && (threshold_counter>1)) {
-         battery_voltage_large_decline_detected_ = true;
-      }
-
-      ctrlm_db_rf4ce_write_battery_last_good_timestamp(network_id, controller_id, battery_last_good_timestamp_);
-      ctrlm_db_rf4ce_write_battery_last_good_percent(network_id, controller_id, battery_last_good_percent_);
-      ctrlm_db_rf4ce_write_battery_last_good_loaded_voltage(network_id, controller_id, battery_last_good_loaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_last_good_unloaded_voltage(network_id, controller_id, battery_last_good_unloaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_voltage_large_decline_detected(network_id, controller_id, battery_voltage_large_decline_detected_);
-      ctrlm_db_rf4ce_write_battery_changed_unloaded_voltage(network_id, controller_id, battery_changed_unloaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_75_percent_unloaded_voltage(network_id, controller_id, battery_75_percent_unloaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_50_percent_unloaded_voltage(network_id, controller_id, battery_50_percent_unloaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_25_percent_unloaded_voltage(network_id, controller_id, battery_25_percent_unloaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_5_percent_unloaded_voltage(network_id, controller_id, battery_5_percent_unloaded_voltage_);
-      ctrlm_db_rf4ce_write_battery_0_percent_unloaded_voltage(network_id, controller_id, battery_0_percent_unloaded_voltage_);
-
-      if(send_event) {
-         safec_rc = memcpy_s(data, sizeof(data), &battery_milestones_, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
-         ERR_CHK(safec_rc);
-         ctrlm_db_rf4ce_write_battery_milestones(network_id, controller_id, data, CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES);
-         send_battery_milestone_event(network_id_get(), controller_id_get(), battery_event, percent);
-      }
-   }
-
-   LOG_INFO("%s: battery_changed <%ld>, <%d%%>, <%4.2fv> battery_75_percent_ <%ld>, <%d%%>, <%4.2fv> battery_50_percent_ <%ld>, <%d%%>, <%4.2fv> battery_25_percent_ <%ld>, <%d%%>, <%4.2fv> battery_5_percent_ <%ld>, <%d%%>, <%4.2fv> battery_0_percent_ <%ld>, <%d%%>, <%4.2fv> \n",
-      __FUNCTION__, battery_milestones_.battery_changed_timestamp, battery_milestones_.battery_changed_actual_percent, battery_changed_unloaded_voltage_ * 4.0 / 255, 
-      battery_milestones_.battery_75_percent_timestamp, battery_milestones_.battery_75_percent_actual_percent, battery_75_percent_unloaded_voltage_ * 4.0 / 255, 
-      battery_milestones_.battery_50_percent_timestamp, battery_milestones_.battery_50_percent_actual_percent, battery_50_percent_unloaded_voltage_ * 4.0 / 255,
-      battery_milestones_.battery_25_percent_timestamp, battery_milestones_.battery_25_percent_actual_percent, battery_25_percent_unloaded_voltage_ * 4.0 / 255, 
-      battery_milestones_.battery_5_percent_timestamp, battery_milestones_.battery_5_percent_actual_percent, battery_5_percent_unloaded_voltage_ * 4.0 / 255, 
-      battery_milestones_.battery_0_percent_timestamp, battery_milestones_.battery_0_percent_actual_percent, battery_0_percent_unloaded_voltage_ * 4.0 / 255);
-   LOG_INFO("%s: battery_last_good_timestamp <%ld> battery_last_good_percent_<%d%%> battery_last_good_loaded_voltage <%4.2fv> battery_last_good_unloaded_voltage <%4.2fv> battery_voltage_large_jump_counter <%d> battery_voltage_large_decline_detected_<%d> battery_first_write_ <%d>\n",
-      __FUNCTION__, battery_last_good_timestamp_, battery_last_good_percent_, battery_last_good_loaded_voltage_ * 4.0 / 255, battery_last_good_unloaded_voltage_ * 4.0 / 255,
-      battery_voltage_large_jump_counter_, battery_voltage_large_decline_detected_, battery_first_write_);
-}
-
-gboolean ctrlm_obj_controller_rf4ce_t::send_battery_milestone_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_battery_event_t battery_event, guchar percent) {
-   LOG_INFO("%s: \n", __FUNCTION__);
-   // Send message to MAIN QUEUE
-   ctrlm_main_queue_msg_rf4ce_battery_milestone_t *msg = (ctrlm_main_queue_msg_rf4ce_battery_milestone_t *)g_malloc(sizeof(ctrlm_main_queue_msg_rf4ce_battery_milestone_t));
-   if(NULL == msg) {
-      LOG_ERROR("%s: Couldn't allocate memory\n", __FUNCTION__);
-      g_assert(0);
-      return(FALSE);
-   }
-
-   msg->type              = CTRLM_MAIN_QUEUE_MSG_TYPE_BATTERY_MILESTONE_EVENT;
-   msg->network_id        = network_id;
-   msg->controller_id     = controller_id;
-   msg->battery_event     = battery_event;
-   msg->percent           = percent;
-   ctrlm_main_queue_msg_push(msg);
-   return(FALSE);
-}
-
 gboolean ctrlm_obj_controller_rf4ce_t::send_remote_reboot_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar voltage, controller_reboot_reason_t reason, guint32 assert_number) {
    LOG_INFO("%s: \n", __FUNCTION__);
    // Send message to MAIN QUEUE
@@ -2155,30 +1209,6 @@ gboolean ctrlm_obj_controller_rf4ce_t::send_remote_reboot_event(ctrlm_network_id
    msg->assert_number     = assert_number;
    ctrlm_main_queue_msg_push(msg);
    return(FALSE);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_battery_status(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0]  = battery_status_.flags;
-   data[1]  = battery_status_.voltage_loaded;
-   data[2]  = (guchar)(battery_status_.codes_txd_rf);
-   data[3]  = (guchar)(battery_status_.codes_txd_rf >> 8);
-   data[4]  = (guchar)(battery_status_.codes_txd_rf >> 16);
-   data[5]  = (guchar)(battery_status_.codes_txd_rf >> 24);
-   data[6]  = (guchar)(battery_status_.codes_txd_ir);
-   data[7]  = (guchar)(battery_status_.codes_txd_ir >> 8);
-   data[8]  = (guchar)(battery_status_.codes_txd_ir >> 16);
-   data[9]  = (guchar)(battery_status_.codes_txd_ir >> 24);
-   data[10] = battery_status_.voltage_unloaded;
-   
-   LOG_INFO("%s: Flags 0x%02X Voltage (%4.2fv, %4.2fv) Codes Txd (RF,IR) (%u,%u)\n", __FUNCTION__, battery_status_.flags, battery_status_.voltage_loaded * 4.0 / 255, battery_status_.voltage_unloaded * 4.0 / 255, battery_status_.codes_txd_rf, battery_status_.codes_txd_ir);
-   
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS);
 }
 
 void ctrlm_obj_controller_rf4ce_t::property_write_short_rf_retry_period(guint32 short_rf_retry_period) {
@@ -2226,164 +1256,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_short_rf_retry_period(guchar 
    LOG_INFO("%s: %u us\n", __FUNCTION__, short_rf_retry_period);
    
    return(CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_voice_metrics(void) {
-   guchar data[CTRLM_RF4CE_LEN_VOICE_METRICS];
-   data[0]  = (guchar)(voice_cmd_count_today_);
-   data[1]  = (guchar)(voice_cmd_count_today_ >> 8);
-   data[2]  = (guchar)(voice_cmd_count_today_ >> 16);
-   data[3]  = (guchar)(voice_cmd_count_today_ >> 24);
-   data[4]  = (guchar)(voice_cmd_count_yesterday_);
-   data[5]  = (guchar)(voice_cmd_count_yesterday_ >> 8);
-   data[6]  = (guchar)(voice_cmd_count_yesterday_ >> 16);
-   data[7]  = (guchar)(voice_cmd_count_yesterday_ >> 24);
-   data[8]  = (guchar)(voice_cmd_short_today_);
-   data[9]  = (guchar)(voice_cmd_short_today_ >> 8);
-   data[10] = (guchar)(voice_cmd_short_today_ >> 16);
-   data[11] = (guchar)(voice_cmd_short_today_ >> 24);
-   data[12] = (guchar)(voice_cmd_short_yesterday_);
-   data[13] = (guchar)(voice_cmd_short_yesterday_ >> 8);
-   data[14] = (guchar)(voice_cmd_short_yesterday_ >> 16);
-   data[15] = (guchar)(voice_cmd_short_yesterday_ >> 24);
-   data[16] = (guchar)(today_);
-   data[17] = (guchar)(today_ >> 8);
-   data[18] = (guchar)(today_ >> 16);
-   data[19] = (guchar)(today_ >> 24);
-   data[20] = (guchar)(voice_packets_sent_today_);
-   data[21] = (guchar)(voice_packets_sent_today_ >> 8);
-   data[22] = (guchar)(voice_packets_sent_today_ >> 16);
-   data[23] = (guchar)(voice_packets_sent_today_ >> 24);
-   data[24] = (guchar)(voice_packets_sent_yesterday_);
-   data[25] = (guchar)(voice_packets_sent_yesterday_ >> 8);
-   data[26] = (guchar)(voice_packets_sent_yesterday_ >> 16);
-   data[27] = (guchar)(voice_packets_sent_yesterday_ >> 24);
-   data[28] = (guchar)(voice_packets_lost_today_);
-   data[29] = (guchar)(voice_packets_lost_today_ >> 8);
-   data[30] = (guchar)(voice_packets_lost_today_ >> 16);
-   data[31] = (guchar)(voice_packets_lost_today_ >> 24);
-   data[32] = (guchar)(voice_packets_lost_yesterday_);
-   data[33] = (guchar)(voice_packets_lost_yesterday_ >> 8);
-   data[34] = (guchar)(voice_packets_lost_yesterday_ >> 16);
-   data[35] = (guchar)(voice_packets_lost_yesterday_ >> 24);
-   data[36] = (guchar)(utterances_exceeding_packet_loss_threshold_today_);
-   data[37] = (guchar)(utterances_exceeding_packet_loss_threshold_today_ >> 8);
-   data[38] = (guchar)(utterances_exceeding_packet_loss_threshold_today_ >> 16);
-   data[39] = (guchar)(utterances_exceeding_packet_loss_threshold_today_ >> 24);
-   data[40] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_);
-   data[41] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_ >> 8);
-   data[42] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_ >> 16);
-   data[43] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_ >> 24);
-
-   if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-      ctrlm_db_rf4ce_write_voice_metrics(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_LEN_VOICE_METRICS);
-   }
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_metrics(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_LEN_VOICE_METRICS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   guint32 voice_cmd_count_today                                 = ((data[3]  << 24) | (data[2]  << 16) | (data[1]  << 8) | data[0]);
-   guint32 voice_cmd_count_yesterday                             = ((data[7]  << 24) | (data[6]  << 16) | (data[5]  << 8) | data[4]);
-   guint32 voice_cmd_short_today                                 = ((data[11] << 24) | (data[10] << 16) | (data[9]  << 8) | data[8]);
-   guint32 voice_cmd_short_yesterday                             = ((data[15] << 24) | (data[14] << 16) | (data[13] << 8) | data[12]);
-   guint32 today                                                 = ((data[19] << 24) | (data[18] << 16) | (data[17] << 8) | data[16]);
-   guint32 voice_packets_sent_today                              = ((data[23] << 24) | (data[22] << 16) | (data[21] << 8) | data[20]);
-   guint32 voice_packets_sent_yesterday                          = ((data[27] << 24) | (data[26] << 16) | (data[25] << 8) | data[24]);
-   guint32 voice_packets_lost_today                              = ((data[31] << 24) | (data[30] << 16) | (data[29] << 8) | data[28]);
-   guint32 voice_packets_lost_yesterday                          = ((data[35] << 24) | (data[34] << 16) | (data[33] << 8) | data[32]);
-   guint32 utterances_exceeding_packet_loss_threshold_today      = ((data[39] << 24) | (data[38] << 16) | (data[37] << 8) | data[36]);
-   guint32 utterances_exceeding_packet_loss_threshold_yesterday  = ((data[43] << 24) | (data[42] << 16) | (data[41] << 8) | data[40]);
-   
-   if(voice_cmd_count_today_                                != voice_cmd_count_today     ||
-      voice_cmd_count_yesterday_                            != voice_cmd_count_yesterday ||
-      voice_cmd_short_today_                                != voice_cmd_short_today     ||
-      voice_cmd_short_yesterday_                            != voice_cmd_short_yesterday ||
-      voice_packets_sent_today_                             != voice_packets_sent_today ||
-      voice_packets_sent_yesterday_                         != voice_packets_sent_yesterday ||
-      voice_packets_lost_today_                             != voice_packets_lost_today ||
-      voice_packets_lost_yesterday_                         != voice_packets_lost_yesterday ||
-      utterances_exceeding_packet_loss_threshold_today_     != utterances_exceeding_packet_loss_threshold_today ||
-      utterances_exceeding_packet_loss_threshold_yesterday_ != utterances_exceeding_packet_loss_threshold_yesterday ||
-      today_                                                != today) {
-      // Store the data on the controller object
-      voice_cmd_count_today_                                 = voice_cmd_count_today;
-      voice_cmd_count_yesterday_                             = voice_cmd_count_yesterday;
-      voice_cmd_short_today_                                 = voice_cmd_short_today;
-      voice_cmd_short_yesterday_                             = voice_cmd_short_yesterday;
-      voice_packets_sent_today_                              = voice_packets_sent_today;
-      voice_packets_sent_yesterday_                          = voice_packets_sent_yesterday;
-      voice_packets_lost_today_                              = voice_packets_lost_today;
-      voice_packets_lost_yesterday_                          = voice_packets_lost_yesterday;
-      utterances_exceeding_packet_loss_threshold_today_      = utterances_exceeding_packet_loss_threshold_today;
-      utterances_exceeding_packet_loss_threshold_yesterday_  = utterances_exceeding_packet_loss_threshold_yesterday;
-      today_                                                 = today;
-
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         property_write_voice_metrics();
-      }
-   }
-
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_metrics(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_LEN_VOICE_METRICS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0]  = (guchar)(voice_cmd_count_today_);
-   data[1]  = (guchar)(voice_cmd_count_today_ >> 8);
-   data[2]  = (guchar)(voice_cmd_count_today_ >> 16);
-   data[3]  = (guchar)(voice_cmd_count_today_ >> 24);
-   data[4]  = (guchar)(voice_cmd_count_yesterday_);
-   data[5]  = (guchar)(voice_cmd_count_yesterday_ >> 8);
-   data[6]  = (guchar)(voice_cmd_count_yesterday_ >> 16);
-   data[7]  = (guchar)(voice_cmd_count_yesterday_ >> 24);
-   data[8]  = (guchar)(voice_cmd_short_today_);
-   data[9]  = (guchar)(voice_cmd_short_today_ >> 8);
-   data[10] = (guchar)(voice_cmd_short_today_ >> 16);
-   data[11] = (guchar)(voice_cmd_short_today_ >> 24);
-   data[12] = (guchar)(voice_cmd_short_yesterday_);
-   data[13] = (guchar)(voice_cmd_short_yesterday_ >> 8);
-   data[14] = (guchar)(voice_cmd_short_yesterday_ >> 16);
-   data[15] = (guchar)(voice_cmd_short_yesterday_ >> 24);
-   data[16] = (guchar)(today_);
-   data[17] = (guchar)(today_ >> 8);
-   data[18] = (guchar)(today_ >> 16);
-   data[19] = (guchar)(today_ >> 24);
-   data[20] = (guchar)(voice_packets_sent_today_);
-   data[21] = (guchar)(voice_packets_sent_today_ >> 8);
-   data[22] = (guchar)(voice_packets_sent_today_ >> 16);
-   data[23] = (guchar)(voice_packets_sent_today_ >> 24);
-   data[24] = (guchar)(voice_packets_sent_yesterday_);
-   data[25] = (guchar)(voice_packets_sent_yesterday_ >> 8);
-   data[26] = (guchar)(voice_packets_sent_yesterday_ >> 16);
-   data[27] = (guchar)(voice_packets_sent_yesterday_ >> 24);
-   data[28] = (guchar)(voice_packets_lost_today_);
-   data[29] = (guchar)(voice_packets_lost_today_ >> 8);
-   data[30] = (guchar)(voice_packets_lost_today_ >> 16);
-   data[31] = (guchar)(voice_packets_lost_today_ >> 24);
-   data[32] = (guchar)(voice_packets_lost_yesterday_);
-   data[33] = (guchar)(voice_packets_lost_yesterday_ >> 8);
-   data[34] = (guchar)(voice_packets_lost_yesterday_ >> 16);
-   data[35] = (guchar)(voice_packets_lost_yesterday_ >> 24);
-   data[36] = (guchar)(utterances_exceeding_packet_loss_threshold_today_);
-   data[37] = (guchar)(utterances_exceeding_packet_loss_threshold_today_ >> 8);
-   data[38] = (guchar)(utterances_exceeding_packet_loss_threshold_today_ >> 16);
-   data[39] = (guchar)(utterances_exceeding_packet_loss_threshold_today_ >> 24);
-   data[40] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_);
-   data[41] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_ >> 8);
-   data[42] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_ >> 16);
-   data[43] = (guchar)(utterances_exceeding_packet_loss_threshold_yesterday_ >> 24);
-   
-   LOG_INFO("%s: Voice Cmd Count Today <%u> Voice Cmd Count Yesterday <%u> Voice Cmd Short Today <%u> Voice Cmd Short Yesterday <%u>  Packets Lost Today <%u>  Packets Lost Yesterday <%u>  Utterances Exceeding Pkt Loss Threshold Today <%u>  Utterances Exceeding Pkt Loss Threshold Yesterday <%u>  Today=<%u>\n", __FUNCTION__, voice_cmd_count_today_, voice_cmd_count_yesterday_, voice_cmd_short_today_, voice_cmd_short_yesterday_, voice_packets_lost_today_, voice_packets_lost_yesterday_, utterances_exceeding_packet_loss_threshold_today_, utterances_exceeding_packet_loss_threshold_yesterday_, today_);
-   
-   return(CTRLM_RF4CE_LEN_VOICE_METRICS);
 }
 
 void ctrlm_obj_controller_rf4ce_t::property_write_firmware_updated(void) {
@@ -2602,144 +1474,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_time_last_checkin_for_device_
    return(CTRLM_RF4CE_LEN_TIME_LAST_CHECKIN_FOR_DEVICE_UPDATE);
 }
 
-guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_command_status(guchar *data, guchar length) {
-   if(length > CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   errno_t safec_rc = -1;
-
-   switch(data[0]) {
-      case VOICE_COMMAND_STATUS_PENDING: LOG_INFO("%s: PENDING\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_TIMEOUT: LOG_INFO("%s: TIMEOUT\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_OFFLINE: LOG_INFO("%s: OFFLINE\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_SUCCESS: LOG_INFO("%s: SUCCESS\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_FAILURE: LOG_INFO("%s: FAILURE\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_NO_CMDS: LOG_INFO("%s: NO CMDS\n", __FUNCTION__); break;
-      #ifdef USE_VOICE_SDK
-      case VOICE_COMMAND_STATUS_TV_AVR_CMD: LOG_INFO("%s: TV_AVR_CMD\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_MIC_CMD:    LOG_INFO("%s: MIC_CMD\n",    __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_AUDIO_CMD:  LOG_INFO("%s: AUDIO_CMD\n",  __FUNCTION__); break;
-      #endif
-      default:                           LOG_ERROR("%s: INVALID STATUS 0x%02X\n", __FUNCTION__, data[0]); return 0;
-   }
-   #ifdef USE_VOICE_SDK
-   if(data[0] >= VOICE_COMMAND_STATUS_TV_AVR_CMD && controller_type_ != RF4CE_CONTROLLER_TYPE_XR19) {
-      // Maintain compatibility for controllers that don't support TV/AVR, MIC, AUDIO cmds
-      data[0] = VOICE_COMMAND_STATUS_SUCCESS;
-      safec_rc = memset_s(data+1, length - 1, 0, length - 1);
-      ERR_CHK(safec_rc);
-   }
-   #endif
-
-   safec_rc = memcpy_s(voice_command_status_, sizeof(voice_command_status_), data,length );
-   ERR_CHK(safec_rc);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_command_status(guchar *data, guchar length) {
-   if(length > CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   // Load the data from the controller object
-   errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, voice_command_status_,length );
-   ERR_CHK(safec_rc);
-
-#ifdef USE_VOICE_SDK
-   LOG_INFO("%s: %s", __FUNCTION__, ctrlm_voice_command_status_str((ctrlm_voice_command_status_t)data[0]));
-   if(data[0] == VOICE_COMMAND_STATUS_TV_AVR_CMD) {
-      LOG_RAW(" -- cmd <%s>", ctrlm_voice_command_status_tv_avr_str((ctrlm_voice_tv_avr_cmd_t)data[2]));
-      switch(data[2]) {
-         case CTRLM_VOICE_TV_AVR_CMD_POWER_OFF:
-         case CTRLM_VOICE_TV_AVR_CMD_POWER_ON: {
-            LOG_RAW(", toggle fallback <%s>", (data[1] & 0x01 ? "YES" : "NO"));
-            break;
-         }
-         case CTRLM_VOICE_TV_AVR_CMD_VOLUME_UP:
-         case CTRLM_VOICE_TV_AVR_CMD_VOLUME_DOWN: {
-            LOG_RAW(", ir repeats <%u>", data[3]);
-            break;
-         }
-         default: break;
-      }
-   }
-   LOG_RAW("\n");
-#else
-   switch(voice_command_status_[0]) {
-      case VOICE_COMMAND_STATUS_PENDING: LOG_INFO("%s: PENDING\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_TIMEOUT: LOG_INFO("%s: TIMEOUT\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_OFFLINE: LOG_INFO("%s: OFFLINE\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_SUCCESS: LOG_INFO("%s: SUCCESS\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_FAILURE: LOG_INFO("%s: FAILURE\n", __FUNCTION__); break;
-      case VOICE_COMMAND_STATUS_NO_CMDS: LOG_INFO("%s: NO CMDS\n", __FUNCTION__); break;
-      default:                           LOG_WARN("%s: UNKNOWN 0x%02X\n", __FUNCTION__, data[0]); break;
-   }
-#endif
-
-   if(voice_command_status_[0] != VOICE_COMMAND_STATUS_PENDING) { // Reset back to "no cmds" after the controller has read the result
-      voice_command_status_[0] = VOICE_COMMAND_STATUS_NO_CMDS;
-      safec_rc = memset_s(&voice_command_status_[1], sizeof(voice_command_status_)-1, 0, sizeof(voice_command_status_)-1);
-      ERR_CHK(safec_rc);
-      #ifdef USE_VOICE_SDK
-      ctrlm_get_voice_obj()->voice_controller_command_status_read(network_id_get(), controller_id_get());
-      #endif
-   }
-
-   return(length);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_voice_command_length(guchar voice_command_length) {
-   if(voice_command_length & 1) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return;
-   }
-   
-   if(voice_command_length_ != voice_command_length) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
-   }
-   
-   // Store the data on the controller object
-   voice_command_length_ = (voice_command_length_t)voice_command_length;
-
-   switch(voice_command_length_) {
-      case VOICE_COMMAND_LENGTH_CONTROLLER_DEFAULT:  LOG_INFO("%s: controller default\n", __FUNCTION__); break;
-      case VOICE_COMMAND_LENGTH_PROFILE_NEGOTIATION: LOG_INFO("%s: profile negotiation\n", __FUNCTION__); break;
-      case VOICE_COMMAND_LENGTH_VALUE:
-      default:                                       LOG_INFO("%s: %u samples\n", __FUNCTION__, voice_command_length_); break;
-   }
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_command_length(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_LENGTH) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   guchar voice_command_length = data[0];
-   property_write_voice_command_length(voice_command_length);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_command_length(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_LENGTH) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0]  = voice_command_length_;
-
-   switch(voice_command_length_) {
-      case VOICE_COMMAND_LENGTH_CONTROLLER_DEFAULT:  LOG_INFO("%s: controller default\n", __FUNCTION__); break;
-      case VOICE_COMMAND_LENGTH_PROFILE_NEGOTIATION: LOG_INFO("%s: profile negotiation\n", __FUNCTION__); break;
-      case VOICE_COMMAND_LENGTH_VALUE:
-      default:                                       LOG_INFO("%s: %u samples\n", __FUNCTION__, voice_command_length_); break;
-   }
-   
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_LENGTH);
-}
-
 void ctrlm_obj_controller_rf4ce_t::property_write_maximum_utterance_length(guint16 maximum_utterance_length) {
    if(maximum_utterance_length > 0 && maximum_utterance_length < 100) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
@@ -2750,7 +1484,7 @@ void ctrlm_obj_controller_rf4ce_t::property_write_maximum_utterance_length(guint
    // Store the data on the controller object
    utterance_duration_max_ = maximum_utterance_length;
    if(utterance_duration_max != maximum_utterance_length) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
+      rib_entries_updated_ = true;
    }
 
    LOG_INFO("%s: %u ms\n", __FUNCTION__, utterance_duration_max_);
@@ -2801,7 +1535,7 @@ void ctrlm_obj_controller_rf4ce_t::property_write_voice_command_encryption(voice
    }
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    if(voice_command_encryption_ != voice_command_encryption) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
+      rib_entries_updated_ = true;
    }
    
    // Store the data on the controller object
@@ -2849,7 +1583,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_command_encryption(guch
 void ctrlm_obj_controller_rf4ce_t::property_write_max_voice_data_retry(guchar max_voice_data_retry_attempts) {
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    if(voice_data_retry_max_ != max_voice_data_retry_attempts) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
+      rib_entries_updated_ = true;
    }
    
    // Store the data on the controller object
@@ -2901,7 +1635,7 @@ void ctrlm_obj_controller_rf4ce_t::property_write_max_voice_csma_backoff(guchar 
    }
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    if(voice_csma_backoff_max_ != max_voice_csma_backoffs) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
+      rib_entries_updated_ = true;
    }
    
    // Store the data on the controller object
@@ -2949,7 +1683,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_max_voice_csma_backoff(guchar
 void ctrlm_obj_controller_rf4ce_t::property_write_min_voice_data_backoff(guchar min_voice_data_backoff_exp) {
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    if(voice_data_backoff_exp_min_ != min_voice_data_backoff_exp) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
+      rib_entries_updated_ = true;
    }
    
    // Store the data on the controller object
@@ -2994,48 +1728,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_min_voice_data_backoff(guchar
    return(CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF);
 }
 
-void ctrlm_obj_controller_rf4ce_t::property_write_voice_ctrl_audio_profiles(guint16 audio_profiles_ctrl) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES];
-   data[0] = (guchar)audio_profiles_ctrl;
-   data[1] = (guchar)(audio_profiles_ctrl >> 8);
-   property_write_voice_ctrl_audio_profiles(data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_ctrl_audio_profiles(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   guint16 audio_profiles_ctrl = ((data[1] << 8) | data[0]);
-   
-   if(audio_profiles_ctrl_ != audio_profiles_ctrl) {
-      // Store the data on the controller object
-      audio_profiles_ctrl_ = audio_profiles_ctrl;
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_audio_profiles(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_VOICE_CTRL_AUDIO_PROFILES, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES, data);
-      }
-   }
-
-   LOG_INFO("%s: 0x%04X\n", __FUNCTION__, audio_profiles_ctrl_);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_ctrl_audio_profiles(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0]  = (guchar) (audio_profiles_ctrl_);
-   data[1]  = (guchar) (audio_profiles_ctrl_ >> 8);
-   
-   LOG_INFO("%s: 0x%04X\n", __FUNCTION__, audio_profiles_ctrl_);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
-}
-
 guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_targ_audio_profiles(guchar *data, guchar length) {
    if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
@@ -3043,11 +1735,12 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_targ_audio_profiles(guc
    }
 
    guint16 audio_profiles_ctrl = VOICE_AUDIO_PROFILE_ADPCM_16BIT_16KHZ;
+   guint16 audio_profiles_ctrl_support = (guint16)audio_profiles_ctrl_.get_profiles();
 
    #ifdef USE_VOICE_SDK
    guint16 audio_profiles_targ = audio_profiles_targ_get(); // RF4CE Network profiles supported
 
-   if(audio_profiles_targ & audio_profiles_ctrl_ & VOICE_AUDIO_PROFILE_OPUS_16BIT_16KHZ)  { // network and controller support OPUS
+   if(audio_profiles_targ & audio_profiles_ctrl_support & VOICE_AUDIO_PROFILE_OPUS_16BIT_16KHZ)  { // network and controller support OPUS
       audio_profiles_ctrl = VOICE_AUDIO_PROFILE_OPUS_16BIT_16KHZ;
    }
    #endif
@@ -3061,98 +1754,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_targ_audio_profiles(guc
    return(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_CTRL_AUDIO_PROFILES);
 }
 
-void ctrlm_obj_controller_rf4ce_t::property_write_voice_statistics(guint32 voice_sessions_activated, guint32 audio_data_tx_time) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS];
-   data[0] = (guchar)(voice_sessions_activated);
-   data[1] = (guchar)(voice_sessions_activated >> 8);
-   data[2] = (guchar)(voice_sessions_activated >> 16);
-   data[3] = (guchar)(voice_sessions_activated >> 24);
-   data[4] = (guchar)(audio_data_tx_time);
-   data[5] = (guchar)(audio_data_tx_time >> 8);
-   data[6] = (guchar)(audio_data_tx_time >> 16);
-   data[7] = (guchar)(audio_data_tx_time >> 24);
-   property_write_voice_statistics(data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_statistics(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   guint32 voice_sessions_activated = (data[3] << 24) | (data[2] << 16) | (data[1] << 8) | data[0];
-   guint32 audio_data_tx_time       = (data[7] << 24) | (data[6] << 16) | (data[5] << 8) | data[4];
-   
-   if(voice_statistics_.voice_sessions_activated != voice_sessions_activated ||
-      voice_statistics_.audio_data_tx_time       != audio_data_tx_time) {
-      // Store the data on the controller object
-      voice_statistics_.voice_sessions_activated = voice_sessions_activated;
-      voice_statistics_.audio_data_tx_time       = audio_data_tx_time;
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_voice_statistics(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_VOICE_STATISTICS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS, data);
-      }
-   }
-
-   LOG_INFO("%s: sessions activated %u\n", __FUNCTION__, voice_statistics_.voice_sessions_activated);
-   LOG_INFO("%s: audio data tx time %u\n", __FUNCTION__, voice_statistics_.audio_data_tx_time);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_statistics(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0]  = (guchar) (voice_statistics_.voice_sessions_activated);
-   data[1]  = (guchar) (voice_statistics_.voice_sessions_activated >> 8);
-   data[2]  = (guchar) (voice_statistics_.voice_sessions_activated >> 16);
-   data[3]  = (guchar) (voice_statistics_.voice_sessions_activated >> 24);
-   data[4]  = (guchar) (voice_statistics_.audio_data_tx_time);
-   data[5]  = (guchar) (voice_statistics_.audio_data_tx_time >> 8);
-   data[6]  = (guchar) (voice_statistics_.audio_data_tx_time >> 16);
-   data[7]  = (guchar) (voice_statistics_.audio_data_tx_time >> 24);
-
-   LOG_INFO("%s: sessions activated %u\n", __FUNCTION__, voice_statistics_.voice_sessions_activated);
-   LOG_INFO("%s: audio data tx time %u\n", __FUNCTION__, voice_statistics_.audio_data_tx_time);
-   
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_STATISTICS);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_rib_entries_updated(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RIB_ENTRIES_UPDATED) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = rib_entries_updated_;
-
-   switch(rib_entries_updated_) {
-      case RIB_ENTRIES_UPDATED_FALSE: { 
-         LOG_INFO("%s: FALSE\n", __FUNCTION__);
-         break;
-      }
-      case RIB_ENTRIES_UPDATED_TRUE: {
-         LOG_INFO("%s: TRUE\n", __FUNCTION__);
-         rib_entries_updated_ = RIB_ENTRIES_UPDATED_FALSE;
-         break;
-      }
-      case RIB_ENTRIES_UPDATED_STOP: {
-         LOG_INFO("%s: STOP\n", __FUNCTION__);
-         break;
-      }
-      default: {
-         LOG_WARN("%s: UNKNOWN 0x%02X\n", __FUNCTION__, rib_entries_updated_);
-         rib_entries_updated_ = RIB_ENTRIES_UPDATED_FALSE;
-         break;
-      }
-   }
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_RIB_ENTRIES_UPDATED);
-}
-
 void ctrlm_obj_controller_rf4ce_t::property_write_rib_update_check_interval(guint16 rib_update_check_interval) {
    if(rib_update_check_interval > 8760) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
@@ -3160,7 +1761,7 @@ void ctrlm_obj_controller_rf4ce_t::property_write_rib_update_check_interval(guin
    }
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    if(rib_update_check_interval_ != rib_update_check_interval) {
-      rib_entries_updated_ = RIB_ENTRIES_UPDATED_TRUE;
+      rib_entries_updated_ = true;
    }
    
    // Store the data on the controller object
@@ -3204,46 +1805,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_rib_update_check_interval(guc
    LOG_INFO("%s: %u hours\n", __FUNCTION__, rib_update_check_interval);
 
    return(CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_session_statistics(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_STATISTICS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Store the data on the controller object
-   guint16 total_packets, total_dropped, drop_retry, drop_buffer, mac_retries, network_retries, cca_sense;
-   float drop_percent, retry_percent, buffer_percent;
-   total_packets   = (data[1]  << 8) | data[0];
-   drop_retry      = (data[3]  << 8) | data[2];
-   drop_buffer     = (data[5]  << 8) | data[4];
-   total_dropped   = drop_retry + drop_buffer;
-   drop_percent    = (100.0 * total_dropped / total_packets);
-   retry_percent   = (100.0 * drop_retry    / total_packets);
-   buffer_percent  = (100.0 * drop_buffer   / total_packets);
-   // Interference indicators
-   mac_retries     = (data[7]  << 8) | data[6];
-   network_retries = (data[9]  << 8) | data[8];
-   cca_sense       = (data[11] << 8) | data[10];
-   
-   // Write this data to the database??
-
-   LOG_INFO("%s: Total Packets %u Dropped %u (%5.2f%%) due to Retry %u (%5.2f%%) Buffer %u (%5.2f%%)\n", __FUNCTION__, total_packets, total_dropped, drop_percent, drop_retry, retry_percent, drop_buffer, buffer_percent);
-
-   if(mac_retries != 0xFFFF || network_retries != 0xFFFF || cca_sense != 0xFFFF) {
-       LOG_INFO("%s: Total MAC Retries %u Network Retries %u CCA Sense Failures %u\n", __FUNCTION__, mac_retries, network_retries, cca_sense);
-   }
-   // Send data to control manager
-   ctrlm_voice_notify_stats_session(network_id_get(), controller_id_get(), total_packets, drop_retry, drop_buffer, mac_retries, network_retries, cca_sense);
-
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_session_statistics(guchar *data, guchar length) {
-   // Load the data from the controller object
-   LOG_INFO("%s: NOT IMPLEMENTED\n", __FUNCTION__);
-   return(0);
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_opus_encoding_params(guchar *data, guchar length) {
@@ -3307,213 +1868,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_session_qos(guchar *dat
 
    return(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS);
    #endif
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_update_version_bootloader(guchar major, guchar minor, guchar revision, guchar patch) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING];
-   data[0] = major;
-   data[1] = minor;
-   data[2] = revision;
-   data[3] = patch;
-   property_write_update_version_bootloader(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_update_version_bootloader(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   if(version_bootloader_.major    != data[0] ||
-      version_bootloader_.minor    != data[1] ||
-      version_bootloader_.revision != data[2] ||
-      version_bootloader_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_bootloader_.major    = data[0];
-      version_bootloader_.minor    = data[1];
-      version_bootloader_.revision = data[2];
-      version_bootloader_.patch    = data[3];
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_update_version_bootloader(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_UPDATE_VERSIONING_BOOTLOADER, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING, data);
-      }
-   }
-   
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_bootloader_.major, version_bootloader_.minor, version_bootloader_.revision, version_bootloader_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_update_version_bootloader(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_bootloader_.major;
-   data[1] = version_bootloader_.minor;
-   data[2] = version_bootloader_.revision;
-   data[3] = version_bootloader_.patch;
-   
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_bootloader_.major, version_bootloader_.minor, version_bootloader_.revision, version_bootloader_.patch);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_update_version_golden(guchar major, guchar minor, guchar revision, guchar patch) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING];
-   data[0] = major;
-   data[1] = minor;
-   data[2] = revision;
-   data[3] = patch;
-   property_write_update_version_golden(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_update_version_golden(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   if(version_golden_.major    != data[0] ||
-      version_golden_.minor    != data[1] ||
-      version_golden_.revision != data[2] ||
-      version_golden_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_golden_.major    = data[0];
-      version_golden_.minor    = data[1];
-      version_golden_.revision = data[2];
-      version_golden_.patch    = data[3];
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_update_version_golden(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_UPDATE_VERSIONING_GOLDEN, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING, data);
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_golden_.major, version_golden_.minor, version_golden_.revision, version_golden_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_update_version_golden(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_golden_.major;
-   data[1] = version_golden_.minor;
-   data[2] = version_golden_.revision;
-   data[3] = version_golden_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_golden_.major, version_golden_.minor, version_golden_.revision, version_golden_.patch);
-   
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_update_version_audio_data(guchar major, guchar minor, guchar revision, guchar patch) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING];
-   data[0] = major;
-   data[1] = minor;
-   data[2] = revision;
-   data[3] = patch;
-   property_write_update_version_audio_data(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_update_version_audio_data(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   if(version_audio_data_.major    != data[0] ||
-      version_audio_data_.minor    != data[1] ||
-      version_audio_data_.revision != data[2] ||
-      version_audio_data_.patch    != data[3]) {
-      // Store the data on the controller object
-      version_audio_data_.major    = data[0];
-      version_audio_data_.minor    = data[1];
-      version_audio_data_.revision = data[2];
-      version_audio_data_.patch    = data[3];
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_update_version_audio_data(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_UPDATE_VERSIONING, CTRLM_RF4CE_RIB_ATTR_INDEX_UPDATE_VERSIONING_AUDIO_DATA, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING, data);
-
-      }
-   }
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_audio_data_.major, version_audio_data_.minor, version_audio_data_.revision, version_audio_data_.patch);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_update_version_audio_data(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // Load the data from the controller object
-   data[0] = version_audio_data_.major;
-   data[1] = version_audio_data_.minor;
-   data[2] = version_audio_data_.revision;
-   data[3] = version_audio_data_.patch;
-
-   LOG_INFO("%s: %u.%u.%u.%u\n", __FUNCTION__, version_audio_data_.major, version_audio_data_.minor, version_audio_data_.revision, version_audio_data_.patch);
-   
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_VERSIONING);
-}
-
-void ctrlm_obj_controller_rf4ce_t::property_write_product_name(const char *name) {
-   guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME];
-   if(name == NULL) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return;
-   }
-
-   errno_t safec_rc = strncpy_s((char *)data, sizeof(data), name, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME-1);
-   ERR_CHK(safec_rc);
-   data[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME - 1] = '\0';
-   property_write_product_name(data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_write_product_name(guchar *data, guchar length) {
-   if(data == NULL || length != CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   if(0 != strncmp(product_name_, (const char *)data, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME)) {
-      // Store the data on the controller object
-      errno_t safec_rc = strcpy_s(product_name_, sizeof(product_name_), (const char *)data);
-      ERR_CHK(safec_rc);
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_product_name(network_id_get(), controller_id_get(), data, length);
-         obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_PRODUCT_NAME, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME, data);
-      }
-
-      controller_chipset_from_product_name();
-
-      has_battery_ = ctrlm_rf4ce_has_battery(controller_type_);
-      has_dsp_     = ctrlm_rf4ce_has_dsp(controller_type_);
-   }
-
-   LOG_INFO("%s: <%s>\n", __FUNCTION__, product_name_);
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_product_name(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   // Load the data from the controller object
-   errno_t safec_rc = strcpy_s((char *)data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, product_name_);
-   ERR_CHK(safec_rc);
-
-   LOG_INFO("%s: <%s>\n", __FUNCTION__, product_name_);
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME);
 }
 
 void ctrlm_obj_controller_rf4ce_t::property_write_download_rate(download_rate_t download_rate) {
@@ -3644,52 +1998,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_data_request_wait_time(guchar
    return(CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME);
 }
 
-void ctrlm_obj_controller_rf4ce_t::property_write_ir_rf_database_status(guchar status) {
-   // ROBIN -- Add polling method if any bits are set
-   if(controller_type_ == RF4CE_CONTROLLER_TYPE_XR19) {
-      if((ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) || (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) || (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE)) {
-         LOG_INFO("%s: IR-RF Database Status has bits set for XR19 (0x%02X), adding polling action\n", __FUNCTION__, ir_rf_database_status_);
-         push_ir_codes();
-      }
-      return;
-   }
-   if(status & IR_RF_DATABASE_STATUS_RESERVED) {
-      LOG_ERROR("%s: INVALID PARAMETERS - Reserved bit is set 0x%02X\n", __FUNCTION__, status);
-      return;
-   } else if((status & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO) && (status & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES)) {
-      LOG_ERROR("%s: Status Download <YES and NO> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-             __FUNCTION__, (status & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO", 
-            (status & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",
-            (status & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-      return;
-   } else if(0 == (status & (IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO | IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES))) {
-      LOG_ERROR("%s: Status Download <None> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-             __FUNCTION__, (status & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO",
-            (status & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",
-            (status & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-      return;
-   } else if((status & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) && ((status & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) || (status & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE))) {
-      LOG_ERROR("%s: Status Download <%s> Tx Ir <%s> Force <%s> 5-Digit IRDB Code <SET and CLEAR>\n", 
-             __FUNCTION__, (status & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO");
-      return;
-   } else if(((status & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) || (status & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) || (status & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE)) && (status & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES)) {
-      LOG_ERROR("%s: Status Download <YES> Set OR Clear 5-Digit IRDB Codes <YES> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", __FUNCTION__,
-            (status & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO", (status & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",
-            (status & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-      return;
-   }
-
-   // Store the data on the controller object
-   ir_rf_database_status_ = status;
-   obj_network_rf4ce_->req_process_rib_export(controller_id_get(), CTRLM_HAL_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE_STATUS, CTRLM_RF4CE_RIB_ATTR_INDEX_GENERAL, CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS, &status);
-
-   LOG_INFO("%s: Status Download <%s> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-         __FUNCTION__, (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO",
-         (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO",
-         (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",(ir_rf_database_status_ & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-}
-
-static gboolean ir_rf_database_status_download_timeout(gpointer data) {
+gboolean ir_rf_database_status_download_timeout(gpointer data) {
    LOG_INFO("%s\n", __FUNCTION__);
    ctrlm_obj_controller_rf4ce_t *rf4ce_controller = (ctrlm_obj_controller_rf4ce_t *)data;
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_CONTROLLER, (ctrlm_msg_handler_controller_t)&ctrlm_obj_controller_rf4ce_t::ir_rf_database_status_download_reset, NULL, 0, rf4ce_controller);
@@ -3699,66 +2008,6 @@ static gboolean ir_rf_database_status_download_timeout(gpointer data) {
 void ctrlm_obj_controller_rf4ce_t::ir_rf_database_status_download_reset(void *data, int size) {
    LOG_INFO("%s: Resetting IR RF Status Download flag.\n", __FUNCTION__);
    ir_rf_database_status_ = IR_RF_DATABASE_STATUS_DEFAULT;
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_ir_rf_database_status(guchar *data, guchar length, bool target) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   
-   // ROBIN -- Clear IR-RF database status
-   if(controller_type_ == RF4CE_CONTROLLER_TYPE_XR19) {
-      if(target) {
-         data[0] = IR_RF_DATABASE_STATUS_DEFAULT;
-      } else {
-         data[0] = ir_rf_database_status_;
-         ir_rf_database_status_ = IR_RF_DATABASE_STATUS_DEFAULT;
-      }
-      return(CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS);
-   }
-
-   // Load the data from the controller object
-   data[0] = ir_rf_database_status_;
-   
-   // HACK for XR15-704
-#ifdef XR15_704
-   if(needs_reset_ && !ctrlm_device_update_is_controller_updating(network_id_get(), controller_id_get(), true)) {
-      if(ctrlm_device_update_xr15_crash_update_get()) {
-         LOG_INFO("%s: ENTERING XR15 CRASH CODE: XR15-10 running less then 2.0.0.0, need to force reboot for device update... Setting proper IR RF Status bits\n", __FUNCTION__);
-         data[0] = IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES | IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD;
-         LOG_INFO("%s: MODIFIED Status Download <%s> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-               __FUNCTION__, (data[0] & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) ? "YES" : "NO", (data[0] & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO",
-               (data[0] & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO", (data[0] & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO",
-               (data[0] & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",(data[0] & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-      }
-   }
-#endif
-   // HACK for XR15-704
-
-   if((ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO) && (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES)) {
-      LOG_WARN("%s: Status Download <YES and NO> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-             __FUNCTION__, (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO", 
-            (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",
-            (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-   } else if(0 == (ir_rf_database_status_ & (IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO | IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES))) {
-      LOG_WARN("%s: Status Download <None> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s>Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-             __FUNCTION__, (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO",
-            (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",
-            (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-   } else {
-      LOG_INFO("%s: Status Download <%s> Tx Ir <%s> Force <%s> Download TV 5-Digit IRDB Code <%s> Download AVR 5-Digit IRDB Code <%s> Clear All 5-Digit IRDB Codes <%s>\n", 
-            __FUNCTION__, (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR) ? "YES" : "NO",
-            (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD) ? "YES" : "NO", (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE) ? "YES" : "NO",
-            (ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE) ? "YES" : "NO",(ir_rf_database_status_ & IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES) ? "YES" : "NO");
-   }
-
-   if(ir_rf_database_status_ & IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES) {
-      LOG_INFO("%s: Creating timer for download flag reset\n", __FUNCTION__);
-      ctrlm_timeout_create(200, ir_rf_database_status_download_timeout, (void *)this);
-   }
-   
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE_STATUS);
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_ir_rf_database(guchar index, guchar *data, guchar length) {
@@ -3771,8 +2020,8 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_ir_rf_database(guchar index,
             return(length);
          }
       }
-      ir_rf_database_status_ |=   IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES;
-      ir_rf_database_status_ &= ~(IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO);
+      ir_rf_database_status_ |=   ctrlm_rf4ce_ir_rf_database_status_t::flag::DB_DOWNLOAD_YES;
+      ir_rf_database_status_ &= ~(ctrlm_rf4ce_ir_rf_database_status_t::flag::DB_DOWNLOAD_NO);
    }
    return(obj_network_rf4ce_->property_write_ir_rf_database(index, data, length));
 }
@@ -3943,93 +2192,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_validation_configuration(guch
    return(CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION);
 }
 
-guchar ctrlm_obj_controller_rf4ce_t::property_write_controller_irdb_status(guchar *data, guchar length) {
-   if((length != CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS) && (length != CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS_MINUS_LOAD_STATUS_BYTES)) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   controller_irdb_status_t controller_irdb_status;
-
-   controller_irdb_status.flags                = data[0];
-   controller_irdb_status.irdb_string_tv[0]    = data[1];
-   controller_irdb_status.irdb_string_tv[1]    = data[2];
-   controller_irdb_status.irdb_string_tv[2]    = data[3];
-   controller_irdb_status.irdb_string_tv[3]    = data[4];
-   controller_irdb_status.irdb_string_tv[4]    = data[5];
-   controller_irdb_status.irdb_string_tv[5]    = data[6];
-   controller_irdb_status.irdb_string_tv[6]    = '\0';
-   controller_irdb_status.irdb_string_avr[0]   = data[7];
-   controller_irdb_status.irdb_string_avr[1]   = data[8];
-   controller_irdb_status.irdb_string_avr[2]   = data[9];
-   controller_irdb_status.irdb_string_avr[3]   = data[10];
-   controller_irdb_status.irdb_string_avr[4]   = data[11];
-   controller_irdb_status.irdb_string_avr[5]   = data[12];
-   controller_irdb_status.irdb_string_avr[6]   = '\0';
-   if(length == CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS) {
-      controller_irdb_status.irdb_load_status_tv  = data[13];
-      controller_irdb_status.irdb_load_status_avr = data[14];
-   } else {
-      data[13] = controller_irdb_status.irdb_load_status_tv  = 0;
-      data[14] = controller_irdb_status.irdb_load_status_avr = 0;
-      LOG_INFO("%s: Length <%d> does not include load status bytes.\n", __FUNCTION__, length);
-   }
-
-   if(controller_irdb_status_.flags != controller_irdb_status.flags || memcmp(controller_irdb_status_.irdb_string_tv,  controller_irdb_status.irdb_string_tv, 6)
-                                                            || memcmp(controller_irdb_status_.irdb_string_avr, controller_irdb_status.irdb_string_avr, 6)
-                                                            || (controller_irdb_status_.irdb_load_status_tv != controller_irdb_status.irdb_load_status_tv)
-                                                            || (controller_irdb_status_.irdb_load_status_avr != controller_irdb_status.irdb_load_status_avr)
-                                                            || obj_network_rf4ce_->is_ir_rf_database_new()) {
-      // Store the data on the controller object
-      controller_irdb_status_ = controller_irdb_status;
-      if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-         ctrlm_db_rf4ce_write_controller_irdb_status(network_id_get(), controller_id_get(), data, CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS);
-
-         //Needed by target Irdb status to know if we need to update
-         controller_irdb_status_is_new_ = true;
-      }
-   }
-
-   LOG_INFO("%s: Flags 0x%02X TV %s AVR %s TV_Load_Status <%s> AVR_Load_Status <%s>\n", __FUNCTION__, controller_irdb_status_.flags, controller_irdb_status_.irdb_string_tv, controller_irdb_status_.irdb_string_avr,
-                                                                          controller_irdb_status_load_status_str(controller_irdb_status_.irdb_load_status_tv),
-                                                                          controller_irdb_status_load_status_str(controller_irdb_status_.irdb_load_status_avr));
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_controller_irdb_status(guchar *data, guchar length) {
-   if((length != CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS) && (length != CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS_MINUS_LOAD_STATUS_BYTES)) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-   // Load the data from the controller object
-   data[0]  = controller_irdb_status_.flags;
-   data[1]  = controller_irdb_status_.irdb_string_tv[0];
-   data[2]  = controller_irdb_status_.irdb_string_tv[1];
-   data[3]  = controller_irdb_status_.irdb_string_tv[2];
-   data[4]  = controller_irdb_status_.irdb_string_tv[3];
-   data[5]  = controller_irdb_status_.irdb_string_tv[4];
-   data[6]  = controller_irdb_status_.irdb_string_tv[5];
-   data[7]  = controller_irdb_status_.irdb_string_avr[0];
-   data[8]  = controller_irdb_status_.irdb_string_avr[1];
-   data[9]  = controller_irdb_status_.irdb_string_avr[2];
-   data[10] = controller_irdb_status_.irdb_string_avr[3];
-   data[11] = controller_irdb_status_.irdb_string_avr[4];
-   data[12] = controller_irdb_status_.irdb_string_avr[5];
-   if(length == CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS) {
-      data[13] = controller_irdb_status_.irdb_load_status_tv;
-      data[14] = controller_irdb_status_.irdb_load_status_avr;
-   } else {
-      controller_irdb_status_.irdb_load_status_tv  = 0;
-      controller_irdb_status_.irdb_load_status_avr = 0;
-      LOG_INFO("%s: Length <%d> does not include load status bytes.\n", __FUNCTION__, length);
-   }
-
-
-   LOG_INFO("%s: Flags 0x%02X TV %s AVR %s TV_Load_Status <%s> AVR_Load_Status <%s>\n", __FUNCTION__, controller_irdb_status_.flags, controller_irdb_status_.irdb_string_tv, controller_irdb_status_.irdb_string_avr,
-                                                                          controller_irdb_status_load_status_str(controller_irdb_status_.irdb_load_status_tv),
-                                                                          controller_irdb_status_load_status_str(controller_irdb_status_.irdb_load_status_avr));
-   return(length);
-}
-
 guchar ctrlm_obj_controller_rf4ce_t::property_write_irdb_entry_id_name_tv(guchar *data, guchar length) {
    gchar irdb_entry_id_name_tv[CTRLM_RF4CE_RIB_ATTR_LEN_IRDB_ENTRY_ID_NAME];
    if(length <= 0) {
@@ -4186,148 +2348,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_device_id(guchar *data, gucha
 
 }
 
-guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_dump(guchar index, guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_DUMP) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   int buf_index = 0;
-   guint16 memory_size = 0;
-   errno_t safec_rc = -1;
-
-   LOG_INFO("%s: Index %u: %d bytes received\n", __FUNCTION__, index, length);
-
-    // first chunk of data, Index 0 of memory dump RIB
-   if(index == 0) {
-      // check if ctrlm_db_rf4ce_write_file() was never called and memory was not freed
-      if (crash_dump_buf_ != NULL) {
-          LOG_WARN("%s: Not all the Remote Memory Dump data has been received!\n", __FUNCTION__);
-          ctrlm_hal_free(crash_dump_buf_);
-          crash_dump_buf_ = NULL;
-      }
-
-      memory_size = (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE + 1] << 8 |
-                     (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE];
-       // validate if Memory Size is in valid range
-       if(memory_size == 0 || memory_size > CTRLM_CRASH_DUMP_MAX_SIZE) {
-          LOG_ERROR("%s: Memory Size value %hu is bad\n", __FUNCTION__, memory_size);
-          return(0);
-       }
-
-       // perform extra checking if Reserved bytes are good
-       const guchar* data_end =  data + length - CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF;
-       if(data_end == (guchar *)find((const char*)data + CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF, (const char*)data_end, '\xFF')) {
-          LOG_ERROR("%s: Reserved bytes are bad\n", __FUNCTION__ );
-          ctrlm_print_data_hex(__FUNCTION__, data + CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF, length - CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF, 32);
-          return(0);
-       }
-
-       // normally memory  will be released in ctrlm_db_rf4ce_write_file() after write completes
-       crash_dump_buf_ = (guchar *)ctrlm_hal_malloc(memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE);
-       if(crash_dump_buf_ == NULL) {
-          LOG_ERROR("%s: Crash Dump Memory Allocation failed\n", __FUNCTION__);
-          return(0);
-       }
-       crash_dump_expected_size_ = memory_size;
-       crash_dump_size_          = 0;
-
-       guint16 memory_id = (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_IDENTIFIER + 1] << 8 |
-                           (guint16)data[CTRLM_CRASH_DUMP_OFFSET_MEMORY_IDENTIFIER];
-
-       LOG_INFO("%s: Expected crash dump size %hu bytes. Memory Identifier 0x%04X\n",
-                     __FUNCTION__, memory_size,  memory_id);
-       // Fill out File Header
-       // signature XDMP
-       safec_rc = strcpy_s((char*)crash_dump_buf_, memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE, "XDMP");
-       if(safec_rc != EOK) {
-         ERR_CHK(safec_rc);
-         ctrlm_hal_free(crash_dump_buf_);
-         crash_dump_buf_ = NULL;
-         return(0);
-       }
-       // header size
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HDR_SIZE]     = CTRLM_CRASH_DUMP_FILE_HDR_SIZE & 0xFF;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HDR_SIZE + 1] = CTRLM_CRASH_DUMP_FILE_HDR_SIZE >> 8;
-       // device ID
-       safec_rc = strncpy_s((char *)crash_dump_buf_ + CTRLM_CRASH_DUMP_FILE_OFFSET_DEVICE_ID, memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE - CTRLM_CRASH_DUMP_FILE_OFFSET_DEVICE_ID, ctrlm_rf4ce_controller_type_str(controller_type_), CTRLM_CRASH_DUMP_FILE_LEN_DEVICE_ID);
-       if(safec_rc != EOK) {
-         ERR_CHK(safec_rc);
-         ctrlm_hal_free(crash_dump_buf_);
-         crash_dump_buf_ = NULL;
-         return(0);
-       }
-       // HW Version
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER]     = version_hardware_.manufacturer << 4 | version_hardware_.model;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER + 1] = version_hardware_.hw_revision;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER + 2] = version_hardware_.lot_code >> 8;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER + 3] = version_hardware_.lot_code & 0xFF;
-       // SW Version
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_SW_VER]     = version_software_.major;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_SW_VER + 1] = version_software_.minor;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_SW_VER + 2] = version_software_.revision;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_SW_VER + 3] = version_software_.patch;
-       // Num dumps in file
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_NUM_DUMPS]     = 1; // for now file is written when first dump is received
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_OFFSET_NUM_DUMPS + 1] = 0;
-       // Remote Crash FILE Data Header
-       // Memory Identifier
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_MEM_ID]     = memory_id & 0xFF;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_MEM_ID + 1] = memory_id >> 8;
-       // offset to dump data
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA]     = (CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE) & 0xFF;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA + 1] = (CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE) >> 8  & 0xFF;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA + 2] = (CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE) >> 16 & 0xFF;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA + 3] = (CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE) >> 24;
-       // dump data length
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA_LEN]     = crash_dump_expected_size_ & 0xFF;
-       crash_dump_buf_[CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA_LEN + 1] = crash_dump_expected_size_ >> 8;
-
-       return(CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_DUMP);
-    }
-
-    // Process Index 1-255
-    // Sanity check
-    if(crash_dump_buf_ == NULL || crash_dump_expected_size_ <= crash_dump_size_) {
-       LOG_ERROR("%s: Unexpected data chunk!\n", __FUNCTION__ );
-       return(0); // something is really screwed!
-    }
-    // If the memory dump is not a multiple of 16, the final index of the memory dump MUST be structured as:
-    // Bytes (Memory Size % 16) - Memory Data
-    // Bytes 16 - (Memory Size % 16) - Reserved (0xFF)
-    if(crash_dump_size_ + length > crash_dump_expected_size_) {
-       length = crash_dump_expected_size_ % CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_DUMP;
-    }
-
-    buf_index = CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE + crash_dump_size_;
-    safec_rc = memcpy_s(&crash_dump_buf_[buf_index],memory_size + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE - buf_index, data, length);
-    if(safec_rc != EOK) {
-      ERR_CHK(safec_rc);
-      ctrlm_hal_free(crash_dump_buf_);
-      crash_dump_buf_ = NULL;
-      return(0);
-    }
-    crash_dump_size_ += length;
-
-    // Check if transfer is completed
-    if(crash_dump_size_ == crash_dump_expected_size_) {
-       // generate binary UUID
-       uuid_t uuid_binary_value;
-       uuid_generate(uuid_binary_value);
-       // convert to string
-       char uuid_string[CTRLM_RF4CE_LEN_UUID_STRING];
-       uuid_unparse_lower(uuid_binary_value, uuid_string);
-       // generate full path name
-       ostringstream dump_path;
-       dump_path << ctrlm_minidump_path_get() << '/' <<  uuid_string << ".xr";
-       // handle writing to file on db thread to release RIB thread
-       ctrlm_db_rf4ce_write_file(dump_path.str().c_str(), crash_dump_buf_, crash_dump_size_ + CTRLM_CRASH_DUMP_FILE_HDR_SIZE + CTRLM_CRASH_DUMP_DATA_HDR_SIZE);
-       crash_dump_buf_ = NULL;
-    }
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_DUMP);
-}
-
 guchar ctrlm_obj_controller_rf4ce_t::property_write_reboot_stats(guchar *data, guchar length) {
    if(length != CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_STATS) {
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
@@ -4368,7 +2388,7 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_reboot_stats(guchar *data, g
    print_remote_firmware_debug_info(RF4CE_PRINT_FIRMWARE_LOG_REBOOT);
 
    // Send data to vrex session
-   ctrlm_voice_notify_stats_reboot(network_id_get(), controller_id_get(), reboot_reason, data[1], battery_level_percent(data[1]));
+   ctrlm_voice_notify_stats_reboot(network_id_get(), controller_id_get(), reboot_reason, data[1], battery_level_percent(controller_type_, version_hardware_, data[1]));
    // Inform device update
    ctrlm_device_update_rf4ce_notify_reboot(network_id_get(), controller_id_get(), device_update_session_resume_support());
    //Save in the database
@@ -4391,9 +2411,9 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_memory_stats(guchar *data, g
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_read_mfg_test(guchar *data, guchar length) {
-   if((!haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) ||
-      (haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
-      LOG_ERROR("%s: INVALID Length for controller with HAPTICS <%s>\n", __FUNCTION__, (haptics_feedback_supported_ ? "ENABLED" : "DISABLED"));
+   if((!capabilities_.has_capability(ctrlm_controller_capabilities_t::capability::HAPTICS) && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) ||
+      ( capabilities_.has_capability(ctrlm_controller_capabilities_t::capability::HAPTICS) && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+      LOG_ERROR("%s: INVALID Length for controller with HAPTICS <%s>\n", __FUNCTION__, (capabilities_.has_capability(ctrlm_controller_capabilities_t::capability::HAPTICS) ? "ENABLED" : "DISABLED"));
       return(0);
    }
 
@@ -4401,9 +2421,9 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_mfg_test(guchar *data, guchar
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_mfg_test(guchar *data, guchar length) {
-   if((!haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) ||
-      (haptics_feedback_supported_ && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
-      LOG_ERROR("%s: INVALID Length for controller with HAPTICS <%s>\n", __FUNCTION__, (haptics_feedback_supported_ ? "ENABLED" : "DISABLED"));
+   if((!capabilities_.has_capability(ctrlm_controller_capabilities_t::capability::HAPTICS) && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) ||
+      ( capabilities_.has_capability(ctrlm_controller_capabilities_t::capability::HAPTICS) && length != CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+      LOG_ERROR("%s: INVALID Length for controller with HAPTICS <%s>\n", __FUNCTION__, (capabilities_.has_capability(ctrlm_controller_capabilities_t::capability::HAPTICS) ? "ENABLED" : "DISABLED"));
       return(0);
    }
 
@@ -4589,45 +2609,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_privacy(guchar *data, guchar 
    return(CTRLM_RF4CE_RIB_ATTR_LEN_PRIVACY);
 }
 
-guchar ctrlm_obj_controller_rf4ce_t::property_write_controller_capabilities(const guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   fmr_supported_              = (data[0] & CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR);
-   par_voice_supported_        = (data[0] & CONTROLLER_CAPABILITIES_BYTE0_FLAGS_PAR);
-   haptics_feedback_supported_ = (data[0] & CONTROLLER_CAPABILITIES_BYTE0_FLAGS_HAPTICS);
-
-   LOG_INFO("%s: Controller Capabilities. FMR <%s> PAR <%s> HAPTICS <%s>\n", __FUNCTION__, (fmr_supported_              ? "SUPPORTED" : "NOT SUPPORTED"), 
-                                                                                           (par_voice_supported_        ? "SUPPORTED" : "NOT SUPPORTED"),
-                                                                                           (haptics_feedback_supported_ ? "SUPPORTED" : "NOT SUPPORTED"));
-
-   if(!loading_db_ && validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS) { // write this data to the database
-      ctrlm_db_rf4ce_write_controller_capabilities(network_id_get(), controller_id_get(), data, length);
-   }
-   return(length);
-}
-
-guchar ctrlm_obj_controller_rf4ce_t::property_read_controller_capabilities(guchar *data, guchar length) {
-   if(length != CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES) {
-      LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
-      return(0);
-   }
-
-   errno_t safec_rc = memset_s(data, length , 0, length);
-   ERR_CHK(safec_rc);
-   data[0]  = (fmr_supported_              ? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_FMR:0);
-   data[0] += (par_voice_supported_        ? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_PAR:0);
-   data[0] += (haptics_feedback_supported_ ? CONTROLLER_CAPABILITIES_BYTE0_FLAGS_HAPTICS:0);
-
-   LOG_INFO("%s: Controller Capabilities. FMR <%s> PAR <%s> HAPTICS <%s>\n", __FUNCTION__, (fmr_supported_              ? "ENABLED" : "DISABLED"),
-                                                                                           (par_voice_supported_        ? "ENABLED" : "DISABLED"),
-                                                                                           (haptics_feedback_supported_ ? "ENABLED" : "DISABLED"));
-
-   return(CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_CAPABILITIES);
-}
-
 guchar ctrlm_obj_controller_rf4ce_t::property_write_far_field_configuration(guchar *data, guchar length) {
    return(obj_network_rf4ce_->property_write_far_field_configuration(data, length));
 }
@@ -4762,24 +2743,13 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_dsp_metrics(guchar *data, guc
 }
 
 void ctrlm_obj_controller_rf4ce_t::update_voice_metrics(ctrlm_rf4ce_voice_utterance_type_t voice_utterance_type, guint32 voice_packets_sent, guint32 voice_packets_lost) {
-   voice_session_prefs_t *vrex_prefs = ctrlm_voice_vrex_prefs_get();
-
-   handle_day_change();
-   voice_packets_sent_today_       += voice_packets_sent;
-   voice_packets_lost_today_       += voice_packets_lost;
-   if((((float)voice_packets_lost/(float)voice_packets_sent)*100.0) > (float)(vrex_prefs->packet_loss_threshold)) {
-      utterances_exceeding_packet_loss_threshold_today_++;
-   }
-
-   if(voice_utterance_type==RF4CE_VOICE_NORMAL_UTTERANCE) {
-      voice_cmd_count_today_++;
-      LOG_INFO("%s: Voice Cmd Count Today <%u>  Voice Packets Sent Today <%u>  Voice Packets Lost Today <%u>  Utterances Exceeding Packet Loss Threshold Today <%u>\n", __FUNCTION__, voice_cmd_count_today_, voice_packets_sent_today_, voice_packets_lost_today_, utterances_exceeding_packet_loss_threshold_today_);
+   voice_metrics_.process_time(false);
+   if(voice_utterance_type == RF4CE_VOICE_NORMAL_UTTERANCE) {
+      voice_metrics_.increment_voice_count(voice_packets_sent, voice_packets_lost);
    } else {
-      voice_cmd_short_today_++;
-      LOG_INFO("%s: Voice Cmd Short Today <%u>  Voice Packets Sent Today <%u>  Voice Packets Lost Today <%u>  Utterances Exceeding Packet Loss Threshold Today <%u>\n", __FUNCTION__, voice_cmd_short_today_, voice_packets_sent_today_, voice_packets_lost_today_, utterances_exceeding_packet_loss_threshold_today_);
+      voice_metrics_.increment_short_voice_count(voice_packets_sent, voice_packets_lost);
    }
-
-   property_write_voice_metrics();
+   LOG_INFO("%s: %s\n", __FUNCTION__, voice_metrics_.get_value().c_str());
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_uptime_privacy_info(guchar *data, guchar length) {
@@ -4859,123 +2829,96 @@ void ctrlm_obj_controller_rf4ce_t::time_last_checkin_for_device_update_get(time_
    *time = time_last_checkin_for_device_update_;
 }
 
-bool ctrlm_obj_controller_rf4ce_t::handle_day_change() {
-   time_t time_in_seconds = time(NULL);
-   time_t shutdown_time   = ctrlm_shutdown_time_get();
-   if(time_in_seconds < shutdown_time) {
-      LOG_WARN("%s: Current Time <%ld> is less than the last shutdown time <%ld>.  Wait until time updates.\n", __FUNCTION__, time_in_seconds, shutdown_time);
-      return(false);
-   }
-   guint32 today = time_in_seconds / (60 * 60 * 24);
-   guint32 day_change = today - today_;
-
-   //If this is a different day...
-   if(day_change > 0) {
-
-      //If this is the next day...
-      if(day_change == 1) {
-         voice_cmd_count_yesterday_                            = voice_cmd_count_today_;
-         voice_cmd_short_yesterday_                            = voice_cmd_short_today_;
-         voice_packets_sent_yesterday_                         = voice_packets_sent_today_;
-         voice_packets_lost_yesterday_                         = voice_packets_lost_today_;
-         utterances_exceeding_packet_loss_threshold_yesterday_ = utterances_exceeding_packet_loss_threshold_today_;
-      } else {
-         voice_cmd_count_yesterday_                            = 0;
-         voice_cmd_short_yesterday_                            = 0;
-         voice_packets_sent_yesterday_                         = 0;
-         voice_packets_lost_yesterday_                         = 0;
-         utterances_exceeding_packet_loss_threshold_yesterday_ = 0;
-      }
-
-      voice_cmd_count_today_                                   = 0;
-      voice_cmd_short_today_                                   = 0;
-      voice_packets_sent_today_                                = 0;
-      voice_packets_lost_today_                                = 0;
-      utterances_exceeding_packet_loss_threshold_today_        = 0;
-      today_                                                   = today;
-
-      return(true);
-   }
-
-   return(false);
-}
-
 void ctrlm_obj_controller_rf4ce_t::get_last_battery_event(ctrlm_rcu_battery_event_t &battery_event, unsigned long &battery_event_timestamp) {
-   if (battery_milestones_.battery_0_percent_timestamp != 0) {
+   if (battery_milestones_.get_timestamp_battery_percent0() != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_0_PERCENT;
-      battery_event_timestamp = battery_milestones_.battery_0_percent_timestamp;
-   } else if (battery_milestones_.battery_5_percent_timestamp != 0) {
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_percent0();
+   } else if (battery_milestones_.get_timestamp_battery_percent5() != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_PENDING_DOOM;
-      battery_event_timestamp = battery_milestones_.battery_5_percent_timestamp;
-   } else if (battery_milestones_.battery_25_percent_timestamp != 0) {
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_percent5();
+   } else if (battery_milestones_.get_timestamp_battery_percent25() != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_25_PERCENT;
-      battery_event_timestamp = battery_milestones_.battery_25_percent_timestamp;
-   } else if (battery_milestones_.battery_50_percent_timestamp != 0) {
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_percent25();
+   } else if (battery_milestones_.get_timestamp_battery_percent50() != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_50_PERCENT;
-      battery_event_timestamp = battery_milestones_.battery_50_percent_timestamp;
-   } else if (battery_milestones_.battery_75_percent_timestamp != 0) {
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_percent50();
+   } else if (battery_milestones_.get_timestamp_battery_percent75() != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_75_PERCENT;
-      battery_event_timestamp = battery_milestones_.battery_75_percent_timestamp;
-   } else if (battery_milestones_.battery_changed_timestamp != 0) {
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_percent75();
+   } else if (battery_milestones_.get_timestamp_battery_changed() != 0) {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_REPLACED;
-      battery_event_timestamp = battery_milestones_.battery_changed_timestamp;
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_changed();
    } else {
       battery_event           = CTRLM_RCU_BATTERY_EVENT_NONE;
-      battery_event_timestamp = battery_last_good_timestamp_;
+      battery_event_timestamp = battery_milestones_.get_timestamp_battery_last_good();
    }
 }
 
 bool ctrlm_obj_controller_rf4ce_t::import_check_validation() {
    bool ret                = TRUE;
-   version_software_t sw_version;
+   ctrlm_sw_version_t zeros(0,0,0,0);
+   ctrlm_sw_version_t invalid(0xFF, 0xFF, 0xFF);
 
-   sw_version.major        = 0x00;
-   sw_version.minor        = 0x00;
-   sw_version.revision     = 0x00;
-   sw_version.patch        = 0x00;
+   if(version_software_   == zeros &&
+      version_irdb_       == zeros &&
+      version_bootloader_ == zeros) {
+         LOG_ERROR("%s: zeros..\n", __FUNCTION__);
+         ret = FALSE;
+      }
 
-   if(!(version_compare(sw_version, version_software_) || version_compare(sw_version, version_irdb_) || version_compare(sw_version, version_bootloader_))) {
-      ret = FALSE;
-   }
-
-   sw_version.major        = 0xFF;
-   sw_version.minor        = 0xFF;
-   sw_version.revision     = 0xFF;
-   sw_version.patch        = 0xFF;
-
-   if(!(version_compare(sw_version, version_software_) || version_compare(sw_version, version_irdb_) || version_compare(sw_version, version_bootloader_))) {
-      ret = FALSE;
-   }
+   if(version_software_   == invalid &&
+      version_irdb_       == invalid &&
+      version_bootloader_ == invalid) {
+         LOG_ERROR("%s: invalid..\n", __FUNCTION__);
+         ret = FALSE;
+      }
 
    return ret;
 }
 
-version_software_t ctrlm_obj_controller_rf4ce_t::version_software_get(){
+ctrlm_sw_version_t ctrlm_obj_controller_rf4ce_t::version_software_get(){
    return version_software_;
 }
 
-version_software_t ctrlm_obj_controller_rf4ce_t::version_dsp_get(){
+ctrlm_sw_version_t ctrlm_obj_controller_rf4ce_t::version_dsp_get(){
    return version_dsp_;
 }
 
-version_software_t ctrlm_obj_controller_rf4ce_t::version_keyword_model_get(){
+ctrlm_sw_version_t ctrlm_obj_controller_rf4ce_t::version_keyword_model_get(){
    return version_keyword_model_;
 }
 
-version_software_t ctrlm_obj_controller_rf4ce_t::version_arm_get(){
+ctrlm_sw_version_t ctrlm_obj_controller_rf4ce_t::version_arm_get(){
    return version_arm_;
 }
 
-version_software_t ctrlm_obj_controller_rf4ce_t::version_audio_data_get(){
+ctrlm_sw_version_t ctrlm_obj_controller_rf4ce_t::version_audio_data_get(){
    return version_audio_data_;
 }
 
-version_hardware_t ctrlm_obj_controller_rf4ce_t::version_hardware_get(){
+ctrlm_hw_version_t ctrlm_obj_controller_rf4ce_t::version_hardware_get(){
    return version_hardware_;
 }
 
-controller_irdb_status_t ctrlm_obj_controller_rf4ce_t::controller_irdb_status_get() {
+ctrlm_controller_capabilities_t ctrlm_obj_controller_rf4ce_t::get_capabilities() const {
+   return(capabilities_);
+}
+
+ctrlm_rf4ce_controller_irdb_status_t ctrlm_obj_controller_rf4ce_t::controller_irdb_status_get() {
    return controller_irdb_status_;
+}
+
+void ctrlm_obj_controller_rf4ce_t::controller_product_name_updated(const ctrlm_rf4ce_product_name_t& product_name) {
+   controller_type_ = rf4ce_controller_type_from_product_name(product_name.get_value());
+   has_battery_     = ctrlm_rf4ce_has_battery(controller_type_);
+   has_dsp_         = ctrlm_rf4ce_has_dsp(controller_type_);
+   LOG_INFO("%s: Controller Type <%s> Has Battery <%s> Has DSP <%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), (has_battery_ ? "YES" : "NO"), (has_dsp_ ? "YES" : "NO"));
+}
+
+void ctrlm_obj_controller_rf4ce_t::controller_irdb_status_updated(const ctrlm_rf4ce_controller_irdb_status_t& status) {
+   if(controller_type_ != RF4CE_CONTROLLER_TYPE_XR19) {
+      obj_network_rf4ce_->target_irdb_status_set(controller_irdb_status_);
+   }
 }
 
 time_t ctrlm_obj_controller_rf4ce_t::time_binding_get() {
@@ -5001,8 +2944,8 @@ void ctrlm_obj_controller_rf4ce_t::log_binding_for_telemetry() {
       time_binding_str[0] = '\0';
       strftime(time_binding_str, 20, "%F %T", localtime((time_t *)&time_binding_));
    }
-   LOG_INFO("%s: Model <%s>, Binding <%s>, Remote Bound (%u,%u), Time <%s>\n", __FUNCTION__, product_name_, ctrlm_rcu_binding_type_str(binding_type_), network_id_get(), controller_id_get(), time_binding_str);
-   ctrlm_update_last_key_info(controller_id, IARM_BUS_IRMGR_KEYSRC_RF, 0, product_name_, false, true);
+   LOG_INFO("%s: Model <%s>, Binding <%s>, Remote Bound (%u,%u), Time <%s>\n", __FUNCTION__, product_name_.get_value().c_str(), ctrlm_rcu_binding_type_str(binding_type_), network_id_get(), controller_id_get(), time_binding_str);
+   ctrlm_update_last_key_info(controller_id, IARM_BUS_IRMGR_KEYSRC_RF, 0, product_name_.get_value().c_str(), false, true);
 }
 
 void ctrlm_obj_controller_rf4ce_t::log_unbinding_for_telemetry() {
@@ -5011,13 +2954,13 @@ void ctrlm_obj_controller_rf4ce_t::log_unbinding_for_telemetry() {
 
    time_unbinding_str[0] = '\0';
    strftime(time_unbinding_str, 20, "%F %T", localtime((time_t *)&time_unbinding));
-   LOG_INFO("%s: Model <%s>, Remote Unbound (%u,%u), Time <%s>\n", __FUNCTION__, product_name_, network_id_get(), controller_id_get(), time_unbinding_str);
+   LOG_INFO("%s: Model <%s>, Remote Unbound (%u,%u), Time <%s>\n", __FUNCTION__, product_name_.get_value().c_str(), network_id_get(), controller_id_get(), time_unbinding_str);
 }
 
 void ctrlm_obj_controller_rf4ce_t::print_remote_firmware_debug_info(ctrlm_rf4ce_controller_firmware_log_t log_type, string message){
    char remote_info[100] = {'\0'};
 
-   errno_t safec_rc = sprintf_s(remote_info, sizeof(remote_info), "%s ID - %u. Current Firmware: <%u.%u.%u.%u>. ", ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), version_software_.major, version_software_.minor, version_software_.revision, version_software_.patch);
+   errno_t safec_rc = sprintf_s(remote_info, sizeof(remote_info), "%s ID - %u. Current Firmware: <%s>. ", ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), version_software_.get_value().c_str());
    if(safec_rc < EOK) {
       ERR_CHK(safec_rc);
    }
@@ -5048,7 +2991,7 @@ void ctrlm_obj_controller_rf4ce_t::print_remote_firmware_debug_info(ctrlm_rf4ce_
          LOG_INFO("%s: %s Remote reboot scheduled. Downloaded: %s\n", __FUNCTION__, remote_info, message.c_str());
          break;
       case RF4CE_PRINT_FIRMWARE_LOG_PAIRED_REMOTE:
-         LOG_INFO("%s: %s Remote Paired. Battery level: %u\n", __FUNCTION__, remote_info, battery_level_percent(battery_status_.voltage_loaded));
+         LOG_INFO("%s: %s Remote Paired. Battery level: %u\n", __FUNCTION__, remote_info, battery_level_percent(controller_type_, version_hardware_, battery_status_.get_voltage_loaded()));
          break;
       default:
          LOG_INFO("%s: INVALID MESSAGE TYPE\n", __FUNCTION__);
@@ -5060,17 +3003,17 @@ void ctrlm_obj_controller_rf4ce_t::print_remote_firmware_debug_info(ctrlm_rf4ce_
 // These functions are HACKS for XR15-704
 #ifdef XR15_704
 void ctrlm_obj_controller_rf4ce_t::set_reset() {
-   version_software_t version_bug;
-   version_bug.major    = XR15_DEVICE_UPDATE_BUG_FIRMWARE_MAJOR;
-   version_bug.minor    = XR15_DEVICE_UPDATE_BUG_FIRMWARE_MINOR;
-   version_bug.revision = XR15_DEVICE_UPDATE_BUG_FIRMWARE_REVISION;
-   version_bug.patch    = XR15_DEVICE_UPDATE_BUG_FIRMWARE_PATCH;
+   ctrlm_sw_version_t version_bug(XR15_DEVICE_UPDATE_BUG_FIRMWARE_MAJOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_MINOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_REVISION, XR15_DEVICE_UPDATE_BUG_FIRMWARE_PATCH);
 
-   if(RF4CE_CONTROLLER_TYPE_XR15 == controller_type_ && -1 == version_compare(version_software_, version_bug)) {
+   if(RF4CE_CONTROLLER_TYPE_XR15 == controller_type_ && version_software_ < version_bug) {
       needs_reset_ = true;
    } else {
       needs_reset_ = false;
    }
+}
+
+bool ctrlm_obj_controller_rf4ce_t::needs_reset() {
+   return(needs_reset_);
 }
 #endif
 // These functions are HACKS for XR15-704
@@ -5204,7 +3147,7 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_heartbeat(ctrlm_timestamp_t timestamp, 
    req_data(CTRLM_RF4CE_PROFILE_ID_COMCAST_RCU, timestamp, response_len, response, NULL, NULL);
 #ifdef ASB
    if(link_key_validation) {
-      obj_network_rf4ce_->process_pair_result(controller_id_get(), ieee_address_, CTRLM_HAL_RESULT_PAIR_SUCCESS);
+      obj_network_rf4ce_->process_pair_result(controller_id_get(), ieee_address_.to_uint64(), CTRLM_HAL_RESULT_PAIR_SUCCESS);
    }
 #endif
    if(NULL != action_msg) {
@@ -5272,76 +3215,6 @@ void ctrlm_obj_controller_rf4ce_t::binding_security_type_set(ctrlm_rcu_binding_s
 
 ctrlm_rcu_binding_security_type_t ctrlm_obj_controller_rf4ce_t::binding_security_type_get() {
    return(binding_security_type_);
-}
-
-gboolean ctrlm_obj_controller_rf4ce_t::version_hardware_valid(guchar *data) {
-   guchar   index = 0;
-   guchar  *hardware_version      = NULL;
-   guchar   num_hardware_versions = 0;
-   gboolean is_valid              = false;
-
-   //Check for mac address of an XR11V2
-   if((ieee_address_ & 0xFFFFFF0000000000)         == XR11V2_IEEE_PREFIX) {
-      hardware_version      = (guchar *)xr11v2_hardware_versions;
-      num_hardware_versions = NUM_XR11V2_HARDWARE_VERSIONS;
-   } else if((((ieee_address_ & 0xFFFFFF0000000000) == XR15V2_IEEE_PREFIX_UP_TO_FEB_2018) ||
-             ((ieee_address_ & 0xFFFFFF0000000000) == XR15V2_IEEE_PREFIX) || 
-             ((ieee_address_ & 0xFFFFFF0000000000) == XR15V2_IEEE_PREFIX_THIRD)) && 
-             (0 != strncmp(product_name_, "XR15-10", CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME))) {
-      hardware_version      = (guchar *)xr15v2_hardware_versions;
-      num_hardware_versions = NUM_XR15V2_HARDWARE_VERSIONS;  
-   //Check for mac address of an XR15V1
-   } else if((ieee_address_ & 0xFFFFFF0000000000)  == XR15V1_IEEE_PREFIX) {
-      hardware_version      = (guchar *)xr15v1_hardware_versions;
-      num_hardware_versions = NUM_XR15V1_HARDWARE_VERSIONS;
-   } else {
-      LOG_INFO("%s: Invalid ieee_address <0x%016llX>\n", __FUNCTION__, ieee_address_);
-      return(false);
-   }
-
-   //If valid mac address, look for valid hardware version
-   for (index=0; index<num_hardware_versions; index++) {
-      if((((guchar *)(hardware_version+(index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[0] == data[0]) && (((guchar *)(hardware_version+(index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[1] == data[1]) && (((guchar *)(hardware_version+(index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[2] == data[2]) && (((guchar *)(hardware_version+(index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[3] == data[3])) {
-         is_valid = true;
-         break;
-      }
-   }
-
-   if(!is_valid) {
-      LOG_INFO("%s: Invalid hardware version: ieee_address 0x%016llX, controller_id <%u>, controller_type <%s>, data[0] <%02x>, data[1] <%02x>, data[2] <%02x>, data[3] <%02x>\n", __FUNCTION__, ieee_address_, controller_id_get(), product_name_, data[0], data[1], data[2], data[3]);
-   }
-   return(is_valid);
-}
-
-void ctrlm_obj_controller_rf4ce_t::controller_fix_hardware_version_by_mac_address(guchar *data) {
-   guchar *hardware_version   = NULL;
-   guchar  hardware_fix_index = 0;
-
-   //Check for mac address of an XR11V2
-   if((ieee_address_ & 0xFFFFFF0000000000) == XR11V2_IEEE_PREFIX) {
-      hardware_version   = (guchar *)xr11v2_hardware_versions;
-      hardware_fix_index = NUM_XR11V2_HARDWARE_FIX_INDEX;
-   //Check for mac address of an XR15V1
-   } else if((ieee_address_ & 0xFFFFFF0000000000) == XR15V1_IEEE_PREFIX) {
-      hardware_version   = (guchar *)xr15v1_hardware_versions;
-      hardware_fix_index = NUM_XR15V1_HARDWARE_FIX_INDEX;
-   //Check for mac address of an XR15V2
-   } else if(((ieee_address_ & 0xFFFFFF0000000000) == XR15V2_IEEE_PREFIX_UP_TO_FEB_2018) ||
-             ((ieee_address_ & 0xFFFFFF0000000000) == XR15V2_IEEE_PREFIX) ||
-             ((ieee_address_ & 0xFFFFFF0000000000) == XR15V2_IEEE_PREFIX_THIRD)) {
-      hardware_version   = (guchar *)xr15v2_hardware_versions;
-      hardware_fix_index = NUM_XR15V2_HARDWARE_FIX_INDEX;
-   } else {
-      LOG_INFO("%s: Invalid ieee_address 0x%016llX\n", __FUNCTION__, ieee_address_);
-      return;
-   }
-
-   data[0] = ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[0];
-   data[1] = ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[1];
-   data[2] = ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[2];
-   data[3] = ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[3];
-
-   LOG_INFO("%s: ieee_address 0x%016llX, controller_id <%u>, controller_type <%s>, hardware_version[0] <%02x>, hardware_version[1] <%02x>, hardware_version[2] <%02x>, hardware_version[3] <%02x>\n", __FUNCTION__, ieee_address_, controller_id_get(), product_name_, ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[0], ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[1], ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[2], ((guchar *)(hardware_version+(hardware_fix_index*CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING)))[3]);
 }
 
 #ifdef ASB
@@ -5467,14 +3340,14 @@ void ctrlm_obj_controller_rf4ce_t::push_ir_codes(void) {
    // ROBIN -- Check Target IRDB status
    guchar flags = this->obj_network_rf4ce_->target_irdb_status_flags_get();
    if(flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_TV) {
-      ir_rf_database_status_ |= IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE;
+      ir_rf_database_status_ |= ctrlm_rf4ce_ir_rf_database_status_t::flag::DOWNLOAD_TV_5_DIGIT_CODE;
    }
    if(flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR) {
-      ir_rf_database_status_ |= IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE;
+      ir_rf_database_status_ |= ctrlm_rf4ce_ir_rf_database_status_t::flag::DOWNLOAD_AVR_5_DIGIT_CODE;
    }
    if(flags & CONTROLLER_IRDB_STATUS_FLAGS_IR_RF_DB) {
-      ir_rf_database_status_ |=   IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES;
-      ir_rf_database_status_ &= ~(IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO);
+      ir_rf_database_status_ |=   ctrlm_rf4ce_ir_rf_database_status_t::flag::DB_DOWNLOAD_YES;
+      ir_rf_database_status_ &= ~(ctrlm_rf4ce_ir_rf_database_status_t::flag::DB_DOWNLOAD_NO);
    }
    if(ir_rf_database_status_ != IR_RF_DATABASE_STATUS_DEFAULT) {
       ctrlm_rf4ce_polling_action_push(network_id_get(), controller_id_get(), RF4CE_POLLING_ACTION_IRRF_STATUS, NULL, 0);
@@ -5485,21 +3358,16 @@ guint8 ctrlm_obj_controller_rf4ce_t::polling_methods_get() const {
    return polling_methods_;
 }
 
-
-bool ctrlm_obj_controller_rf4ce_t::is_fmr_supported() const {
-   return fmr_supported_;
-}
-
 gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_changed(guchar new_voltage) {
    guchar battery_increase = (0.3 * 255 / 4);
    //If the new voltage goes up by 0.3v or more, consider this a batteries changed situation
-   return(new_voltage >= (battery_status_.voltage_unloaded + battery_increase));
+   return(new_voltage >= (battery_status_.get_voltage_unloaded() + battery_increase));
 }
 
 gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar new_voltage) {
    guchar battery_increase = (0.2 * 255 / 4);
    //If the new voltage goes up by 0.2v or more but less than 0.3v, don't set the new voltage but report as a large jump.
-   return(new_voltage >= (battery_status_.voltage_unloaded + battery_increase));
+   return(new_voltage >= (battery_status_.get_voltage_unloaded() + battery_increase));
 }
 
 void ctrlm_obj_controller_rf4ce_t::ota_failure_count_set(uint8_t ota_failures) {

@@ -27,7 +27,7 @@
 #include "../ctrlm.h"
 #include "../ctrlm_utils.h"
 #include "../ctrlm_log.h"
-#include "../ctrlm_database.h"
+#include "ctrlm_database.h"
 #include "ctrlm_ble_network.h"
 #include "ctrlm_ble_controller.h"
 #include "ctrlm_ble_utils.h"

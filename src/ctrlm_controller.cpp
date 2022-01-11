@@ -27,8 +27,6 @@ using namespace std;
 ctrlm_obj_controller_t::ctrlm_obj_controller_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_t &network) :
    controller_id_(controller_id),
    obj_network_(&network),
-   par_voice_supported_(false),
-   haptics_feedback_supported_(false),
    irdb_entry_id_name_tv_("0"),
    irdb_entry_id_name_avr_("0")
 {
@@ -39,8 +37,6 @@ ctrlm_obj_controller_t::ctrlm_obj_controller_t(ctrlm_controller_id_t controller_
 ctrlm_obj_controller_t::ctrlm_obj_controller_t() {
    controller_id_ = CTRLM_MAIN_CONTROLLER_ID_INVALID;
    obj_network_ = NULL;  //CID:82352 - Uninit_ctor
-   par_voice_supported_ = false;
-   haptics_feedback_supported_ = false;
    LOG_INFO("ctrlm_obj_controller_t constructor - default\n");
 }
 
@@ -100,6 +96,10 @@ guchar ctrlm_obj_controller_t::property_read_irdb_entry_id_name_avr(guchar *data
    return 0;
 }
 
+ctrlm_controller_capabilities_t ctrlm_obj_controller_t::get_capabilities() const {
+   return(ctrlm_controller_capabilities_t()); // return empty capabilities object
+}
+
 void ctrlm_obj_controller_t::irdb_entry_id_name_set(ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t irdb_entry_id_name) {
    switch(type) {
       case CTRLM_IRDB_DEV_TYPE_TV:
@@ -120,12 +120,4 @@ ctrlm_irdb_ir_entry_id_t ctrlm_obj_controller_t::get_irdb_entry_id_name_tv() {
 
 ctrlm_irdb_ir_entry_id_t ctrlm_obj_controller_t::get_irdb_entry_id_name_avr() {
    return irdb_entry_id_name_avr_;
-}
-
-bool ctrlm_obj_controller_t::is_par_voice_supported() const {
-   return par_voice_supported_;
-}
-
-bool ctrlm_obj_controller_t::is_haptics_feedback_supported() const {
-   return haptics_feedback_supported_;
 }

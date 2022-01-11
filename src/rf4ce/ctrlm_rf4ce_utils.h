@@ -31,7 +31,6 @@ const char *ctrlm_rf4ce_controller_type_str(ctrlm_rf4ce_controller_type_t contro
 const char *ctrlm_rf4ce_voice_command_encryption_str(voice_command_encryption_t encryption);
 const char *ctrlm_rf4ce_binding_initiation_indicator_str(ctrlm_rf4ce_binding_initiation_indicator_t indicator);
 const char *ctrlm_rf4ce_firmware_updated_str(ctrlm_rf4ce_firmware_updated_t updated);
-const char *ctrlm_rf4ce_controller_manufacturer(guchar controller_manufacturer);
 const char *ctrlm_rf4ce_controller_polling_configuration_str(ctrlm_rf4ce_controller_type_t controller_type);
 const char *ctrlm_rf4ce_controller_polling_trigger_str(uint16_t trigger);
 const char *ctrlm_rf4ce_discovery_type_str(uint8_t dev_type);

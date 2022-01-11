@@ -21,6 +21,7 @@
 
 #include <vector>
 #include <string>
+#include "ctrlm_db_attr.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -85,28 +86,10 @@ void ctrlm_db_rf4ce_read_binding_type(ctrlm_network_id_t network_id, ctrlm_contr
 void ctrlm_db_rf4ce_read_validation_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_validation_type_t *validation_type);
 void ctrlm_db_rf4ce_read_time_binding(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_binding);
 void ctrlm_db_rf4ce_read_time_last_key(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_last_key);
-void ctrlm_db_rf4ce_read_time_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_battery_status);
 void ctrlm_db_rf4ce_read_peripheral_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_rf_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_irdb(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_hardware(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_software(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_dsp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_keyword_model(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_arm(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_version_dsp_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_audio_profiles(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_voice_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_update_version_bootloader(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_update_version_golden(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_update_version_audio_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_product_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_controller_irdb_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_irdb_entry_id_name_tv(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_irdb_entry_id_name_avr(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
-void ctrlm_db_rf4ce_read_voice_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_firmware_updated(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_reboot_diagnostics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_memory_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
@@ -117,7 +100,6 @@ void ctrlm_db_rf4ce_read_polling_configuration_mac(ctrlm_network_id_t network_id
 void ctrlm_db_rf4ce_read_polling_configuration_heartbeat(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_rib_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int *status);
 void ctrlm_db_rf4ce_read_binding_security_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_security_type_t *type);
-void ctrlm_db_rf4ce_read_battery_milestones(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_privacy(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_controller_capabilities(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_far_field_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
@@ -129,33 +111,14 @@ void ctrlm_db_rf4ce_read_asb_key_derivation_method(ctrlm_network_id_t network_id
 void ctrlm_db_rf4ce_read_device_update_session_state(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_read_ota_failures_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 
-void ctrlm_db_rf4ce_write_ieee_address(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long long ieee_address);
 void ctrlm_db_rf4ce_write_binding_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_type_t binding_type);
 void ctrlm_db_rf4ce_write_validation_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_validation_type_t validation_type);
 void ctrlm_db_rf4ce_write_time_binding(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t time_binding);
 void ctrlm_db_rf4ce_write_time_last_key(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t time_last_key);
-void ctrlm_db_rf4ce_write_time_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t time_battery_status);
 void ctrlm_db_rf4ce_write_peripheral_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_rf_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_irdb(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_hardware(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_software(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_dsp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_keyword_model(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_arm(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_version_dsp_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_audio_profiles(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_voice_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_update_version_bootloader(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_update_version_golden(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_update_version_audio_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_product_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_controller_irdb_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_irdb_entry_id_name_tv(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_irdb_entry_id_name_avr(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
-void ctrlm_db_rf4ce_write_voice_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_firmware_updated(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_reboot_diagnostics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_memory_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
@@ -166,7 +129,6 @@ void ctrlm_db_rf4ce_write_polling_configuration_mac(ctrlm_network_id_t network_i
 void ctrlm_db_rf4ce_write_polling_configuration_heartbeat(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_rib_configuration_complete(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int status);
 void ctrlm_db_rf4ce_write_binding_security_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_security_type_t type);
-void ctrlm_db_rf4ce_write_battery_milestones(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_privacy(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_controller_capabilities(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const guchar *data, guint32 length);
 void ctrlm_db_rf4ce_write_far_field_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
@@ -272,30 +234,6 @@ void ctrlm_db_voice_write_device_status(int device, int status);
 void ctrlm_db_voice_write_audio_ducking_beep_enable(bool enable);
 void ctrlm_db_voice_write_par_voice_status(bool status);
 
-void ctrlm_db_rf4ce_read_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &battery_last_good_timestamp);
-void ctrlm_db_rf4ce_read_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_percent);
-void ctrlm_db_rf4ce_read_battery_last_good_loaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_loaded_voltage);
-void ctrlm_db_rf4ce_read_battery_last_good_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_unloaded_voltage);
-void ctrlm_db_rf4ce_read_battery_voltage_large_jump_counter(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_voltage_large_jump_counter);
-void ctrlm_db_rf4ce_read_battery_voltage_large_decline_detected(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, gboolean &battery_voltage_large_decline_detected);
-void ctrlm_db_rf4ce_read_battery_changed_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_changed_unloaded_voltage);
-void ctrlm_db_rf4ce_read_battery_75_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_75_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_read_battery_50_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_50_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_read_battery_25_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_25_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_read_battery_5_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_5_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_read_battery_0_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_0_percent_unloaded_voltage);
-
-void ctrlm_db_rf4ce_write_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t battery_last_good_timestamp);
-void ctrlm_db_rf4ce_write_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_percent);
-void ctrlm_db_rf4ce_write_battery_last_good_loaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_loaded_voltage);
-void ctrlm_db_rf4ce_write_battery_last_good_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_unloaded_voltage);
-void ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_voltage_large_jump_counter);
-void ctrlm_db_rf4ce_write_battery_voltage_large_decline_detected(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, gboolean battery_voltage_large_decline_detected);
-void ctrlm_db_rf4ce_write_battery_changed_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_changed_unloaded_voltage);
-void ctrlm_db_rf4ce_write_battery_75_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_75_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_write_battery_50_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_50_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_write_battery_25_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_25_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_write_battery_5_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_5_percent_unloaded_voltage);
-void ctrlm_db_rf4ce_write_battery_0_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_0_percent_unloaded_voltage);
-
+void ctrlm_db_attr_write(ctrlm_db_attr_t *attr);
+bool ctrlm_db_attr_read(ctrlm_db_attr_t *attr);
 #endif

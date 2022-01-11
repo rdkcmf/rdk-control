@@ -92,6 +92,7 @@ typedef enum {
 #ifdef DEEPSLEEP_CLOSE_DB
    CTRLM_DB_QUEUE_MSG_TYPE_POWER_STATE_CHANGE = 8,
 #endif
+   CTRLM_DB_QUEUE_MSG_TYPE_WRITE_ATTR         = 9,
    CTRLM_DB_QUEUE_MSG_TYPE_TICKLE             = CTRLM_MAIN_QUEUE_MSG_TYPE_TICKLE
 } ctrlm_db_queue_msg_type_t;
 
@@ -120,6 +121,11 @@ typedef struct {
    guchar *                    value;
    guint32                     length;
 } ctrlm_db_queue_msg_write_blob_t;
+
+typedef struct {
+   ctrlm_db_queue_msg_header_t header;
+   ctrlm_db_attr_t *           attr;
+} ctrlm_db_queue_msg_write_attr_t;
 
 typedef struct {
    ctrlm_db_queue_msg_header_t header;
@@ -474,6 +480,12 @@ gpointer ctrlm_db_thread(gpointer param) {
             LOG_DEBUG("%s: WRITE BLOB %s:%s:%u\n", __FUNCTION__, blob->table, blob->key, blob->length);
             ctrlm_print_data_hex(__FUNCTION__, blob->value, blob->length, 16);
             ctrlm_db_write_blob_(blob->table, blob->key, blob->value, blob->length);
+            break;
+         }
+        case CTRLM_DB_QUEUE_MSG_TYPE_WRITE_ATTR: {  
+            ctrlm_db_queue_msg_write_attr_t *attr = (ctrlm_db_queue_msg_write_attr_t *)msg;
+            LOG_DEBUG("%s: WRITE ATTR\n", __FUNCTION__);
+            attr->attr->write_db(g_ctrlm_db.handle);
             break;
          }
          case CTRLM_DB_QUEUE_MSG_TYPE_WRITE_FILE: {
@@ -1621,13 +1633,6 @@ void ctrlm_db_rf4ce_read_ieee_address(ctrlm_network_id_t network_id, ctrlm_contr
    ctrlm_db_read_uint64(table, "ieee_address", ieee_address);
 }
 
-void ctrlm_db_rf4ce_write_ieee_address(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long long ieee_address) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "ieee_address", ieee_address);
-}
-
 void ctrlm_db_rf4ce_read_binding_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_type_t *binding_type) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
@@ -1703,21 +1708,6 @@ void ctrlm_db_rf4ce_write_time_last_heartbeat(ctrlm_network_id_t network_id, ctr
    ctrlm_db_write_uint64(table, "time_last_heartbeat", time_last_heartbeat);
 }
 
-void ctrlm_db_rf4ce_read_time_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t *time_battery_status) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-   unsigned long long value = 0;
-   ctrlm_db_read_uint64(table, "time_battery_status", &value);
-   *time_battery_status = (time_t) value;
-}
-
-void ctrlm_db_rf4ce_write_time_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t time_battery_status) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "time_battery_status", time_battery_status);
-}
-
 void ctrlm_db_rf4ce_read_peripheral_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
    char table[CONTROLLER_TABLE_NAME_MAX_LEN];
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
@@ -1744,485 +1734,6 @@ void ctrlm_db_rf4ce_write_rf_statistics(ctrlm_network_id_t network_id, ctrlm_con
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
 
    ctrlm_db_write_blob(table, "rf_statistics", data, length);
-}
-
-void ctrlm_db_rf4ce_read_version_irdb(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_irdb", data, length);
-}
-
-void ctrlm_db_rf4ce_write_version_irdb(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_irdb", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_version_hardware(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_hardware", data, length);
-}
-
-void ctrlm_db_rf4ce_write_version_hardware(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_hardware", data, length);
-}
-
-void ctrlm_db_rf4ce_read_version_software(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_software", data, length);
-
-}
-
-void ctrlm_db_rf4ce_write_version_software(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_software", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_version_dsp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_dsp", data, length);
-
-}
-
-void ctrlm_db_rf4ce_write_version_dsp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_dsp", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_version_keyword_model(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_keyword_model", data, length);
-
-}
-
-void ctrlm_db_rf4ce_write_version_keyword_model(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_keyword_model", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_version_arm(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_arm", data, length);
-
-}
-
-void ctrlm_db_rf4ce_write_version_arm(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_arm", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_version_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_build_id", data, length);
-
-}
-
-void ctrlm_db_rf4ce_write_version_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_build_id", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_version_dsp_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "version_dsp_build_id", data, length);
-
-}
-
-void ctrlm_db_rf4ce_write_version_dsp_build_id(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "version_dsp_build_id", data, length);
-
-}
-
-void ctrlm_db_rf4ce_read_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "battery_status", data, length);
-}
-
-void ctrlm_db_rf4ce_write_battery_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "battery_status", data, length);
-}
-
-void ctrlm_db_rf4ce_read_battery_milestones(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "battery_milestones", data, length);
-}
-
-void ctrlm_db_rf4ce_write_battery_milestones(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "battery_milestones", data, length);
-}
-
-void ctrlm_db_rf4ce_read_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t &battery_last_good_timestamp) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_timestamp", &data)) {
-      LOG_WARN("%s: Failed to load battery_last_good_timestamp from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_last_good_timestamp = (time_t)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_last_good_timestamp(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, time_t battery_last_good_timestamp) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_last_good_timestamp", battery_last_good_timestamp);
-}
-
-void ctrlm_db_rf4ce_read_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_percent) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_percent", &data)) {
-      LOG_WARN("%s: Failed to load battery_last_good_percent from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_last_good_percent = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_last_good_percent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_percent) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_last_good_percent", battery_last_good_percent);
-}
-
-void ctrlm_db_rf4ce_read_battery_last_good_loaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_loaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_loaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_last_good_loaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_last_good_loaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_last_good_loaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_loaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_last_good_loaded_voltage", battery_last_good_loaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_last_good_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_last_good_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_last_good_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_last_good_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_last_good_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_last_good_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_last_good_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_last_good_unloaded_voltage", battery_last_good_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_voltage_large_jump_counter(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_voltage_large_jump_counter) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_voltage_large_jump_counter", &data)) {
-      LOG_WARN("%s: Failed to load battery_voltage_large_jump_counter from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_voltage_large_jump_counter = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_voltage_large_jump_counter(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_voltage_large_jump_counter) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_voltage_large_jump_counter", battery_voltage_large_jump_counter);
-}
-
-void ctrlm_db_rf4ce_read_battery_voltage_large_decline_detected(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, gboolean &battery_voltage_large_decline_detected) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_voltage_large_decline_detected", &data)) {
-      LOG_WARN("%s: Failed to load battery_voltage_large_decline_detected from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_voltage_large_decline_detected = (data ? true : false);
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_voltage_large_decline_detected(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, gboolean battery_voltage_large_decline_detected) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_voltage_large_decline_detected", (guint64) (battery_voltage_large_decline_detected ? 1 : 0));
-}
-
-void ctrlm_db_rf4ce_read_battery_changed_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_changed_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_changed_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_changed_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_changed_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_changed_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_changed_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_changed_unloaded_voltage", battery_changed_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_75_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_75_percent_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_75_percent_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_75_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_75_percent_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_75_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_75_percent_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_75_percent_unloaded_voltage", battery_75_percent_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_50_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_50_percent_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_50_percent_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_50_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_50_percent_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_50_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_50_percent_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_50_percent_unloaded_voltage", battery_50_percent_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_25_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_25_percent_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_25_percent_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_25_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_25_percent_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_25_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_25_percent_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_25_percent_unloaded_voltage", battery_25_percent_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_5_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_5_percent_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_5_percent_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_5_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_5_percent_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_5_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_5_percent_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_5_percent_unloaded_voltage", battery_5_percent_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_battery_0_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar &battery_0_percent_unloaded_voltage) {
-   sqlite_uint64 data;
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   if (0 > ctrlm_db_read_uint64(table, "battery_0_percent_unloaded_voltage", &data)) {
-      LOG_WARN("%s: Failed to load battery_0_percent_unloaded_voltage from db (%u, %u)\n", __FUNCTION__, network_id, controller_id);
-   } else {
-      battery_0_percent_unloaded_voltage = (guchar)data;
-   }
-}
-
-void ctrlm_db_rf4ce_write_battery_0_percent_unloaded_voltage(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar battery_0_percent_unloaded_voltage) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_uint64(table, "battery_0_percent_unloaded_voltage", battery_0_percent_unloaded_voltage);
-}
-
-void ctrlm_db_rf4ce_read_audio_profiles(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "audio_profiles", data, length);
-}
-
-void ctrlm_db_rf4ce_write_audio_profiles(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "audio_profiles", data, length);
-}
-
-void ctrlm_db_rf4ce_read_voice_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "voice_statistics", data, length);
-}
-
-void ctrlm_db_rf4ce_write_voice_statistics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "voice_statistics", data, length);
-}
-
-void ctrlm_db_rf4ce_read_update_version_bootloader(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "update_version_bootloader", data, length);
-}
-
-void ctrlm_db_rf4ce_write_update_version_bootloader(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "update_version_bootloader", data, length);
-}
-
-void ctrlm_db_rf4ce_read_update_version_golden(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "update_version_golden", data, length);
-}
-
-void ctrlm_db_rf4ce_write_update_version_golden(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "update_version_golden", data, length);
-}
-
-void ctrlm_db_rf4ce_read_update_version_audio_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "update_version_audio_data", data, length);
-}
-
-void ctrlm_db_rf4ce_write_update_version_audio_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "update_version_audio_data", data, length);
-}
-
-void ctrlm_db_rf4ce_read_product_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "product_name", data, length);
-}
-
-void ctrlm_db_rf4ce_write_product_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "product_name", data, length);
-}
-
-void ctrlm_db_rf4ce_read_controller_irdb_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_read_blob(table, "controller_irdb_status", data, length);
-}
-
-void ctrlm_db_rf4ce_write_controller_irdb_status(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length) {
-   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
-   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
-
-   ctrlm_db_write_blob(table, "controller_irdb_status", data, length);
 }
 
 void ctrlm_db_rf4ce_read_irdb_entry_id_name_tv(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
@@ -3509,4 +3020,20 @@ void ctrlm_db_voice_read_par_voice_status(bool &status) {
 
 void ctrlm_db_voice_write_par_voice_status(bool status) {
    ctrlm_db_write_uint64(CTRLM_DB_TABLE_VOICE, "par_voice_status", (guint64) (status ? 1 : 0));
+}
+
+void ctrlm_db_attr_write(ctrlm_db_attr_t *attr) {
+   ctrlm_db_queue_msg_write_attr_t *msg = (ctrlm_db_queue_msg_write_attr_t *)g_malloc(sizeof(ctrlm_db_queue_msg_write_attr_t));
+   if(msg == NULL) {
+      LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
+      return;
+   }
+   msg->header.type = CTRLM_DB_QUEUE_MSG_TYPE_WRITE_ATTR;
+   msg->attr        = attr;
+
+   ctrlm_db_queue_msg_push((gpointer)msg);
+}
+
+bool ctrlm_db_attr_read(ctrlm_db_attr_t *attr) {
+   return(attr->read_db(g_ctrlm_db.handle));
 }

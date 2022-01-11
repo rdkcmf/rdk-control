@@ -39,7 +39,7 @@
 #include "client/linux/handler/exception_handler.h"
 #endif
 #include "comcastIrKeyCodes.h"
-#include "ctrlm_version.h"
+#include "ctrlm_version_build.h"
 #include "ctrlm_hal_rf4ce.h"
 #include "ctrlm_hal_ble.h"
 #include "ctrlm_hal_ip.h"
@@ -58,6 +58,7 @@
 #endif
 #endif
 #include "ctrlm_rfc.h"
+#include "ctrlm_config.h"
 #include "ctrlm_tr181.h"
 #include "rf4ce/ctrlm_rf4ce_network.h"
 #include "ctrlm_voice.h"
@@ -596,9 +597,12 @@ int main(int argc, char *argv[]) {
    g_ctrlm.irdb = ctrlm_irdb_create();
 
    LOG_INFO("ctrlm_main: ctrlm_rfc init\n");
-   if(FALSE == ctrlm_rfc_init()) {
-      LOG_ERROR("ctrlm_main: failed to init rfc component\n");
-   }
+   // This tells the RFC component to go fetch all the enabled attributes once
+   // we are fully initialized. This brings us to parity with the current RFC/TR181
+   // implementation.
+   g_idle_add(&ctrlm_rfc_t::fetch_attributes, (void *)ctrlm_rfc_t::get_instance());
+   // TODO: We could possibly schedule this to run once every few hours or whatever
+   //       the team decides is best.
 
 #ifdef AUTH_ENABLED
    LOG_INFO("ctrlm_main: ctrlm_auth init\n");
@@ -816,6 +820,9 @@ int main(int argc, char *argv[]) {
    }
    clnl_destroy();
 #endif
+
+   ctrlm_config_t::destroy_instance();
+   ctrlm_rfc_t::destroy_instance();
 
    LOG_INFO("ctrlm_main: exit program\n");
    return (g_ctrlm.return_code);
@@ -1569,38 +1576,30 @@ gboolean ctrlm_load_authservice_data(void) {
 }
 
 gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, json_t **json_obj_voice, json_t **json_obj_device_update, json_t **json_obj_validation, json_t **json_obj_vsdk) {
-   const gchar *config_fn_opt = "/opt/ctrlm_config.json";
-   const gchar *config_fn_etc = "/etc/ctrlm_config.json";
-   gchar *contents = NULL;
+   std::string config_fn_opt = "/opt/ctrlm_config.json";
+   std::string config_fn_etc = "/etc/ctrlm_config.json";
    json_t *json_obj_ctrlm;
+   ctrlm_config_t *ctrlm_config = ctrlm_config_t::get_instance();
 
    LOG_INFO("%s\n", __FUNCTION__);
-
-   if(!ctrlm_is_production_build() && g_file_test(config_fn_opt, G_FILE_TEST_EXISTS) && g_file_get_contents(config_fn_opt, &contents, NULL, NULL)) {
-      LOG_INFO("%s: Read configuration from <%s> Contents <%s>\n", __FUNCTION__, config_fn_opt, contents);
-   } else if(g_file_test(config_fn_etc, G_FILE_TEST_EXISTS) && g_file_get_contents(config_fn_etc, &contents, NULL, NULL)) {
-      LOG_INFO("%s: Read configuration from <%s> Contents <%s>\n", __FUNCTION__, config_fn_etc, contents);
+   if(ctrlm_config == NULL) {
+      LOG_ERROR("%s: Failed to get config manager instance\n", __FUNCTION__);
+      return(false);
+   } else if(!ctrlm_is_production_build() && g_file_test(config_fn_opt.c_str(), G_FILE_TEST_EXISTS) && ctrlm_config->load_config(config_fn_opt)) {
+      LOG_INFO("%s: Read configuration from <%s>\n", __FUNCTION__, config_fn_opt.c_str());
+   } else if(g_file_test(config_fn_etc.c_str(), G_FILE_TEST_EXISTS) && ctrlm_config->load_config(config_fn_etc)) {
+      LOG_INFO("%s: Read configuration from <%s>\n", __FUNCTION__, config_fn_etc.c_str());
    } else {
       LOG_WARN("%s: Configuration error. Configuration file(s) missing, using defaults\n", __FUNCTION__);
       return(false);
    }
 
-   if(NULL == contents) {
-      LOG_WARN("%s: Configuration error. Empty configuration file, using defaults\n", __FUNCTION__);
-      return(false);
-   }
-
    // Parse the JSON data
-   json_error_t json_error;
-   *json_obj_root = json_loads(contents, JSON_REJECT_DUPLICATES, &json_error);
-
-   g_free(contents);
-
+   *json_obj_root = ctrlm_config->json_from_path("", true); // Get root AND add ref to it, since this code derefs it
    if(*json_obj_root == NULL) {
-      LOG_ERROR("%s: JSON decoding error at line %u column %u <%s>\n", __FUNCTION__, json_error.line, json_error.column, json_error.text);
+      LOG_ERROR("%s: JSON object from config manager is NULL\n", __FUNCTION__);
       return(false);
-   }
-   if(!json_is_object(*json_obj_root)) {
+   } else if(!json_is_object(*json_obj_root)) {
       // invalid response data
       LOG_INFO("%s: received invalid json response data - not a json object\n", __FUNCTION__);
       json_decref(*json_obj_root);

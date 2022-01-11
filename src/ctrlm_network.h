@@ -111,6 +111,7 @@ public:
    ctrlm_network_type_t type_get() const;
    const char *         name_get() const;
    const char *         version_get() const;
+   virtual std::string  db_name_get() const;
    void                 receiver_id_set(const std::string& receiver_id);
    std::string          receiver_id_get()  const;
    virtual void         device_id_set(const std::string& device_id);

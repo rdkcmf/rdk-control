@@ -27,7 +27,7 @@
 #include "ctrlm.h"
 #include "ctrlm_voice.h"
 #include "ctrlm_xraudio_hal.h"
-#include "ctrlm_config.h"
+#include "ctrlm_config_default.h"
 #include "jansson.h"
 #include "xr_timestamp.h"
 #include "ctrlm_voice_types.h"

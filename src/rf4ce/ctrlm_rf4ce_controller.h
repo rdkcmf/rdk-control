@@ -24,10 +24,16 @@
 #include "ctrlm_hal_rf4ce.h"
 #include "ctrlm_ipc_device_update.h"
 #include "ctrlm_ipc_voice.h"
-#include "ctrlm_voice.h"
+#include "rf4ce/rib/ctrlm_rf4ce_rib.h"
+#include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_version.h"
+#include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_general.h"
+#include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_battery.h"
+#include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_voice.h"
+#include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_irdb.h"
 #ifdef ASB
 #include "../cpc/asb/advanced_secure_binding.h"
 #endif
+#include "ctrlm_voice.h"
 #include "ctrlm_voice_session.h"
 #ifdef USE_VOICE_SDK
 #include "ctrlm_voice_obj.h"
@@ -50,16 +56,6 @@ class ctrlm_obj_network_rf4ce_t;
 // This flag creates controller variables to store network wide parameters in the controller object.  This should not be enabled unless there is a need to
 // make changes to these attributes on a per controller basis.  And if that happens, only the desired attributes should be added (not all of them like it is now).
 //#define CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
-
-#define IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD            (0x01)
-#define IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE  (0x02)
-#define IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE (0x04)
-#define IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR          (0x08)
-#define IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES   (0x10)
-#define IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO            (0x40)
-#define IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES           (0x80)
-#define IR_RF_DATABASE_STATUS_RESERVED                  (0x20)
-#define IR_RF_DATABASE_STATUS_DEFAULT                   (IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO)
 
 #define IR_RF_DATABASE_ATTRIBUTE_FLAGS_RF_PRESSED       (0x01)
 #define IR_RF_DATABASE_ATTRIBUTE_FLAGS_RF_REPEATED      (0x02)
@@ -89,10 +85,6 @@ class ctrlm_obj_network_rf4ce_t;
 #define TARGET_IRDB_STATUS_FLAGS_IR_DB_CODE_TV          (0x08)
 #define TARGET_IRDB_STATUS_FLAGS_IR_DB_CODE_AVR         (0x10)
 #define TARGET_IRDB_STATUS_DEFAULT                      (CONTROLLER_IRDB_STATUS_FLAGS_NO_IR_PROGRAMMED)
-
-#define BATTERY_STATUS_FLAGS_REPLACEMENT    (0x01)
-#define BATTERY_STATUS_FLAGS_CHARGING       (0x02)
-#define BATTERY_STATUS_FLAGS_IMPENDING_DOOM (0x04)
 
 #define FAR_FIELD_CONFIGURATION_FLAGS_OPENING_CHIME      (0x01)
 #define FAR_FIELD_CONFIGURATION_FLAGS_CLOSING_CHIME      (0x02)
@@ -134,7 +126,6 @@ class ctrlm_obj_network_rf4ce_t;
 #define CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING                 (4)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID       (92)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID   (92)
-#define CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_STATUS            (11)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD      (4)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA            (40)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS            (1)
@@ -180,7 +171,6 @@ class ctrlm_obj_network_rf4ce_t;
 #define CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT            (1)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_DIAGNOSTICS        (20)
 #define CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATISTICS         (16)
-#define CTRLM_RF4CE_RIB_ATTR_LEN_BATTERY_MILESTONES        (sizeof(battery_voltage_milestones_t))
 #define CTRLM_RF4CE_RIB_ATTR_LEN_UPTIME_PRIVACY_INFO       (12)
 
 #define CTRLM_RF4CE_RIB_ATTR_LEN_CONTROLLER_IRDB_STATUS_MINUS_LOAD_STATUS_BYTES (13)
@@ -231,9 +221,6 @@ class ctrlm_obj_network_rf4ce_t;
 #define RF4CE_XR15_VERSION_HARDWARE_MODEL_REV_0            (0)
 #define RF4CE_XR15_VERSION_HARDWARE_MODEL_REV_3            (3)
 #define RF4CE_XR15_VERSION_HARDWARE_REVISION_MIN           (1)
-#define RF4CE_BATTERY_STATUS_VOLTAGE_LOADED_DEFAULT        (3000*255/4000) //3000 millivolts
-#define RF4CE_BATTERY_STATUS_VOLTAGE_UNLOADED_DEFAULT      (3000*255/4000) //3000 millivolts
-#define RF4CE_BATTERY_STATUS_VOLTAGE_PERCENTAGE_DEFAULT    (100)
 
 #define RF4CE_CHECKIN_FOR_DEVICE_UPDATE_SECONDS_TO_HOURS   (3600)
 #define RF4CE_CHECKIN_FOR_DEVICE_UPDATE_HOURS              (24)
@@ -333,12 +320,6 @@ typedef enum {
 } voice_audio_profile_t;
 
 typedef enum {
-   RIB_ENTRIES_UPDATED_FALSE = 0,
-   RIB_ENTRIES_UPDATED_TRUE  = 1,
-   RIB_ENTRIES_UPDATED_STOP  = 2
-} rib_entries_updated_t;
-
-typedef enum {
    DOWNLOAD_RATE_IMMEDIATE  = 0,
    DOWNLOAD_RATE_BACKGROUND = 1,
 } download_rate_t;
@@ -408,13 +389,6 @@ typedef enum {
 } ctrlm_rf4ce_firmware_updated_t;
 
 typedef enum {
-   RF4CE_CONTROLLER_MANUFACTURER_NOBODY          = 0,
-   RF4CE_CONTROLLER_MANUFACTURER_REMOTE_SOLUTION = 1,
-   RF4CE_CONTROLLER_MANUFACTURER_UEI             = 2,
-   RF4CE_CONTROLLER_MANUFACTURER_OMNI            = 3
-} ctrlm_rf4ce_controller_manufacturer_t;
-
-typedef enum {
    RF4CE_PRINT_FIRMWARE_LOG_BUTTON_PRESS            = 0,
    RF4CE_PRINT_FIRMWARE_LOG_REBOOT                  = 1,
    RF4CE_PRINT_FIRMWARE_LOG_UPGRADE_CHECK           = 2,
@@ -462,47 +436,6 @@ typedef enum {
    RF4CE_VOICE_SHORT_UTTERANCE              = 1
 } ctrlm_rf4ce_voice_utterance_type_t;
 
-/* Below enum and Structure are defined for better optinamization of multiple if- else cases */
-typedef enum {
-    XR2  = 0,
-    XR5,
-    XR11,
-    XR15_1,
-    XR15_2,
-    XR16,
-    XR18,
-    XR19,
-    XRA
-} ctrlm_rf4ce_product_name_t;
-
-/*Structure defined to get the product_name */
-typedef struct {
-  const char                         *name;
-  ctrlm_rf4ce_product_name_t     product_type;
-  ctrlm_rf4ce_controller_type_t controller_type;
-} ctrlm_rf4ce_product_name_pair_t;
-
-/* Function to get the corresponding product name type from the given product name */
-bool ctrlm_rf4ce_get_product_type_from_product_name(const char *name, ctrlm_rf4ce_product_name_t *product_type, ctrlm_rf4ce_controller_type_t *controller_type);
-
-typedef struct {
-   gchar  build_id[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_BUILD_ID];
-   guint8 length;
-} version_build_id_t;
-
-typedef struct {
-   gchar  build_id[CTRLM_RF4CE_RIB_ATTR_LEN_VERSIONING_DSP_BUILD_ID];
-   guint8 length;
-} version_dsp_build_id_t;
-
-typedef struct {
-   // TODO
-} peripheral_id_t;
-
-typedef struct {
-   // TODO
-} rf_statistics_t;
-
 typedef struct {
    time_t  update_time;
    guchar  flags;
@@ -512,19 +445,6 @@ typedef struct {
    guint32 codes_txd_ir;
    guchar  percent;
 } battery_status_t;
-
-typedef struct {
-   guint32 voice_sessions_activated;
-   guint32 audio_data_tx_time;
-} voice_statistics_t;
-
-typedef struct {
-   guchar flags;
-   char   irdb_string_tv[7];
-   char   irdb_string_avr[7];
-   guchar irdb_load_status_tv;
-   guchar irdb_load_status_avr;
-} controller_irdb_status_t;
 
 typedef struct {
    guchar flags;
@@ -550,21 +470,6 @@ typedef struct {
    char                         data[POLLING_RESPONSE_DATA_LEN];
 } ctrlm_rf4ce_polling_action_msg_t;
 // End Polling Structs
-
-typedef struct {
-   time_t   battery_changed_timestamp;
-   time_t   battery_75_percent_timestamp;
-   time_t   battery_50_percent_timestamp;
-   time_t   battery_25_percent_timestamp;
-   time_t   battery_5_percent_timestamp;
-   time_t   battery_0_percent_timestamp;
-   guchar   battery_changed_actual_percent;
-   guchar   battery_75_percent_actual_percent;
-   guchar   battery_50_percent_actual_percent;
-   guchar   battery_25_percent_actual_percent;
-   guchar   battery_5_percent_actual_percent;
-   guchar   battery_0_percent_actual_percent;
-} battery_voltage_milestones_t;
 
 typedef struct {
    uint8_t flags;
@@ -637,6 +542,9 @@ typedef struct {
    bool                                       type_z;
 } rf4ce_device_update_session_resume_info_t;
 
+ctrlm_rf4ce_controller_type_t rf4ce_controller_type_from_product_name(std::string product_name);
+gboolean ir_rf_database_status_download_timeout(gpointer data);
+
 class ctrlm_obj_controller_rf4ce_t : public ctrlm_obj_controller_t
 {
 public:
@@ -650,12 +558,12 @@ public:
    void db_load();
    void db_store();
 
+   virtual void configure_rib();
    bool is_bound(void);
    void backup_pairing(void *data);
    void restore_pairing(void);
-   unsigned long long ieee_address_get(void);
+   ctrlm_ieee_addr_t ieee_address_get(void);
    void user_string_set(guchar *user_string);
-   void controller_chipset_from_product_name(void);
    void autobind_in_progress_set(bool in_progress);
    bool autobind_in_progress_get(void);
    void binding_button_in_progress_set(bool in_progress);
@@ -674,8 +582,8 @@ public:
    void rf4ce_rib_set_target(ctrlm_rf4ce_rib_attr_id_t identifier, guchar index, guchar length, guchar *data);
    void rf4ce_rib_set_controller(ctrlm_timestamp_t timestamp, ctrlm_rf4ce_rib_attr_id_t identifier, guchar index, guchar length, guchar *data);
    void rf4ce_controller_status(ctrlm_controller_status_t *status);
-   const char *product_name_get(void) const;
-   const battery_status_t& battery_status_get() const;
+   std::string product_name_get(void) const;
+   const ctrlm_rf4ce_battery_status_t& battery_status_get() const;
    void manual_poll_firmware(void);
    void manual_poll_audio_data(void);
    void audio_theme_set(ctrlm_rf4ce_device_update_audio_theme_t audio_theme);
@@ -691,7 +599,6 @@ public:
    void set_firmware_updated();
    void time_last_checkin_for_device_update_set();
    void time_last_checkin_for_device_update_get(time_t *time);
-   bool handle_day_change();
    void get_last_battery_event(ctrlm_rcu_battery_event_t &battery_event, unsigned long &battery_event_timestamp);
 
    bool import_check_validation();
@@ -706,29 +613,29 @@ public:
    // These functions are HACKS for XR15-704
 #ifdef XR15_704
    void set_reset();
+   bool needs_reset();
 #endif
    // These functions are HACKS for XR15-704
 
-   version_software_t     version_software_get();
-   version_software_t     version_audio_data_get();
-   version_software_t     version_dsp_get();
-   version_software_t     version_keyword_model_get();
-   version_software_t     version_arm_get();
-   version_hardware_t     version_hardware_get();
-   int                    version_compare(version_software_t first, version_software_t second);
-   int                    version_compare(version_hardware_t first, version_hardware_t second);
+   ctrlm_sw_version_t     version_software_get();
+   ctrlm_sw_version_t     version_audio_data_get();
+   ctrlm_sw_version_t     version_dsp_get();
+   ctrlm_sw_version_t     version_keyword_model_get();
+   ctrlm_sw_version_t     version_arm_get();
+   ctrlm_hw_version_t     version_hardware_get();
+   virtual ctrlm_controller_capabilities_t get_capabilities() const;
    gboolean               is_firmeware_updated();
    void                   check_for_update_file_delete(guint16 image_id);
    void                   log_binding_for_telemetry();
    void                   log_unbinding_for_telemetry();
-   guchar                 battery_level_percent(unsigned char voltage_loaded);
    gboolean               has_battery();
    gboolean               has_dsp();
 
-   controller_irdb_status_t controller_irdb_status_get(void);
-   time_t                   time_binding_get(void);
+   ctrlm_rf4ce_controller_irdb_status_t controller_irdb_status_get(void);
+   virtual void           controller_product_name_updated(const ctrlm_rf4ce_product_name_t& product_name);
+   virtual void           controller_irdb_status_updated(const ctrlm_rf4ce_controller_irdb_status_t& status);
+   time_t                 time_binding_get(void);
    guint8                 polling_methods_get() const;
-   bool                   is_fmr_supported() const;
 
    void print_remote_firmware_debug_info(ctrlm_rf4ce_controller_firmware_log_t, string message = "");
 
@@ -743,8 +650,6 @@ public:
    
    void binding_security_type_set(ctrlm_rcu_binding_security_type_t type);
    ctrlm_rcu_binding_security_type_t binding_security_type_get();
-   gboolean version_hardware_valid(guchar *data);
-   void controller_fix_hardware_version_by_mac_address(guchar *data);
 #ifdef ASB
    void asb_key_derivation_method_set(asb_key_derivation_method_t method);
    asb_key_derivation_method_t asb_key_derivation_method_get();
@@ -773,55 +678,45 @@ private:
    bool                                    loading_db_;
    bool                                    stored_in_db_;
    void *                                  pairing_data_;
-   unsigned long long                      ieee_address_;
+   ctrlm_rf4ce_ieee_addr_t                 ieee_address_;
    unsigned short                          short_address_;
-   ctrlm_rf4ce_result_validation_t         validation_result_;
-   ctrlm_rcu_configuration_result_t        configuration_result_;
-   peripheral_id_t                         peripheral_id_;
-   rf_statistics_t                         rf_statistics_;
-   version_software_t                      version_software_;
-   version_software_t                      version_dsp_;
-   version_software_t                      version_keyword_model_;
-   version_software_t                      version_arm_;
-   version_software_t                      version_irdb_;
-   version_hardware_t                      version_hardware_;
-   version_build_id_t                      version_build_id_;
-   version_dsp_build_id_t                  version_dsp_build_id_;
-   battery_status_t                        battery_status_;
-   unsigned char                           voice_command_status_[CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS];
-   voice_command_length_t                  voice_command_length_;
-   guint32                                 voice_cmd_count_today_;
-   guint32                                 voice_cmd_count_yesterday_;
-   guint32                                 voice_cmd_short_today_;
-   guint32                                 voice_cmd_short_yesterday_;
-   guint32                                 today_;
-   guint32                                 voice_packets_sent_today_;
-   guint32                                 voice_packets_sent_yesterday_;
-   guint32                                 voice_packets_lost_today_;
-   guint32                                 voice_packets_lost_yesterday_;
-   guint32                                 utterances_exceeding_packet_loss_threshold_today_;
-   guint32                                 utterances_exceeding_packet_loss_threshold_yesterday_;
+   ctrlm_rf4ce_result_validation_t         validation_result_; // simple enum type..
+   ctrlm_rcu_configuration_result_t        configuration_result_; // simple enum type..
+   ctrlm_rf4ce_rib_t                       rib_;
+   ctrlm_rf4ce_sw_version_t                version_software_;
+   ctrlm_rf4ce_dsp_version_t               version_dsp_;
+   ctrlm_rf4ce_keyword_model_version_t     version_keyword_model_;
+   ctrlm_rf4ce_arm_version_t               version_arm_;
+   ctrlm_rf4ce_irdb_version_t              version_irdb_;
+   ctrlm_rf4ce_bootloader_version_t        version_bootloader_;
+   ctrlm_rf4ce_golden_version_t            version_golden_;
+   ctrlm_rf4ce_audio_data_version_t        version_audio_data_;
+   ctrlm_rf4ce_hw_version_t                version_hardware_;
+   ctrlm_rf4ce_sw_build_id_t               version_build_id_;
+   ctrlm_rf4ce_dsp_build_id_t              version_dsp_build_id_;
+   ctrlm_rf4ce_battery_status_t            battery_status_;
+   ctrlm_rf4ce_battery_milestones_t        battery_milestones_;
+   ctrlm_rf4ce_voice_command_status_t      voice_command_status_;
+   ctrlm_rf4ce_voice_command_length_t      voice_command_length_;
+   ctrlm_rf4ce_voice_metrics_t             voice_metrics_;
    ctrlm_rf4ce_firmware_updated_t          firmware_updated_;
-   guint16                                 audio_profiles_ctrl_;
-   voice_statistics_t                      voice_statistics_;
-   rib_entries_updated_t                   rib_entries_updated_;
-   version_software_t                      version_bootloader_;
-   version_software_t                      version_golden_;
-   version_software_t                      version_audio_data_;
-   char                                    product_name_[CTRLM_RF4CE_RIB_ATTR_LEN_PRODUCT_NAME + 1];
-   char                                    manufacturer_[CTRLM_RCU_MAX_MANUFACTURER_LENGTH];
-   char                                    chipset_[CTRLM_RCU_MAX_CHIPSET_LENGTH];
+   ctrlm_rf4ce_controller_audio_profiles_t audio_profiles_ctrl_;
+   ctrlm_rf4ce_voice_statistics_t          voice_statistics_;
+   ctrlm_rf4ce_voice_session_statistics_t  voice_session_statistics_;
+   ctrlm_rf4ce_rib_entries_updated_t       rib_entries_updated_;
+   ctrlm_rf4ce_product_name_t              product_name_;
    ctrlm_rf4ce_controller_type_t           controller_type_;
+   ctrlm_rf4ce_controller_capabilities_t   capabilities_;
    guchar                                  download_rate_;
-   controller_irdb_status_t                controller_irdb_status_;
+   ctrlm_rf4ce_controller_irdb_status_t    controller_irdb_status_;
    gboolean                                controller_irdb_status_is_new_;
-   controller_reboot_reason_t              reboot_reason_;
-   guchar                                  reboot_voltage_level_;
-   guint32                                 reboot_assert_number_;
-   time_t                                  reboot_time_;
+   ctrlm_rf4ce_controller_ir_rf_database_status_t ir_rf_database_status_;
+   controller_reboot_reason_t              reboot_reason_;        // NEXT
+   guchar                                  reboot_voltage_level_; // NEXT
+   guint32                                 reboot_assert_number_; // NEXT
+   time_t                                  reboot_time_;          // NEXT
    guint16                                 memory_available_;
    guint16                                 memory_largest_;
-   guchar                                  ir_rf_database_status_;
    gboolean                                download_in_progress_;
    guint16                                 download_image_id_;
    bool                                    autobind_in_progress_;
@@ -842,36 +737,21 @@ private:
    gboolean                                manual_poll_firmware_;
    gboolean                                manual_poll_audio_data_;
    ctrlm_rf4ce_device_update_audio_theme_t audio_theme_;
-   guchar *                                crash_dump_buf_;           // crash data buffer
-   guint16                                 crash_dump_size_;          // data received size
-   guint16                                 crash_dump_expected_size_; // data allocated size
+   ctrlm_rf4ce_controller_memory_dump_t    memory_dump_;
    bool                                    print_firmware_on_button_press;
    gboolean                                has_battery_;
    gboolean                                has_dsp_;
-   battery_voltage_milestones_t            battery_milestones_;
-   time_t                                  battery_last_good_timestamp_;
-   guchar                                  battery_last_good_percent_;
-   guchar                                  battery_last_good_loaded_voltage_;
-   guchar                                  battery_last_good_unloaded_voltage_;
-   guchar                                  battery_changed_unloaded_voltage_;
-   guchar                                  battery_75_percent_unloaded_voltage_;
-   guchar                                  battery_50_percent_unloaded_voltage_;
-   guchar                                  battery_25_percent_unloaded_voltage_;
-   guchar                                  battery_5_percent_unloaded_voltage_;
-   guchar                                  battery_0_percent_unloaded_voltage_;
-   guchar                                  battery_voltage_large_jump_counter_;
-   gboolean                                battery_voltage_large_decline_detected_;
    gboolean                                battery_first_write_;
 
    gboolean                                configuration_complete_failure_;
 
    // Far Field
-   uint8_t                                 privacy_;
-   far_field_metrics_t                     ff_metrics_;
-   dsp_metrics_t                           dsp_metrics_;
-   time_t                                  time_metrics_;
-   uptime_privacy_info_t                   uptime_privacy_info_;
-   guint32                                 time_since_last_saved_;
+   uint8_t                                 privacy_;               // NEXT
+   far_field_metrics_t                     ff_metrics_;            // NEXT
+   dsp_metrics_t                           dsp_metrics_;           // NEXT 
+   time_t                                  time_metrics_;          // NEXT  
+   uptime_privacy_info_t                   uptime_privacy_info_;   // NEXT 
+   guint32                                 time_since_last_saved_; // NEXT  
 
    // Polling variables
    GAsyncQueue                              *polling_actions_;
@@ -879,11 +759,11 @@ private:
    ctrlm_rf4ce_polling_configuration_t       polling_configurations_[RF4CE_POLLING_METHOD_MAX];
    time_t                                    time_last_heartbeat_;
    // End Polling variables
-   ctrlm_rf4ce_rib_configuration_complete_status_t rib_configuration_complete_status_;
+   ctrlm_rf4ce_rib_configuration_complete_status_t rib_configuration_complete_status_; // NEXT
 
 #ifdef ASB
    // ASB variables
-   asb_key_derivation_method_t             asb_key_derivation_method_used_;
+   asb_key_derivation_method_t             asb_key_derivation_method_used_; // NEXT
    ctrlm_timestamp_t                       asb_key_derivation_ts_start_;
    guint                                   asb_tag_;
    // End ASB variables
@@ -895,7 +775,6 @@ private:
    gboolean                                did_reset_;
 #endif
    // HACK for XR15-704
-   bool                                    fmr_supported_;
    guint8                                  mfg_test_result_;
 
    ctrlm_timestamp_t                       checkin_time_;    ///< OUT - Timestamp indicating the most recent poll indication of the controller
@@ -936,8 +815,6 @@ private:
    ctrlm_hal_result_t network_property_get(ctrlm_hal_network_property_t property, void **value);
    ctrlm_hal_result_t network_property_set(ctrlm_hal_network_property_t property, void *value);
 
-   guchar battery_level_percent(void);
-   void property_write_battery_milestones(bool batteries_changed, guchar voltage_loaded, guchar voltage_unloaded, guchar percent, time_t timestamp);
    gboolean send_battery_milestone_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_battery_event_t battery_event, guchar percent);
    gboolean send_remote_reboot_event(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar voltage, controller_reboot_reason_t reason, guint32 assert_number);
    gboolean is_batteries_changed(guchar new_voltage);
@@ -945,46 +822,24 @@ private:
 
    guchar property_read_peripheral_id(guchar *data, guchar length);
    guchar property_read_rf_statistics(guchar *data, guchar length);
-   guchar property_read_version_irdb(guchar *data, guchar length);
-   guchar property_read_version_hardware(guchar *data, guchar length);
-   guchar property_read_version_software(guchar *data, guchar length);
-   guchar property_read_version_dsp(guchar *data, guchar length);
-   guchar property_read_version_keyword_model(guchar *data, guchar length);
-   guchar property_read_version_arm(guchar *data, guchar length);
-   guchar property_read_version_build_id(guchar *data, guchar length);
-   guchar property_read_version_dsp_build_id(guchar *data, guchar length);
-   guchar property_read_battery_status(guchar *data, guchar length);
    guchar property_read_short_rf_retry_period(guchar *data, guchar length);
-   guchar property_read_voice_command_status(guchar *data, guchar length);
-   guchar property_read_voice_command_length(guchar *data, guchar length);
    guchar property_read_maximum_utterance_length(guchar *data, guchar length);
    guchar property_read_voice_command_encryption(guchar *data, guchar length);
    guchar property_read_max_voice_data_retry(guchar *data, guchar length);
    guchar property_read_max_voice_csma_backoff(guchar *data, guchar length);
    guchar property_read_min_voice_data_backoff(guchar *data, guchar length);
-   guchar property_read_voice_ctrl_audio_profiles(guchar *data, guchar length);
    guchar property_read_voice_targ_audio_profiles(guchar *data, guchar length);
-   guchar property_read_voice_statistics(guchar *data, guchar length);
-   guchar property_read_rib_entries_updated(guchar *data, guchar length);
    guchar property_read_rib_update_check_interval(guchar *data, guchar length);
-   guchar property_read_voice_session_statistics(guchar *data, guchar length);
    guchar property_read_opus_encoding_params(guchar *data, guchar length);
    guchar property_read_voice_session_qos(guchar *data, guchar length);
-   guchar property_read_update_version_bootloader(guchar *data, guchar length);
-   guchar property_read_update_version_golden(guchar *data, guchar length);
-   guchar property_read_update_version_audio_data(guchar *data, guchar length);
-   guchar property_read_product_name(guchar *data, guchar length);
    guchar property_read_download_rate(guchar *data, guchar length);
    guchar property_read_update_polling_period(guchar *data, guchar length);
    guchar property_read_data_request_wait_time(guchar *data, guchar length);
-   guchar property_read_ir_rf_database_status(guchar *data, guchar length, bool target);
    guchar property_read_ir_rf_database(guchar index, guchar *data, guchar length);
    guchar property_read_validation_configuration(guchar *data, guchar length);
-   guchar property_read_controller_irdb_status(guchar *data, guchar length);
    guchar property_read_target_irdb_status(guchar *data, guchar length);
    guchar property_read_irdb_entry_id_name_tv(guchar *data, guchar length);
    guchar property_read_irdb_entry_id_name_avr(guchar *data, guchar length);
-   guchar property_read_voice_metrics(guchar *data, guchar length);
    guchar property_read_firmware_updated(guchar *data, guchar length);
    guchar property_read_reboot_diagnostics(guchar *data, guchar length);
    guchar property_read_memory_statistics(guchar *data, guchar length);
@@ -997,7 +852,6 @@ private:
    guchar property_read_polling_configuration_heartbeat(guchar *data, guchar length);
    guchar property_read_polling_configuration_mac(guchar *data, guchar length);
    guchar property_read_privacy(guchar *data, guchar length);
-   guchar property_read_controller_capabilities(guchar *data, guchar length);
    guchar property_read_far_field_configuration(guchar *data, guchar length);
    guchar property_read_far_field_metrics(guchar *data, guchar length);
    guchar property_read_dsp_configuration(guchar *data, guchar length);
@@ -1006,38 +860,18 @@ private:
 
    void property_write_peripheral_id();
    void property_write_rf_statistics();
-   void property_write_version_irdb(guchar major, guchar minor, guchar revision, guchar patch);
-   void property_write_version_hardware(guchar manufacturer, guchar model, guchar hw_revision, guint16 lot_code);
-   void property_write_version_software(guchar major, guchar minor, guchar revision, guchar patch);
-   void property_write_battery_status(guchar flags, guchar voltage_loaded, guint32 codes_txd_rf, guint32 codes_txd_ir, guchar voltage_unloaded);
    void property_write_short_rf_retry_period(guint32 short_rf_retry_period);
-   #ifdef USE_VOICE_SDK
-   void property_write_voice_command_status(ctrlm_voice_command_status_t voice_command_status, guint8 flags, guint8 value);
-   #else
-   void property_write_voice_command_status(voice_command_status_t voice_command_status, guint8 flags, guint8 value);
-   #endif
    void property_write_voice_command_length(guchar voice_command_length);
    void property_write_maximum_utterance_length(guint16 maximum_utterance_length);
    void property_write_voice_command_encryption(voice_command_encryption_t voice_command_encryption);
    void property_write_max_voice_data_retry(guchar max_voice_data_retry_attempts);
    void property_write_max_voice_csma_backoff(guchar max_voice_csma_backoffs);
    void property_write_min_voice_data_backoff(guchar min_voice_data_backoff_exp);
-   void property_write_voice_ctrl_audio_profiles(guint16 audio_profiles_ctrl);
-   void property_write_voice_statistics(guint32 voice_sessions_activated, guint32 audio_data_tx_time);
    void property_write_rib_update_check_interval(guint16 rib_update_check_interval);
-   //void property_write_voice_session_statistics();
-   void property_write_update_version_bootloader(guchar major, guchar minor, guchar revision, guchar patch);
-   void property_write_update_version_golden(guchar major, guchar minor, guchar revision, guchar patch);
-   void property_write_update_version_audio_data(guchar major, guchar minor, guchar revision, guchar patch);
-   void property_write_product_name(const char *name);
    void property_write_download_rate(download_rate_t download_rate);
    void property_write_update_polling_period(guint16 update_polling_period);
    void property_write_data_request_wait_time(guint16 data_request_wait_time);
-   void property_write_ir_rf_database_status(guchar status);
-   //void property_write_ir_rf_database();
    void property_write_validation_configuration(guint16 auto_check_validation_period, guint16 link_lost_wait_time);
-   //void property_read_controller_irdb_status();
-   void property_write_voice_metrics(void);
    void property_write_firmware_updated(void);
    void property_write_reboot_diagnostics(void);
    void property_write_memory_statistics(void);
@@ -1045,49 +879,28 @@ private:
 
    guchar property_write_peripheral_id(guchar *data, guchar length);
    guchar property_write_rf_statistics(guchar *data, guchar length);
-   guchar property_write_version_irdb(guchar *data, guchar length);
-   guchar property_write_version_hardware(guchar *data, guchar length);
-   guchar property_write_version_software(guchar *data, guchar length);
-   guchar property_write_version_dsp(guchar *data, guchar length);
-   guchar property_write_version_keyword_model(guchar *data, guchar length);
-   guchar property_write_version_arm(guchar *data, guchar length);
-   guchar property_write_version_build_id(guchar *data, guchar length);
-   guchar property_write_version_dsp_build_id(guchar *data, guchar length);
-   guchar property_write_battery_status(guchar *data, guchar length);
    guchar property_write_short_rf_retry_period(guchar *data, guchar length);
-   guchar property_write_voice_command_status(guchar *data, guchar length);
-   guchar property_write_voice_command_length(guchar *data, guchar length);
    guchar property_write_maximum_utterance_length(guchar *data, guchar length);
    guchar property_write_voice_command_encryption(guchar *data, guchar length);
    guchar property_write_max_voice_data_retry(guchar *data, guchar length);
    guchar property_write_max_voice_csma_backoff(guchar *data, guchar length);
    guchar property_write_min_voice_data_backoff(guchar *data, guchar length);
-   guchar property_write_voice_ctrl_audio_profiles(guchar *data, guchar length);
-   guchar property_write_voice_statistics(guchar *data, guchar length);
    guchar property_write_rib_update_check_interval(guchar *data, guchar length);
-   guchar property_write_voice_session_statistics(guchar *data, guchar length);
    guchar property_write_opus_encoding_params(guchar *data, guchar length);
    guchar property_write_voice_session_qos(guchar *data, guchar length);
-   guchar property_write_update_version_bootloader(guchar *data, guchar length);
-   guchar property_write_update_version_golden(guchar *data, guchar length);
-   guchar property_write_update_version_audio_data(guchar *data, guchar length);
-   guchar property_write_product_name(guchar *data, guchar length);
    guchar property_write_download_rate(guchar *data, guchar length);
    guchar property_write_update_polling_period(guchar *data, guchar length);
    guchar property_write_data_request_wait_time(guchar *data, guchar length);
    guchar property_write_ir_rf_database(guchar index, guchar *data, guchar length);
    guchar property_write_validation_configuration(guchar *data, guchar length);
-   guchar property_write_controller_irdb_status(guchar *data, guchar length);
    guchar property_write_target_irdb_status(guchar *data, guchar length);
    guchar property_write_irdb_entry_id_name_tv(guchar *data, guchar length);
    guchar property_write_irdb_entry_id_name_avr(guchar *data, guchar length);
-   guchar property_write_voice_metrics(guchar *data, guchar length);
    guchar property_write_firmware_updated(guchar *data, guchar length);
    guchar property_write_reboot_diagnostics(guchar *data, guchar length);
    guchar property_write_memory_statistics(guchar *data, guchar length);
    guchar property_write_time_last_checkin_for_device_update(guchar *data, guchar length);
 
-   guchar property_write_memory_dump(guchar index, guchar *data, guchar length);
    guchar property_write_reboot_stats(guchar *data, guchar length);
    guchar property_write_memory_stats(guchar *data, guchar length);
    guchar property_write_receiver_id(guchar *data, guchar length);
@@ -1097,9 +910,7 @@ private:
    guchar property_write_polling_methods(guchar *data, guchar length);
    guchar property_write_polling_configuration_heartbeat(guchar *data, guchar length);
    guchar property_write_polling_configuration_mac(guchar *data, guchar length);
-   guchar property_write_battery_milestones(guchar *data, guchar length);
    guchar property_write_privacy(guchar *data, guchar length);
-   guchar property_write_controller_capabilities(const guchar *data, guchar length);
    guchar property_write_far_field_configuration(guchar *data, guchar length);
    guchar property_write_far_field_metrics(guchar *data, guchar length);
    guchar property_write_dsp_configuration(guchar *data, guchar length);

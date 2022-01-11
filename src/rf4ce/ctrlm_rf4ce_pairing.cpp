@@ -660,7 +660,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_unpair(void *data, int size) { //ctr
       LOG_ERROR("%s: Controller doesn't exist!\n", __FUNCTION__);
       params.result = CTRLM_HAL_RESULT_UNPAIR_FAILURE;
    } else {
-      ctrlm_hal_rf4ce_ieee_address_t controller_ieee = controllers_[controller_id]->ieee_address_get();
+      ctrlm_ieee_addr_t controller_ieee = controllers_[controller_id]->ieee_address_get();
 
       // Check to make sure the ieee address matches
       if(controller_ieee != ieee_address) {

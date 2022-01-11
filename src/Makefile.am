@@ -20,6 +20,10 @@
 AM_CPPFLAGS = -I$(top_srcdir)/                     \
               -I$(top_srcdir)/include/             \
               -I$(top_srcdir)/src/                 \
+              -I$(top_srcdir)/src/attributes       \
+              -I$(top_srcdir)/src/config           \
+              -I$(top_srcdir)/src/database         \
+              -I$(top_srcdir)/src/rfc              \
               -I$(top_srcdir)/src/irdb/            \
               -I$(top_srcdir)/src/irdb/ipc/        \
               -I$(top_srcdir)/src/voice/           \
@@ -43,13 +47,22 @@ controlMgr_SOURCES = ctrlm_main.cpp                           \
                      ctrlm_controller.cpp                     \
                      ctrlm_rcu.cpp                            \
                      ctrlm_rcu_iarm.cpp                       \
-                     ctrlm_database.cpp                       \
+                     attributes/ctrlm_attr.cpp                \
+                     attributes/ctrlm_version.cpp             \
+                     attributes/ctrlm_attr_general.cpp     \
+                     config/ctrlm_config.cpp                  \
+                     config/ctrlm_config_types.cpp            \
+                     config/ctrlm_config_attr.cpp             \
+                     database/ctrlm_database.cpp              \
+                     database/ctrlm_db_attr.cpp               \
+                     database/ctrlm_db_types.cpp              \
                      ctrlm_validation.cpp                     \
                      ctrlm_device_update.cpp                  \
                      ctrlm_device_update_iarm.cpp             \
                      ctrlm_recovery.cpp                       \
                      ctrlm_tr181.cpp                          \
-                     ctrlm_rfc.cpp                            \
+                     rfc/ctrlm_rfc.cpp                        \
+                     rfc/ctrlm_rfc_attr.cpp                   \
                      json_config.cpp                          \
                      irdb/ctrlm_irdb.cpp                      \
                      irdb/ctrlm_irdb_stub.cpp                 \
@@ -84,21 +97,29 @@ endif
 if RF4CE_ENABLED
 AM_CPPFLAGS += -DCTRLM_NETWORK_RF4CE
 AM_CPPFLAGS += -DCTRLM_NETWORK_HAS_HAL_NVM
+AM_CPPFLAGS += -I$(top_srcdir)/src/rf4ce/rib
 AM_LDFLAGS  += $(CTRLM_HAL_RF4CE_LIBRARY)
 
-controlMgr_SOURCES  += rf4ce/ctrlm_rf4ce_battery.cpp       \
-                       rf4ce/ctrlm_rf4ce_controller.cpp    \
-                       rf4ce/ctrlm_rf4ce_device_update.cpp \
-                       rf4ce/ctrlm_rf4ce_discovery.cpp     \
-                       rf4ce/ctrlm_rf4ce_indication.cpp    \
-                       rf4ce/ctrlm_rf4ce_network.cpp       \
-                       rf4ce/ctrlm_rf4ce_pairing.cpp       \
-                       rf4ce/ctrlm_rf4ce_rcu.cpp           \
-                       rf4ce/ctrlm_rf4ce_rib.cpp           \
-                       rf4ce/ctrlm_rf4ce_utils.cpp         \
-                       rf4ce/ctrlm_rf4ce_validation.cpp    \
-                       rf4ce/ctrlm_rf4ce_ir_rf_db.cpp      \
-                       rf4ce/ctrlm_rf4ce_ir_rf_db_entry.cpp
+controlMgr_SOURCES  += rf4ce/ctrlm_rf4ce_battery.cpp                                       \
+                       rf4ce/ctrlm_rf4ce_controller.cpp                                    \
+                       rf4ce/ctrlm_rf4ce_device_update.cpp                                 \
+                       rf4ce/ctrlm_rf4ce_discovery.cpp                                     \
+                       rf4ce/ctrlm_rf4ce_indication.cpp                                    \
+                       rf4ce/ctrlm_rf4ce_network.cpp                                       \
+                       rf4ce/ctrlm_rf4ce_pairing.cpp                                       \
+                       rf4ce/ctrlm_rf4ce_rcu.cpp                                           \
+                       rf4ce/ctrlm_rf4ce_rib.cpp                                           \
+                       rf4ce/ctrlm_rf4ce_utils.cpp                                         \
+                       rf4ce/ctrlm_rf4ce_validation.cpp                                    \
+                       rf4ce/ctrlm_rf4ce_ir_rf_db.cpp                                      \
+                       rf4ce/ctrlm_rf4ce_ir_rf_db_entry.cpp                                \
+                       rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_version.cpp \
+                       rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_general.cpp \
+                       rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_battery.cpp \
+                       rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_voice.cpp   \
+                       rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_irdb.cpp    \
+                       rf4ce/rib/ctrlm_rf4ce_rib_attr.cpp                                  \
+                       rf4ce/rib/ctrlm_rf4ce_rib.cpp
 endif
 
 if BLE_ENABLED
@@ -252,8 +273,8 @@ endif
 CTRLM_CONFIG_JSON        =ctrlm_config.json
 CTRLM_CONFIG_JSON_DEF    =ctrlm_config_default.json
 CTRLM_CONFIG_JSON_TMPL   =ctrlm_config.json.template
-CTRLM_CONFIG_H           =ctrlm_config.h
-CTRLM_VERSION_H          =ctrlm_version.h
+CTRLM_CONFIG_H           =ctrlm_config_default.h
+CTRLM_VERSION_H          =ctrlm_version_build.h
 
 BUILT_SOURCES = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON)
 CLEANFILES    = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON)

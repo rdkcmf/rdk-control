@@ -25,7 +25,7 @@
 #include "../ctrlm_rcu.h"
 #include "ctrlm_rf4ce_network.h"
 #include "../ctrlm_device_update.h"
-#include "../ctrlm_database.h"
+#include "ctrlm_database.h"
 
 #define RF4CE_DEVICE_UPDATE_CMD_LEN_IMAGE_CHECK_REQUEST     (2)
 #define RF4CE_DEVICE_UPDATE_CMD_LEN_IMAGE_CHECK_RESPONSE    (7)
@@ -183,17 +183,17 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
             manual_poll_firmware_ = false;
             manual_poll           = true;
          }
-         image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_software_, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, is_controller_type_z());
+         image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_.to_versiont(), version_bootloader_.to_versiont(), version_software_.to_versiont(), RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, is_controller_type_z());
          break;
       }
       case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_AUDIO_DATA_1: {
          LOG_INFO("%s: (%u) Audio Data 1\n", __FUNCTION__, controller_id_get());
          if(manual_poll_audio_data_) { // Manual poll from the remote, use the audio theme if set
-            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_audio_data_, audio_theme_, &image_info, false);
+            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_.to_versiont(), version_bootloader_.to_versiont(), version_audio_data_.to_versiont(), audio_theme_, &image_info, false);
             manual_poll_audio_data_ = false;
             manual_poll             = true;
          } else {
-            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_audio_data_, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, false);
+            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_.to_versiont(), version_bootloader_.to_versiont(), version_audio_data_.to_versiont(), RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, false);
          }
          break;
       }
@@ -210,12 +210,12 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
                manual_poll           = true;
             }
             switch(image_type) {
-               case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_DSP:           version = version_dsp_;           break;
-               case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_KEYWORD_MODEL: version = version_keyword_model_; break;
-               case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_AUDIO_DATA_2:  version = version_audio_data_;    break;
+               case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_DSP:           version = version_dsp_.to_versiont();           break;
+               case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_KEYWORD_MODEL: version = version_keyword_model_.to_versiont(); break;
+               case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_AUDIO_DATA_2:  version = version_audio_data_.to_versiont();    break;
                default: break;
             }
-            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, false);
+            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_.to_versiont(), version_bootloader_.to_versiont(), version, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, false);
             break;
          }
       }
@@ -227,14 +227,14 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
 
    ctrlm_device_update_session_id_t session_id = 0;
    if(image_available) { // Attempt to start update session
-      ready_to_download = ctrlm_device_update_rf4ce_begin(network_id_get(), controller_id_get(), version_hardware_, version_bootloader_, version_software_, image_info.id, ctrlm_device_update_request_timeout_get(), manual_poll, &begin_info, NULL, &session_id, device_update_session_resume_support());
+      ready_to_download = ctrlm_device_update_rf4ce_begin(network_id_get(), controller_id_get(), version_hardware_.to_versiont(), version_bootloader_.to_versiont(), version_software_.to_versiont(), image_info.id, ctrlm_device_update_request_timeout_get(), manual_poll, &begin_info, NULL, &session_id, device_update_session_resume_support());
       print_remote_firmware_debug_info(RF4CE_PRINT_FIRMWARE_LOG_IMAGE_DOWNLOAD_STARTED, ctrlm_device_update_get_software_version(image_info.id));
       download_in_progress_ = true;
    }
 
 #ifdef XR15_704
    // HACK: We need to make XR15s running < 2.0.0.0 do not get an image pending flag to avoid bug on device.
-   version_software_t version_bug = {XR15_DEVICE_UPDATE_BUG_FIRMWARE_MAJOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_MINOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_REVISION, XR15_DEVICE_UPDATE_BUG_FIRMWARE_PATCH};
+   ctrlm_sw_version_t version_bug(XR15_DEVICE_UPDATE_BUG_FIRMWARE_MAJOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_MINOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_REVISION, XR15_DEVICE_UPDATE_BUG_FIRMWARE_PATCH);
 #endif
  
    if(!image_available || !ready_to_download) {
@@ -247,7 +247,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
       }
 #ifdef XR15_704
       // HACK: We need to make XR15s running < 2.0.0.0 do not get an image pending flag to avoid bug on device.
-      else if(RF4CE_CONTROLLER_TYPE_XR15 == controller_type_ && -1 == version_compare(version_software_, version_bug)) {
+      else if(RF4CE_CONTROLLER_TYPE_XR15 == controller_type_ && version_software_ < version_bug) {
          LOG_INFO("%s: Image Check response - Image is pending - XR15v1 running < 2.0.0.0, sending No image available\n", __FUNCTION__);
          print_remote_firmware_debug_info(RF4CE_PRINT_FIRMWARE_LOG_IMAGE_DOWNLOAD_PENDING, ctrlm_device_update_get_software_version(image_info.id));
          if(begin_info.when == RF4CE_DEVICE_UPDATE_IMAGE_CHECK_POLL_TIME) {
@@ -317,9 +317,9 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
       response[14] = (guchar)(image_info.crc >> 8);
       response[15] = (guchar)(image_info.crc >> 16);
       response[16] = (guchar)(image_info.crc >> 24);
-      response[17] = (guchar)((version_hardware_.manufacturer << 4) | (version_hardware_.model & 0xF)); // Hardware Version
-      response[18] = version_hardware_.hw_revision;
-      safec_rc = strcpy_s((char *)&response[19], sizeof(response)-19, product_name_);
+      response[17] = (guchar)((version_hardware_.get_manufacturer() << 4) | (version_hardware_.get_model() & 0xF)); // Hardware Version
+      response[18] = version_hardware_.get_revision();
+      safec_rc = strcpy_s((char *)&response[19], sizeof(response)-19, product_name_.get_value().c_str());
       ERR_CHK(safec_rc);
       response_length = RF4CE_DEVICE_UPDATE_CMD_LEN_IMAGE_AVAILABLE;
 
@@ -420,9 +420,9 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_load_request(ctrlm_timest
 
 #ifdef XR15_704
    // HACK: We need to make XR15s running < 2.0.0.0 load ASAP to avoid bug on device.
-   version_software_t version_bug = {XR15_DEVICE_UPDATE_BUG_FIRMWARE_MAJOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_MINOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_REVISION, XR15_DEVICE_UPDATE_BUG_FIRMWARE_PATCH};
+   ctrlm_sw_version_t version_bug(XR15_DEVICE_UPDATE_BUG_FIRMWARE_MAJOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_MINOR, XR15_DEVICE_UPDATE_BUG_FIRMWARE_REVISION, XR15_DEVICE_UPDATE_BUG_FIRMWARE_PATCH);
 
-   if(RF4CE_CONTROLLER_TYPE_XR15 == controller_type_ && -1 == version_compare(version_software_, version_bug)) {
+   if(RF4CE_CONTROLLER_TYPE_XR15 == controller_type_ && version_software_ < version_bug) {
        LOG_INFO("%s: XR15v1 running < 2.0.0.0, LOAD IMMEDIATELY\n", __FUNCTION__);
        load_info.when = RF4CE_DEVICE_UPDATE_IMAGE_LOAD_NOW;
        log_string += "Load scheduled: Immediately.";
@@ -576,7 +576,7 @@ bool ctrlm_obj_controller_rf4ce_t::device_update_session_resume_support(void) {
                                                    .minor    = 6,
                                                    .revision = 0,
                                                    .patch    = 2 };
-      return(ctrlm_device_update_rf4ce_is_software_version_min_met(version_software_get(), xr19_fw4_w_ota_resume));
+      return(ctrlm_device_update_rf4ce_is_software_version_min_met(version_software_get().to_versiont(), xr19_fw4_w_ota_resume));
    }
    return(false);
 }
@@ -644,9 +644,9 @@ bool ctrlm_obj_controller_rf4ce_t::device_update_session_resume_load(rf4ce_devic
    info->network_id         = network_id_get();
    info->controller_id      = controller_id_get();
    info->type               = controller_type_;
-   info->version_hardware   = version_hardware_;
-   info->version_bootloader = version_bootloader_;
-   info->version_software   = version_software_;
+   info->version_hardware   = version_hardware_.to_versiont();
+   info->version_bootloader = version_bootloader_.to_versiont();
+   info->version_software   = version_software_.to_versiont();
    info->timeout            = obj_network_rf4ce_->device_update_session_timeout_get();
    info->type_z             = is_controller_type_z();
 

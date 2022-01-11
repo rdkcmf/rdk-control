@@ -161,16 +161,6 @@ const char *ctrlm_rf4ce_firmware_updated_str(ctrlm_rf4ce_firmware_updated_t upda
    return(ctrlm_invalid_return(updated));
 }
 
-const char *ctrlm_rf4ce_controller_manufacturer(guchar controller_manufacturer) {
-   switch(controller_manufacturer) {
-   case RF4CE_CONTROLLER_MANUFACTURER_NOBODY:           return("NOBODY");
-   case RF4CE_CONTROLLER_MANUFACTURER_REMOTE_SOLUTION:  return("RS");
-   case RF4CE_CONTROLLER_MANUFACTURER_UEI:              return("UEI");
-   case RF4CE_CONTROLLER_MANUFACTURER_OMNI:             return("OMNI");
-   }
-   return(ctrlm_invalid_return(controller_manufacturer));
-}
-
 const char *ctrlm_rf4ce_controller_polling_configuration_str(ctrlm_rf4ce_controller_type_t controller_type) {
    switch(controller_type) {
    case RF4CE_CONTROLLER_TYPE_XR2:     return("xr2");

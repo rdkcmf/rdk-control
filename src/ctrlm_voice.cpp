@@ -1244,9 +1244,9 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_begin(void *data, int 
    params.timeout_vrex_request = g_ctrlm_voice.vrex_prefs.timeout_vrex_request;
 #ifdef CTRLM_NETWORK_RF4CE
    params.user_string = controller.product_name_get();
-   params.sw_version = controller.version_software_get();
-   params.hw_version = controller.version_hardware_get();
-   params.battery_voltage = controller.battery_status_get().voltage_loaded;
+   params.sw_version = controller.version_software_get().to_versiont();
+   params.hw_version = controller.version_hardware_get().to_versiont();
+   params.battery_voltage = controller.battery_status_get().get_voltage_loaded();
    params.battery_percentage = ctrlm_battery_level_percent(controller_id, params.battery_voltage);
 #endif
 

@@ -137,6 +137,11 @@ const char * ctrlm_obj_network_t::name_get() const {
    return(name_.c_str());
 }
 
+std::string ctrlm_obj_network_t::db_name_get() const {
+   THREAD_ID_VALIDATE();
+   return("network");
+}
+
 void ctrlm_obj_network_t::mask_key_codes_set(gboolean mask_key_codes) {
    THREAD_ID_VALIDATE();
    mask_key_codes_ = mask_key_codes;

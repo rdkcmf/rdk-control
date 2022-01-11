@@ -28,14 +28,12 @@
 #include "ctrlm_ipc_key_codes.h"
 #include "../ctrlm_voice.h"
 #include "../ctrlm_voice_obj.h"
-#include "../ctrlm_database.h"
+#include "ctrlm_database.h"
 #include "../ctrlm_rcu.h"
 #include "../ctrlm_utils.h"
-#include "../ctrlm_rfc.h"
 #include "../ctrlm_vendor_network_factory.h"
 #include "../json_config.h"
 #include "../ctrlm_tr181.h"
-#include "../ctrlm_rfc.h"
 #include "../ctrlm_ipc_device_update.h"
 #include <iostream>
 #include <string>
@@ -232,6 +230,10 @@ void ctrlm_obj_network_ble_t::hal_init_cfm(void *data, int size) {
    ctrlm_obj_network_t::hal_init_cfm(data, size);
 }
 
+std::string ctrlm_obj_network_ble_t::db_name_get() const {
+   return("ble");
+}
+
 void ctrlm_obj_network_ble_t::hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t params) {
    THREAD_ID_VALIDATE();
 
@@ -421,7 +423,7 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_begin(void *data, int si
                                                                 controllers_[controller_id]->getSwRevision().toString().c_str(), 
                                                                 controllers_[controller_id]->getHwRevision().toString().c_str(), 0.0,
                                                                 false, NULL, NULL, NULL, true);
-         if (!controllers_[controller_id]->is_par_voice_supported() && (VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE == voice_status)) {
+         if (!controllers_[controller_id]->get_capabilities().has_capability(ctrlm_controller_capabilities_t::capability::PAR) && (VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE == voice_status)) {
             LOG_WARN("%s: PAR voice is enabled but not supported by BLE controller treating as normal voice session\n", __FUNCTION__);
             voice_status = VOICE_SESSION_RESPONSE_AVAILABLE;
          }

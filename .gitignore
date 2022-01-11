@@ -1,5 +1,5 @@
 # files produced by the build
-ctrlm_config.h
+ctrlm_config_default.h
 ctrlm_config.json
 
 # Temp Files

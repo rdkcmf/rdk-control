@@ -22,44 +22,10 @@
 #include <sstream>
 #include <vector>
 #include "irdb/ctrlm_irdb.h"
+#include "ctrlm_version.h"
+#include "ctrlm_attr_general.h"
 
 #define LAST_KEY_DATABASE_FLUSH_INTERVAL (2 * 60 * 60) // in seconds
-
-// Specification: Comcast-SP-RF4CE-XRC-Profile-D11-160505
-// 6.5.8.12 Memory Dump
-#define   CTRLM_CRASH_DUMP_OFFSET_MEMORY_SIZE         0
-#define   CTRLM_CRASH_DUMP_OFFSET_MEMORY_IDENTIFIER   2
-#define   CTRLM_CRASH_DUMP_OFFSET_RESERVED_0xFF       4
-#define   CTRLM_CRASH_DUMP_MAX_SIZE                   (255*CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_DUMP)
-
-// Remote Crash Dump File header                          // Dump File Format
-#define CTRLM_CRASH_DUMP_FILE_LEN_SIGNATURE           4   // 4 bytes signature 'XDMP'
-#define CTRLM_CRASH_DUMP_FILE_OFFSET_HDR_SIZE         4   // 2 bytes header size
-#define CTRLM_CRASH_DUMP_FILE_OFFSET_DEVICE_ID        6   
-#define CTRLM_CRASH_DUMP_FILE_LEN_DEVICE_ID           4   // 4 bytes device id
-#define CTRLM_CRASH_DUMP_FILE_OFFSET_HW_VER          10   // 4 bytes hw version
-#define CTRLM_CRASH_DUMP_FILE_OFFSET_SW_VER          14   // 4 bytes sw version
-#define CTRLM_CRASH_DUMP_FILE_OFFSET_NUM_DUMPS       18   // 2 bytes number of dumps in the file
-#define CTRLM_CRASH_DUMP_FILE_HDR_SIZE               20    
-// Remote Crash FILE Data Header (offsets are relative to beginning of theheader)
-#define CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_MEM_ID       0   // 2 bytes memory Id
-#define CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA         2   // 4 bytes offset to dump data
-#define CTRLM_CRASH_DUMP_DATA_HDR_OFFSET_DATA_LEN     6   // 2 bytes data length
-#define CTRLM_CRASH_DUMP_DATA_HDR_SIZE                8
-
-typedef struct {
-   guchar  manufacturer;
-   guchar  model;
-   guchar  hw_revision;
-   guint16 lot_code;
-} version_hardware_t;
-
-typedef struct {
-   guchar major;
-   guchar minor;
-   guchar revision;
-   guchar patch;
-} version_software_t;
 
 class ctrlm_version_t {
 public:
@@ -144,8 +110,7 @@ public:
    void irdb_entry_id_name_set(ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t irdb_ir_entry_id);
    ctrlm_irdb_ir_entry_id_t get_irdb_entry_id_name_tv();
    ctrlm_irdb_ir_entry_id_t get_irdb_entry_id_name_avr();
-   bool is_par_voice_supported() const;
-   bool is_haptics_feedback_supported() const;
+   virtual ctrlm_controller_capabilities_t get_capabilities() const;
 
    // Internal methods
    ctrlm_controller_id_t controller_id_get() const;
@@ -167,8 +132,6 @@ private:
    virtual guchar property_read_irdb_entry_id_name_avr(guchar *data, guchar length);
 
 protected:
-   bool                     par_voice_supported_;
-   bool                     haptics_feedback_supported_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_tv_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_avr_;
 };

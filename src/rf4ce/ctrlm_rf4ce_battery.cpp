@@ -22,13 +22,7 @@
 #include <glib.h>
 #include <string.h>
 #include <vector>
-#include "../ctrlm.h"
-#include "../ctrlm_utils.h"
-#include "../ctrlm_rcu.h"
 #include "ctrlm_rf4ce_network.h"
-#include "../ctrlm_voice.h"
-#include "../ctrlm_device_update.h"
-#include "../ctrlm_database.h"
 
 using namespace std;
 
@@ -561,15 +555,11 @@ const char v2p_table_xra[55] = {
 };
 
 
-guchar ctrlm_obj_controller_rf4ce_t::battery_level_percent(unsigned char voltage_unloaded) {
-   switch(controller_type_) {
+uint8_t battery_level_percent(int type, ctrlm_hw_version_t hw_version, unsigned char voltage_unloaded) {
+   switch(type) {
       case RF4CE_CONTROLLER_TYPE_XR11: {
-         version_hardware_t xr11_version_min;
-         xr11_version_min.manufacturer = 2;
-         xr11_version_min.model        = 2;
-         xr11_version_min.hw_revision  = 2;
-         xr11_version_min.lot_code     = 0;
-         if(version_compare(version_hardware_, xr11_version_min) >= 0) {
+         ctrlm_hw_version_t xr11_version_min(2, 2, 2, 0);
+         if(hw_version >= xr11_version_min) { // if hardware version is >= 2.2.2.0
             if(voltage_unloaded > V2P_INDEX_XR11_FIX_PERCENT_100) {
                return(100);
             } else if(voltage_unloaded < V2P_INDEX_XR11_FIX_PERCENT_ZERO) {

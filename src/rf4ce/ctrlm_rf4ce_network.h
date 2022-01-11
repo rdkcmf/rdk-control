@@ -57,6 +57,15 @@
 #define CTRLM_RF4CE_DISCOVERY_ASB_OCTET_ENABLED              (0x80)
 #endif
 
+#define IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD            (0x01)
+#define IR_RF_DATABASE_STATUS_DOWNLOAD_TV_5_DIGIT_CODE  (0x02)
+#define IR_RF_DATABASE_STATUS_DOWNLOAD_AVR_5_DIGIT_CODE (0x04)
+#define IR_RF_DATABASE_STATUS_TX_IR_DESCRIPTOR          (0x08)
+#define IR_RF_DATABASE_STATUS_CLEAR_ALL_5_DIGIT_CODES   (0x10)
+#define IR_RF_DATABASE_STATUS_DB_DOWNLOAD_NO            (0x40)
+#define IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES           (0x80)
+#define IR_RF_DATABASE_STATUS_RESERVED                  (0x20)
+
 typedef enum {
    CTRLM_RF4CE_DEVICE_TYPE_STB         = 0x09,
    CTRLM_RF4CE_DEVICE_TYPE_AUTOBIND    = 0xD0,
@@ -261,6 +270,7 @@ public:
    virtual void                         hal_init_complete();
    ctrlm_hal_result_t                   network_init(GThread *ctrlm_main_thread);
    void                                 network_destroy();
+   virtual std::string                  db_name_get() const;
    void                                 discovery_config_get(ctrlm_controller_discovery_config_t *config);
    bool                                 discovery_config_set(ctrlm_controller_discovery_config_t config);
    void                                 controllers_load();
@@ -284,6 +294,7 @@ public:
    ctrlm_rf4ce_controller_type_t        controller_type_from_user_string(guchar *user_string);
    const char *                         chipset_get();
    unsigned char                        ctrlm_battery_level_percent(ctrlm_controller_id_t controller_id, unsigned char voltage_loaded);
+   bool                                 is_importing_controller() const;
 
    void                                 ind_process_discovery(void *data, int size);  
    void                                 ind_process_pair(void *data, int size);       
@@ -313,7 +324,7 @@ public:
 //   void                                 req_process_voice_settings_update(ctrlm_main_queue_msg_voice_settings_update_t *dqm);
    void req_process_rib_set(void *data, int size);
    void req_process_rib_get(void *data, int size);
-   ctrlm_rib_request_cmd_result_t req_process_rib_export(ctrlm_controller_id_t controller_id, ctrlm_hal_rf4ce_rib_attr_id_t identifier, unsigned char index, unsigned char length, unsigned char *data);
+   ctrlm_rib_request_cmd_result_t req_process_rib_export(ctrlm_controller_id_t controller_id, uint8_t identifier, unsigned char index, unsigned char length, unsigned char *data);
    void req_process_controller_status(void *dqm, int size);
    void req_process_controller_product_name(void *data, int size);
    void req_process_network_status(void *data, int size);
@@ -353,9 +364,9 @@ public:
    void                                 push_ir_codes_to_voice_assistants_from_target_irdb_status();
    guchar                               write_target_irdb_status(guchar *data, guchar length);
    gboolean                             target_irdb_status_read_from_db();
-   void                                 target_irdb_status_set(controller_irdb_status_t controller_irdb_status);
+   void                                 target_irdb_status_set(ctrlm_rf4ce_controller_irdb_status_t controller_irdb_status);
    guchar                               target_irdb_status_flags_get();
-   controller_irdb_status_t             most_recent_controller_irdb_status_get();
+   ctrlm_rf4ce_controller_irdb_status_t most_recent_controller_irdb_status_get();
    virtual void                         disable_hal_calls();
 
    // Bastille 37 vulnerability public functions
@@ -417,7 +428,6 @@ public:
  
    ctrlm_rf4ce_polling_configuration_t  controller_polling_configuration_heartbeat_get(ctrlm_rf4ce_controller_type_t controller_type);
    ctrlm_rf4ce_polling_generic_config_t controller_generic_polling_configuration_get();
-   bool                                 is_ir_rf_database_new();
 
    vector<rf4ce_device_update_session_resume_info_t> *device_update_session_resume_list_get();
    guint32                              device_update_session_timeout_get();

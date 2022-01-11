@@ -108,6 +108,7 @@ public:
    void                          hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t params);
    virtual void                  hal_init_complete();
    virtual void                  hal_init_cfm(void *data, int size);
+   virtual std::string           db_name_get() const;
 
    void                          ind_process_rcu_status(void *data, int size);
    void                          ind_process_paired(void *data, int size);

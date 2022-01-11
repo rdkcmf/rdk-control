@@ -427,7 +427,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_data_rcu(ctrlm_main_queue_msg_rf4ce_
                LOG_WARN("%s: Key Combo - Unsupported Length %u\n", __FUNCTION__, length);
             }
 
-            if(strncmp(controllers_[dqm->controller_id]->product_name_get(), "XR15", 4) == 0) {
+            if(strncmp(controllers_[dqm->controller_id]->product_name_get().c_str(), "XR15", 4) == 0) {
                if(function == CTRLM_RCU_FUNCTION_MODE_IR_MOTOROLA ||
                   function == CTRLM_RCU_FUNCTION_MODE_IR_CISCO ||
                   function == CTRLM_RCU_FUNCTION_BLINK_IR_DB_VERSION) {
@@ -435,7 +435,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_data_rcu(ctrlm_main_queue_msg_rf4ce_
                   function = CTRLM_RCU_FUNCTION_INVALID;
                }
             }
-            if(strncmp(controllers_[dqm->controller_id]->product_name_get(), "XR11", 4) == 0) {
+            if(strncmp(controllers_[dqm->controller_id]->product_name_get().c_str(), "XR11", 4) == 0) {
                if(function == CTRLM_RCU_FUNCTION_BLINK_AVR_CODE) {
                   LOG_WARN("%s: Key Combo - Unsupported Function for XR11 <%s>\n", __FUNCTION__, ctrlm_rcu_function_str(function));
                   function = CTRLM_RCU_FUNCTION_INVALID;
@@ -488,7 +488,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_data_rcu(ctrlm_main_queue_msg_rf4ce_
          if(cmd_length < 2 || cmd_length > 3) {
             LOG_ERROR("%s: Ghost Code. Invalid Length %lu, (should be 2 or 3)\n", __FUNCTION__, cmd_length);
          } else {
-            ctrlm_remote_keypad_config remote_keypad_config = ctrlm_rf4ce_get_remote_keypad_config(controllers_[dqm->controller_id]->product_name_get());
+            ctrlm_remote_keypad_config remote_keypad_config = ctrlm_rf4ce_get_remote_keypad_config(controllers_[dqm->controller_id]->product_name_get().c_str());
             switch(cmd_data[1]) {
                case CTRLM_RCU_GHOST_CODE_VOLUME_UNITY_GAIN: {
                   LOG_INFO("%s: Ghost Code - Volume Unity Gain\n", __FUNCTION__);
