@@ -414,8 +414,10 @@ int main(int argc, char *argv[]) {
    const char *rf4ce_hal_lib = "/usr/lib/libctrlm_hal_rf4ce.so";
    if(!ctrlm_file_exists(rf4ce_hal_lib)) {
       LOG_INFO("%s: skipping ctrlm_hal_rf4ce library\n", __FUNCTION__);
+      rf4ce_hal_lib = NULL;
    } else if(clnl_lock(rf4ce_hal_lib, SECTION_TEXT)) { // returns 1 on error, 0 on success
       LOG_ERROR("%s: failed to lock ctrlm_hal_rf4ce instructions to memory\n", __FUNCTION__);
+      rf4ce_hal_lib = NULL;
    } else {
       LOG_INFO("%s: locked ctrlm_hal_rf4ce instructions to memory\n", __FUNCTION__);
    }
@@ -796,6 +798,11 @@ int main(int argc, char *argv[]) {
    clnl_unlock("/usr/bin/controlMgr", SECTION_TEXT);
 #ifdef USE_VOICE_SDK
    clnl_unlock("/usr/lib/libxraudio-hal.so.0", SECTION_TEXT);
+#endif
+#ifdef CTRLM_NETWORK_RF4CE
+   if(rf4ce_hal_lib != NULL) {
+      clnl_unlock(rf4ce_hal_lib, SECTION_TEXT);
+   }
 #endif
    clnl_destroy();
 #endif
