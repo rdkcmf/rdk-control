@@ -122,7 +122,7 @@ bool ctrlm_rf4ce_ir_rf_db_entry_t::to_binary(uint8_t **data, uint16_t *length) {
                 throw std::string("Failed to allocate buffer");
             }
             uint8_t *data_ptr = *data;
-            safec_rc = memset_s(&data_ptr, buffer_size, 0, buffer_size);
+            safec_rc = memset_s(data_ptr, buffer_size, 0, buffer_size);
             if(safec_rc < 0) ERR_CHK(safec_rc);
             switch(this->type) {
                 case CTRLM_RF4CE_IR_RF_DB_DEV_TV: {
