@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <regex>
 #include <limits.h>
+#include <sys/sysinfo.h>
 #include "../ctrlm.h"
 #include "../ctrlm_utils.h"
 #include "../ctrlm_rcu.h"
@@ -3932,8 +3933,24 @@ void ctrlm_obj_network_rf4ce_t::cfm_voice_session_rsp(void *data, int size) {
        }
        ctrlm_timestamp_t now;
        ctrlm_timestamp_get(&now);
+
+       double loadavg[3] = { -1, -1, -1 };
+       getloadavg(loadavg, 3);
+       struct sysinfo s_info;
+       if(sysinfo(&s_info) != 0) {
+           s_info.uptime = 0;
+       }
+       ctrlm_controller_id_t controller_id = voice_session_rsp_params_.controller_id;
+       float voltage_loaded   = 0.0;
+       float voltage_unloaded = 0.0;
+       if(controller_exists(controller_id)) {
+           battery_status_t battery_status = controllers_[voice_session_rsp_params_.controller_id]->battery_status_get();
+           voltage_loaded   = battery_status.voltage_loaded * 4.0 / 255;
+           voltage_unloaded = battery_status.voltage_unloaded * 4.0 / 255;
+       }
+       unsigned long session_id = ctrlm_get_voice_obj()->voice_session_id_get();
        LOG_ERROR("%s: result <%s> session response transmission failure\n", __FUNCTION__, ctrlm_hal_rf4ce_result_str(dqm->result));
-       LOG_ERROR("%s: packet recv to data_req <%lldms>, packet recv to now <%lldms>, retries <%u>\n", __FUNCTION__, ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, voice_session_rsp_params_.timestamp_rsp_req), ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, now), voice_session_rsp_params_.retries);
+       LOG_ERROR("%s: packet recv to data_req <%lldms>, packet recv to now <%lldms>, retries <%u> load avg <%5.2f, %5.2f, %5.2f> type <%s> voltage <%4.2f, %4.2f> uptime <%lu> session id <%u>\n", __FUNCTION__, ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, voice_session_rsp_params_.timestamp_rsp_req), ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, now), voice_session_rsp_params_.retries, loadavg[0], loadavg[1], loadavg[2], ctrlm_rf4ce_controller_type_str(controller_type_get(controller_id)), voltage_loaded, voltage_unloaded, s_info.uptime, session_id);
        b_result = false;
    }
 

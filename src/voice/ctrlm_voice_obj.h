@@ -372,6 +372,7 @@ class ctrlm_voice_t {
     void                                  voice_session_term();
     void                                  voice_session_info(ctrlm_voice_session_info_t *data);
     bool                                  voice_session_id_is_current(uuid_t uuid);
+    unsigned long                         voice_session_id_get();
 
     virtual void                          voice_stb_data_stb_sw_version_set(std::string &sw_version);
     std::string                           voice_stb_data_stb_sw_version_get() const;

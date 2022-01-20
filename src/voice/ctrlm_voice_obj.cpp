@@ -2645,6 +2645,10 @@ bool ctrlm_voice_t::voice_session_id_is_current(uuid_t uuid) {
     return(true);
 }
 
+unsigned long ctrlm_voice_t::voice_session_id_get() {
+    return(this->session_id);
+}
+
 void ctrlm_voice_t::voice_set_ipc(ctrlm_voice_ipc_t *ipc) {
     if(this->voice_ipc) {
         this->voice_ipc->deregister_ipc();
