@@ -74,6 +74,7 @@ typedef struct {
    version_software_t                                    version_software;
    version_software_t                                    version_bootloader_min;
    version_hardware_t                                    version_hardware_min;
+   bool                                                  type_z;
 } ctrlm_main_queue_msg_notify_firmware_t;
 
 typedef struct {
@@ -84,6 +85,7 @@ typedef struct {
    gboolean           force_update;
    gboolean           do_not_load;
    char               file_name[CTRLM_DEVICE_UPDATE_PATH_LENGTH];
+   gboolean           type_z;
 } rf4ce_device_update_image_info_t;
 
 typedef struct {
@@ -106,7 +108,7 @@ void     ctrlm_device_update_init(json_t *json_obj_device_update);
 gboolean ctrlm_device_update_init_iarm(void);
 void     ctrlm_device_update_terminate(void);
 void     ctrlm_device_update_queue_msg_push(gpointer msg);
-gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_image_type_t image_type, ctrlm_rf4ce_controller_type_t type, version_hardware_t version_hardware, version_software_t version_bootloader, version_software_t version_software, ctrlm_rf4ce_device_update_audio_theme_t audio_theme, rf4ce_device_update_image_info_t *image_info);
+gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_image_type_t image_type, ctrlm_rf4ce_controller_type_t type, version_hardware_t version_hardware, version_software_t version_bootloader, version_software_t version_software, ctrlm_rf4ce_device_update_audio_theme_t audio_theme, rf4ce_device_update_image_info_t *image_info, bool type_z);
 guint16  ctrlm_device_update_rf4ce_image_data_read(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint16 image_id, guint32 offset, guint16 length, guchar *data);
 gboolean ctrlm_device_update_rf4ce_begin(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, version_hardware_t version_hardware, version_software_t version_bootloader, version_software_t version_software, guint16 image_id, guint32 timeout, gboolean manual_poll, rf4ce_device_update_begin_info_t *begin_info, ctrlm_device_update_session_id_t *session_id_in, ctrlm_device_update_session_id_t *session_id_out, gboolean session_resume);
 void     ctrlm_device_update_rf4ce_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint16 image_id, ctrlm_device_update_iarm_load_result_t status);

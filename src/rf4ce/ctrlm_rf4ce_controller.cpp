@@ -193,7 +193,8 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    did_reset_(false),
 #endif
    fmr_supported_(false),
-   mfg_test_result_(1)
+   mfg_test_result_(1),
+   ota_failures_(0)
 {
    LOG_INFO("ctrlm_obj_controller_rf4ce_t constructor - %u\n", controller_id);
 
@@ -1193,6 +1194,15 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
       LOG_WARN("%s: Not read from DB - Mfg Test Result\n", __FUNCTION__);
    } else {
       property_write_mfg_test_result(data, length);
+      ctrlm_db_free(data);
+      data = NULL;
+   }
+
+   ctrlm_db_rf4ce_read_ota_failures_count(network_id, controller_id, &data, &length);
+   if (data == NULL) {
+      LOG_WARN("%s: Not read from DB - OTA failure count\n", __FUNCTION__);
+   } else {
+      ota_failures_ = (uint8_t) data[0];
       ctrlm_db_free(data);
       data = NULL;
    }
@@ -5490,4 +5500,19 @@ gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar ne
    guchar battery_increase = (0.2 * 255 / 4);
    //If the new voltage goes up by 0.2v or more but less than 0.3v, don't set the new voltage but report as a large jump.
    return(new_voltage >= (battery_status_.voltage_unloaded + battery_increase));
+}
+
+void ctrlm_obj_controller_rf4ce_t::ota_failure_count_set(uint8_t ota_failures) {
+   ota_failures_  = (ota_failures_ >= 4) ? 0 : ota_failures;
+   ctrlm_db_rf4ce_write_ota_failures_count(network_id_get(), controller_id_get(), ota_failures_);
+}
+
+uint8_t ctrlm_obj_controller_rf4ce_t::ota_failure_count_get(void) {
+   return ota_failures_;
+}
+
+bool ctrlm_obj_controller_rf4ce_t::is_controller_type_z(void) {
+   bool is_type_z = (ota_failures_ >= 2) ? true : false;
+   LOG_INFO("%s: Controller id %d (%s) is %s\n", __FUNCTION__, controller_id_get(), ctrlm_rf4ce_controller_type_str(controller_type_), is_type_z ? "TYPE Z" : "NOT TYPE Z");
+   return is_type_z;
 }

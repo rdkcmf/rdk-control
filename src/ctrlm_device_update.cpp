@@ -119,6 +119,7 @@ typedef struct {
    gboolean                                force_update;
    ctrlm_rf4ce_device_update_audio_theme_t audio_theme;
    guint32                                 reader_count;
+   gboolean                                type_z;
 } ctrlm_device_update_rf4ce_image_info_t;
 
 typedef struct {
@@ -747,9 +748,9 @@ void ctrlm_device_update_process_device_file(string file_path_archive, string de
                controller_type = RF4CE_CONTROLLER_TYPE_XR11;
             } else if(image_info.device_name == "XR15-10") {
                controller_type = RF4CE_CONTROLLER_TYPE_XR15;
-            } else if(image_info.device_name == "XR15-20") {
+            } else if(image_info.device_name == "XR15-20" || image_info.device_name == "XR15-20Z") {
                controller_type = RF4CE_CONTROLLER_TYPE_XR15V2;
-            } else if(image_info.device_name == "XR16-10") {
+            } else if(image_info.device_name == "XR16-10" || image_info.device_name == "XR16-10Z") {
                controller_type = RF4CE_CONTROLLER_TYPE_XR16;
             } else if(image_info.device_name == "XR19-10") {
                controller_type = RF4CE_CONTROLLER_TYPE_XR19;
@@ -807,6 +808,7 @@ void ctrlm_device_update_process_device_file(string file_path_archive, string de
                msg->image_type        = image_info.image_type;
                msg->controller_type   = controller_type;
                msg->force_update      = image_info.force_update;
+               msg->type_z            = image_info.type_z;
                safec_rc = memcpy_s(&msg->version_software, sizeof(msg->version_software), &image_info.version_software, sizeof(version_software_t));
                ERR_CHK(safec_rc);
                safec_rc = memcpy_s(&msg->version_bootloader_min, sizeof(msg->version_bootloader_min), &image_info.version_bootloader_min, sizeof(version_software_t));
@@ -940,6 +942,9 @@ gboolean ctrlm_device_update_image_info_get(string filename, ctrlm_device_update
       return false;
    }
 
+   char type_z = image_info->device_name.back();
+   image_info->type_z = (type_z == 'Z') ? true : false;
+
    image_info->file_name_image  = ctrlm_xml_tag_text_get(xml, "image:fileName");
    if(image_info->file_name_image.length() == 0) {
       LOG_ERROR("%s: Missing File Name\n", __FUNCTION__);
@@ -974,7 +979,7 @@ gboolean ctrlm_device_update_image_info_get(string filename, ctrlm_device_update
    }
 #ifdef CTRLM_NETWORK_RF4CE
    LOG_INFO("%s: device <%s> type <%s> size %u crc 0x%08X\n", __FUNCTION__, image_info->device_name.c_str(), ctrlm_rf4ce_device_update_image_type_str(image_info->image_type), image_info->size, image_info->crc);
-   LOG_INFO("%s: sw version <%u.%u.%u.%u> force update <%s> image file name <%s> audio theme <%s>\n", __FUNCTION__, image_info->version_software.major, image_info->version_software.minor, image_info->version_software.revision, image_info->version_software.patch, image_info->force_update ? "YES" : "NO", image_info->file_name_image.c_str(), ctrlm_rf4ce_device_update_audio_theme_str(image_info->audio_theme));
+   LOG_INFO("%s: sw version <%u.%u.%u.%u> force update <%s> image file name <%s> audio theme <%s> type z <%s>\n", __FUNCTION__, image_info->version_software.major, image_info->version_software.minor, image_info->version_software.revision, image_info->version_software.patch, image_info->force_update ? "YES" : "NO", image_info->file_name_image.c_str(), ctrlm_rf4ce_device_update_audio_theme_str(image_info->audio_theme), image_info->type_z ? "YES" : "NO");
    LOG_INFO("%s: hw version min <%u.%u.%u>\n", __FUNCTION__, image_info->version_hardware_min.manufacturer, image_info->version_hardware_min.model, image_info->version_hardware_min.hw_revision);
    LOG_INFO("%s: bldr version min <%u.%u.%u.%u>\n", __FUNCTION__, image_info->version_bootloader_min.major, image_info->version_bootloader_min.minor, image_info->version_bootloader_min.revision, image_info->version_bootloader_min.patch);
 #endif
@@ -1066,7 +1071,7 @@ guint32 ctrlm_device_update_request_timeout_get(void) {
    return g_ctrlm_device_update.prefs.download.request_timeout;
 }
 
-gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_image_type_t image_type, ctrlm_rf4ce_controller_type_t type, version_hardware_t version_hardware, version_software_t version_bootloader, version_software_t version_software, ctrlm_rf4ce_device_update_audio_theme_t audio_theme, rf4ce_device_update_image_info_t *image_info) {
+gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_image_type_t image_type, ctrlm_rf4ce_controller_type_t type, version_hardware_t version_hardware, version_software_t version_bootloader, version_software_t version_software, ctrlm_rf4ce_device_update_audio_theme_t audio_theme, rf4ce_device_update_image_info_t *image_info, bool type_z) {
    gboolean           found   = false;
    rf4ce_device_update_image_info_t upgrade;
    errno_t safec_rc = -1;
@@ -1075,8 +1080,7 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
    upgrade.version = version_software;
 
 #ifdef CTRLM_NETWORK_RF4CE
-   LOG_INFO("%s: Controller type <%s> Current  image type <%s> theme <%s> hw ver <%u.%u.%u.%u> bldr ver <%u.%u.%u.%u> sw ver <%u.%u.%u.%u>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(type), ctrlm_rf4ce_device_update_image_type_str(image_type), ctrlm_rf4ce_device_update_audio_theme_str(audio_theme), version_hardware.manufacturer, version_hardware.model, version_hardware.hw_revision, version_hardware.lot_code,
-         version_bootloader.major, version_bootloader.minor, version_bootloader.revision, version_bootloader.patch, version_software.major, version_software.minor, version_software.revision, version_software.patch);
+   LOG_INFO("%s: Controller type <%s> Current  image type <%s> theme <%s> hw ver <%u.%u.%u.%u> bldr ver <%u.%u.%u.%u> sw ver <%u.%u.%u.%u> type Z <%s>\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(type), ctrlm_rf4ce_device_update_image_type_str(image_type), ctrlm_rf4ce_device_update_audio_theme_str(audio_theme), version_hardware.manufacturer, version_hardware.model, version_hardware.hw_revision, version_hardware.lot_code, version_bootloader.major, version_bootloader.minor, version_bootloader.revision, version_bootloader.patch, version_software.major, version_software.minor, version_software.revision, version_software.patch, type_z ? "YES":"NO");
 #endif
 
    DEVICE_UPDATE_MUTEX_LOCK();
@@ -1098,6 +1102,7 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                upgrade.crc          = it->crc;
                upgrade.force_update = true; // Themes are always force updates
                upgrade.do_not_load  = g_ctrlm_device_update.prefs.download.load_immediately ? false : true;
+               upgrade.type_z       = it->type_z;
                safec_rc = strncpy_s(upgrade.file_name, sizeof(upgrade.file_name), it->file_path_archive.c_str(), sizeof(upgrade.file_name) - 1);
                ERR_CHK(safec_rc);
                found = true;
@@ -1114,12 +1119,12 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
    // Check for a newer version of image for this controller type
    for(vector<ctrlm_device_update_rf4ce_image_info_t>::iterator it = g_ctrlm_device_update.rf4ce_images->begin(); it < g_ctrlm_device_update.rf4ce_images->end(); it++) {
 #ifdef CTRLM_NETWORK_RF4CE
-      LOG_INFO("%s: Checking image type <%s> theme <%s> controller_type <%s>  hw ver min <%u.%u.%u.%u> bldr ver min <%u.%u.%u.%u> sw ver <%u.%u.%u.%u> force <%s>\n", __FUNCTION__, ctrlm_rf4ce_device_update_image_type_str(it->image_type), ctrlm_rf4ce_device_update_audio_theme_str(it->audio_theme), ctrlm_rf4ce_controller_type_str(it->controller_type), it->version_hardware_min.manufacturer, it->version_hardware_min.model, it->version_hardware_min.hw_revision, it->version_hardware_min.lot_code,
-            it->version_bootloader_min.major, it->version_bootloader_min.minor, it->version_bootloader_min.revision, it->version_bootloader_min.patch, it->version_software.major, it->version_software.minor, it->version_software.revision, it->version_software.patch, it->force_update ? "YES" : "NO");
+      LOG_INFO("%s: Checking image type <%s> theme <%s> controller_type <%s>  hw ver min <%u.%u.%u.%u> bldr ver min <%u.%u.%u.%u> sw ver <%u.%u.%u.%u> force <%s> type z <%s>\n", __FUNCTION__, ctrlm_rf4ce_device_update_image_type_str(it->image_type), ctrlm_rf4ce_device_update_audio_theme_str(it->audio_theme), ctrlm_rf4ce_controller_type_str(it->controller_type), it->version_hardware_min.manufacturer, it->version_hardware_min.model, it->version_hardware_min.hw_revision, it->version_hardware_min.lot_code, it->version_bootloader_min.major, it->version_bootloader_min.minor, it->version_bootloader_min.revision, it->version_bootloader_min.patch, it->version_software.major, it->version_software.minor, it->version_software.revision, it->version_software.patch, it->force_update ? "YES" : "NO", it->type_z ? "YES" : "NO");
 #endif
       if((it->image_type == image_type) && (it->controller_type == type) && ((it->audio_theme == RF4CE_DEVICE_UPDATE_AUDIO_THEME_DEFAULT) || (it->audio_theme >= RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID))
                                                                          && ctrlm_device_update_rf4ce_is_hardware_version_min_met(version_hardware, it->version_hardware_min)
-                                                                         && ctrlm_device_update_rf4ce_is_software_version_min_met(version_bootloader, it->version_bootloader_min)) {
+                                                                         && ctrlm_device_update_rf4ce_is_software_version_min_met(version_bootloader, it->version_bootloader_min)
+                                                                         && (it->type_z == type_z)) {
          // Image is for this device.  Check for force update or newer image
          LOG_INFO("%s: Image is compatible with the hardware\n", __FUNCTION__);
 
@@ -1133,6 +1138,7 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                upgrade.crc          = it->crc;
                upgrade.force_update = true;
                upgrade.do_not_load  = g_ctrlm_device_update.prefs.download.load_immediately ? false : true;
+               upgrade.type_z       = it->type_z;
                safec_rc = strncpy_s(upgrade.file_name, sizeof(upgrade.file_name), it->file_path_archive.c_str(), sizeof(upgrade.file_name) - 1);
                ERR_CHK(safec_rc);
                found = true;
@@ -1149,6 +1155,7 @@ gboolean ctrlm_device_update_rf4ce_is_image_available(ctrlm_rf4ce_device_update_
                upgrade.crc          = it->crc;
                upgrade.force_update = false;
                upgrade.do_not_load  = g_ctrlm_device_update.prefs.download.load_immediately ? false : true;
+               upgrade.type_z       = it->type_z;
                safec_rc = strncpy_s(upgrade.file_name, sizeof(upgrade.file_name), it->file_path_archive.c_str(), sizeof(upgrade.file_name) - 1);
                ERR_CHK(safec_rc);
                found = true;
@@ -2389,7 +2396,7 @@ void ctrlm_device_update_rf4ce_session_resume_check(vector<rf4ce_device_update_s
       }
 
       rf4ce_device_update_image_info_t image_info;
-      gboolean image_available = ctrlm_device_update_rf4ce_is_image_available(it->state.image_type, it->type, it->version_hardware, it->version_bootloader, it->version_software, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info);
+      gboolean image_available = ctrlm_device_update_rf4ce_is_image_available(it->state.image_type, it->type, it->version_hardware, it->version_bootloader, it->version_software, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, it->type_z);
       if(image_available) {
          rf4ce_device_update_begin_info_t begin_info;
          begin_info.when                = (rf4ce_device_update_image_check_when_t)it->state.when;

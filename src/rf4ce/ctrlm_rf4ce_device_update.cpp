@@ -183,17 +183,17 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
             manual_poll_firmware_ = false;
             manual_poll           = true;
          }
-         image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_software_, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info);
+         image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_software_, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, is_controller_type_z());
          break;
       }
       case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_AUDIO_DATA_1: {
          LOG_INFO("%s: (%u) Audio Data 1\n", __FUNCTION__, controller_id_get());
          if(manual_poll_audio_data_) { // Manual poll from the remote, use the audio theme if set
-            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_audio_data_, audio_theme_, &image_info);
+            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_audio_data_, audio_theme_, &image_info, false);
             manual_poll_audio_data_ = false;
             manual_poll             = true;
          } else {
-            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_audio_data_, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info);
+            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version_audio_data_, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, false);
          }
          break;
       }
@@ -215,7 +215,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
                case RF4CE_DEVICE_UPDATE_IMAGE_TYPE_AUDIO_DATA_2:  version = version_audio_data_;    break;
                default: break;
             }
-            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info);
+            image_available = ctrlm_device_update_rf4ce_is_image_available(image_type, controller_type_, version_hardware_, version_bootloader_, version, RF4CE_DEVICE_UPDATE_AUDIO_THEME_INVALID, &image_info, false);
             break;
          }
       }
@@ -545,6 +545,18 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_download_complete(ctrlm_t
       }
    }
 
+   if (result == RF4CE_DEVICE_UPDATE_RESULT_SUCCESS) {
+      // Reset controller ota counter to zero
+      ota_failure_count_set(0);
+   }
+   else {
+      if (is_controller_type_z() || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_CRC || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH) {
+         // Increment ota counter
+         ota_failure_count_set(ota_failure_count_get() + 1);
+         LOG_WARN("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_count_get());
+      }
+   }
+
    print_remote_firmware_debug_info(RF4CE_PRINT_FIRMWARE_LOG_IMAGE_DOWNLOAD_COMPLETE, log_string);
 
    if(download_in_progress_) { // End the download session since the controller has finished loading the image
@@ -635,6 +647,7 @@ bool ctrlm_obj_controller_rf4ce_t::device_update_session_resume_load(rf4ce_devic
    info->version_bootloader = version_bootloader_;
    info->version_software   = version_software_;
    info->timeout            = obj_network_rf4ce_->device_update_session_timeout_get();
+   info->type_z             = is_controller_type_z();
 
    free(state);
 

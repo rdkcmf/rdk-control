@@ -2122,11 +2122,19 @@ json_t *ctrlm_obj_network_rf4ce_t::xconf_export_controllers() {
             ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR15V2:
-            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR15V2);
+            if (obj_controller_rf4ce->is_controller_type_z()) {
+               safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR15V2_TYPE_Z);
+            } else {
+               safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR15V2);
+            }
             ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR16:
-            safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR16);
+            if (obj_controller_rf4ce->is_controller_type_z()) {
+               safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR16_TYPE_Z);
+            } else {
+               safec_rc = strcpy_s(product_name, sizeof(product_name), RF4CE_PRODUCT_NAME_XR16);
+            }
             ERR_CHK(safec_rc);
             break;
          case  RF4CE_CONTROLLER_TYPE_XR19:

@@ -218,7 +218,9 @@ class ctrlm_obj_network_rf4ce_t;
 #define RF4CE_PRODUCT_NAME_XR11                            ("XR11-20")
 #define RF4CE_PRODUCT_NAME_XR15                            ("XR15-10")
 #define RF4CE_PRODUCT_NAME_XR15V2                          ("XR15-20")
+#define RF4CE_PRODUCT_NAME_XR15V2_TYPE_Z                   ("XR15-20Z")
 #define RF4CE_PRODUCT_NAME_XR16                            ("XR16-10")
+#define RF4CE_PRODUCT_NAME_XR16_TYPE_Z                     ("XR16-10Z")
 #define RF4CE_PRODUCT_NAME_XR19                            ("XR19-10")
 #define RF4CE_PRODUCT_NAME_XR5                             ("XR5-40")
 #define RF4CE_PRODUCT_NAME_XRA                             ("XRA-10")
@@ -632,6 +634,7 @@ typedef struct {
    version_software_t                         version_bootloader;
    version_software_t                         version_software;
    guint32                                    timeout;
+   bool                                       type_z;
 } rf4ce_device_update_session_resume_info_t;
 
 class ctrlm_obj_controller_rf4ce_t : public ctrlm_obj_controller_t
@@ -695,6 +698,10 @@ public:
    void time_last_key_update(void);
 
    void push_ir_codes(void);
+
+   void    ota_failure_count_set(uint8_t ota_failures);
+   uint8_t ota_failure_count_get(void);
+   bool    is_controller_type_z(void);
 
    // These functions are HACKS for XR15-704
 #ifdef XR15_704
@@ -892,6 +899,8 @@ private:
    guint8                                  mfg_test_result_;
 
    ctrlm_timestamp_t                       checkin_time_;    ///< OUT - Timestamp indicating the most recent poll indication of the controller
+
+   guint8                                  ota_failures_;
 
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    guint32                                 short_rf_retry_period_;

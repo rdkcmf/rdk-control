@@ -127,6 +127,7 @@ void ctrlm_db_rf4ce_read_time_metrics(ctrlm_network_id_t network_id, ctrlm_contr
 void ctrlm_db_rf4ce_read_asb_key_derivation_method(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned char *method);
 #endif
 void ctrlm_db_rf4ce_read_device_update_session_state(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
+void ctrlm_db_rf4ce_read_ota_failures_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 
 void ctrlm_db_rf4ce_write_ieee_address(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long long ieee_address);
 void ctrlm_db_rf4ce_write_binding_type(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_rcu_binding_type_t binding_type);
@@ -180,6 +181,7 @@ void ctrlm_db_rf4ce_write_device_update_session_state(ctrlm_network_id_t network
 void ctrlm_db_rf4ce_write_file(const char *path, guchar *data, guint32 length);
 void ctrlm_db_rf4ce_read_mfg_test_result(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_rf4ce_write_mfg_test_result(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
+void ctrlm_db_rf4ce_write_ota_failures_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 ota_failures);
 
 void ctrlm_db_rf4ce_destroy_device_update_session_state(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
 bool ctrlm_db_rf4ce_exists_device_update_session_state(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);

@@ -2562,6 +2562,22 @@ void ctrlm_db_rf4ce_write_mfg_test_result(ctrlm_network_id_t network_id, ctrlm_c
    ctrlm_db_write_blob(table, "mfg_test_result", data, length);
 }
 
+void ctrlm_db_rf4ce_read_ota_failures_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_read_blob(table, "ota_failures", data, length);
+}
+
+void ctrlm_db_rf4ce_write_ota_failures_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 ota_failures) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   guchar data[1] = {0};
+   ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
+
+   data[0] = (guchar) ota_failures;
+   ctrlm_db_write_blob(table, "ota_failures", data, 1);
+}
+
 void ctrlm_db_voice_settings_remove() {
    int rc;
    if(ctrlm_db_key_exists(CTRLM_DB_TABLE_CTRLMGR, CTRLM_DB_VOICE_KEY_SETTINGS)) {
