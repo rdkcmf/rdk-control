@@ -40,6 +40,7 @@
 #define CTRLM_RF4CE_TR181_ASB_ENABLED                        "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.XRPairing.ASBEnable"
 #define CTRLM_RF4CE_TR181_ASB_DERIVATION_METHOD              "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.XRPairing.ASBDerivationMethod"
 #define CTRLM_RF4CE_TR181_ASB_FAIL_THRESHOLD                 "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.XRPairing.ASBFailThreshold"
+#define CTRLM_RF4CE_TR181_THREAD_MONITOR_MINIDUMP_ENABLE     "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ThreadMonitorMinidump.Enable"
 #define CTRLM_RF4CE_TR181_XR19_DSP_CONFIGURATION             "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.XRDsp.XR19.Configuration"
 #define CTRLM_RF4CE_TR181_RF4CE_AUDIO_PROFILE_TARGET         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.RF4CE.AudioProfileTarget"
 #define CTRLM_RF4CE_TR181_RF4CE_OPUS_ENCODER_PARAMS          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.RF4CE.OpusEncoderParams"

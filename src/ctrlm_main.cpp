@@ -202,6 +202,7 @@ typedef struct {
    guint                              thread_monitor_timeout_val;
    guint                              thread_monitor_timeout_tag;
    guint                              thread_monitor_index;
+   bool                               thread_monitor_minidump;
    string                             server_url_authservice;
    guint                              authservice_poll_val;
    guint                              authservice_poll_tag;
@@ -503,6 +504,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.service_access_token_expiration_tag = 0;
    g_ctrlm.thread_monitor_timeout_val     = JSON_INT_VALUE_CTRLM_GLOBAL_THREAD_MONITOR_PERIOD * 1000;
    g_ctrlm.thread_monitor_index           = 0;
+   g_ctrlm.thread_monitor_minidump        = JSON_BOOL_VALUE_CTRLM_GLOBAL_THREAD_MONITOR_MINIDUMP;
    g_ctrlm.server_url_authservice         = JSON_STR_VALUE_CTRLM_GLOBAL_URL_AUTH_SERVICE;
    g_ctrlm.authservice_poll_val           = JSON_INT_VALUE_CTRLM_GLOBAL_AUTHSERVICE_POLL_PERIOD * 1000;
    g_ctrlm.bound_controller_qty           = 0;
@@ -869,6 +871,12 @@ void ctrlm_thread_monitor_init(void) {
 
    g_ctrlm.monitor_threads.shrink_to_fit();
 
+   if(CTRLM_TR181_RESULT_SUCCESS != ctrlm_tr181_bool_get(CTRLM_RF4CE_TR181_THREAD_MONITOR_MINIDUMP_ENABLE, &g_ctrlm.thread_monitor_minidump)) {
+      LOG_INFO("%s: Thread Monitor Minidump is <%s> (TR181 not present)\n", __FUNCTION__, (g_ctrlm.thread_monitor_minidump ? "ENABLED" : "DISABLED"));
+   } else {
+      LOG_INFO("%s: Thread Monitor Minidump is <%s>\n", __FUNCTION__, (g_ctrlm.thread_monitor_minidump ? "ENABLED" : "DISABLED"));
+   }
+
    // Run once to kick off the first poll
    ctrlm_thread_monitor(NULL);
 }
@@ -909,6 +917,12 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
 
       if(it->response != CTRLM_THREAD_MONITOR_RESPONSE_ALIVE) {
          LOG_FATAL("%s: Thread %s is unresponsive\n", __FUNCTION__, it->name);
+         #ifdef BREAKPAD_SUPPORT
+         if(g_ctrlm.thread_monitor_minidump) {
+            LOG_FATAL("%s: Thread Monitor Minidump is enabled\n", __FUNCTION__);
+            ctrlm_crash();
+         }
+         #endif
          ctrlm_quit_main_loop();
          return (FALSE);
       }
@@ -1654,6 +1668,18 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
          } else {
             g_ctrlm.thread_monitor_timeout_val = value * 1000;
          }
+      }
+      json_obj = json_object_get(json_obj_ctrlm, JSON_BOOL_NAME_CTRLM_GLOBAL_THREAD_MONITOR_MINIDUMP);
+      text     = "Thread Monitor Minidump";
+      if(json_obj != NULL && json_is_boolean(json_obj)) {
+         LOG_INFO("%s: %-28s - PRESENT <%s>\n", __FUNCTION__, text, json_is_true(json_obj) ? "true" : "false");
+         if(json_is_true(json_obj)) {
+            g_ctrlm.thread_monitor_minidump = true;
+         } else {
+            g_ctrlm.thread_monitor_minidump = false;
+         }
+      } else {
+         LOG_INFO("%s: %-28s - ABSENT\n", __FUNCTION__, text);
       }
       json_obj = json_object_get(json_obj_ctrlm, JSON_STR_NAME_CTRLM_GLOBAL_URL_AUTH_SERVICE);
       text     = "Auth Service URL";

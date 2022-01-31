@@ -3,6 +3,7 @@
       "minidump_path"                    : "/opt/minidumps",
       "db_path"                          : "/opt/ctrlm.sql",
       "thread_monitor_period"            :        60,
+      "thread_monitor_minidump"          :     false,
       "authservice_poll_period"          :         5,
       "keycode_logging_poll_period"      :        30,
       "keycode_logging_max_retries"      :         5,
