@@ -25,7 +25,9 @@
 // Defines for crash recovery
 #define CTRLM_RECOVERY_SHARED_MEMORY_NAME "/ctrlm_shared_memory"
 #define CTRLM_NVM_BACKUP                  "/opt/ctrlm.back"
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
 #define HAL_NVM_BACKUP                    "/opt/hal_nvm.back"
+#endif
 
 typedef enum {
    CTRLM_RECOVERY_CRASH_COUNT,

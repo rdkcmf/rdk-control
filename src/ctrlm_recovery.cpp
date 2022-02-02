@@ -120,9 +120,11 @@ void ctrlm_recovery_factory_reset() {
    if (remove(CTRLM_NVM_BACKUP) != 0) {
         LOG_ERROR("%s: CTRLM_NVM_BACKUP failed \n", __FUNCTION__);  //CID:87883 - checked return
    }
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
    if (remove(HAL_NVM_BACKUP) != 0) {
         LOG_ERROR("%s: HAL_NVM_BACKUP failed \n", __FUNCTION__);  //CID:87883 - checked return
    }
+#endif
 }
 
 void ctrlm_recovery_terminate(gboolean unlink) {

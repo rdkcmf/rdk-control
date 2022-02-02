@@ -5461,6 +5461,7 @@ void ctrlm_crash_recovery_check() {
    //FILE *fd;
    LOG_INFO("%s: Checking if recovering from pre-init crash\n", __FUNCTION__);
 
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
    ctrlm_recovery_property_get(CTRLM_RECOVERY_INVALID_HAL_NVM, &invalid_hal_nvm);
    // Clear invalid NVM flag
    if(invalid_hal_nvm) {
@@ -5468,7 +5469,7 @@ void ctrlm_crash_recovery_check() {
       ctrlm_recovery_property_set(CTRLM_RECOVERY_INVALID_HAL_NVM, &invalid_hal_nvm);
       invalid_hal_nvm = 1;
    }
-
+#endif
    ctrlm_recovery_property_get(CTRLM_RECOVERY_INVALID_CTRLM_DB, &invalid_ctrlm_db);
    // Clear invalid DB flag
    if(invalid_ctrlm_db) {
@@ -5509,6 +5510,7 @@ void ctrlm_crash_recovery_check() {
       guint64    hal_nvm_ts  = 0;
       guint64    ctrlm_db_ts = 0;
 
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
       if(FALSE == ctrlm_file_timestamp_get(HAL_NVM_BACKUP, &hal_nvm_ts)) {
          LOG_ERROR("%s: Failed to read timestamp of HAL NVM backup\n", __FUNCTION__);
          // Increment crash count
@@ -5516,7 +5518,7 @@ void ctrlm_crash_recovery_check() {
          ctrlm_recovery_property_set(CTRLM_RECOVERY_CRASH_COUNT, &crash_count);
          return;
       }
-
+#endif
       if(FALSE == ctrlm_file_timestamp_get(CTRLM_NVM_BACKUP, &ctrlm_db_ts)) {
          LOG_ERROR("%s: Failed to read timestamp of ctrlm db backup\n", __FUNCTION__);
          // Increment crash count
@@ -5577,7 +5579,9 @@ void ctrlm_backup_data() {
    // Back up ctrlm db
    if(FALSE == ctrlm_db_backup()) {
       remove(CTRLM_NVM_BACKUP);
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
       remove(HAL_NVM_BACKUP);
+#endif
       return;
    }
 glong tv_sec = 0;
@@ -5589,18 +5593,21 @@ glong tv_sec = 0;
    g_get_current_time(&t);
    tv_sec = t.tv_sec;
 #endif
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
    if(FALSE == ctrlm_file_timestamp_set(HAL_NVM_BACKUP, tv_sec)) {
       remove(CTRLM_NVM_BACKUP);
       remove(HAL_NVM_BACKUP);
       return;
    }
+#endif
 
    if(FALSE == ctrlm_file_timestamp_set(CTRLM_NVM_BACKUP, tv_sec)) {
       remove(CTRLM_NVM_BACKUP);
+#ifdef CTRLM_NETWORK_HAS_HAL_NVM
       remove(HAL_NVM_BACKUP);
+#endif
       return;
    }
-
 }
 #endif
 
