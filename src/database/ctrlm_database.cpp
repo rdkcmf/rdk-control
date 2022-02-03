@@ -1467,7 +1467,7 @@ void ctrlm_db_read_globals(ctrlm_db_global_data_t *db) {
    guint64 device_update_session_id = 0;
 
    ctrlm_db_read_int(CTRLM_DB_TABLE_CTRLMGR, CTRLM_DB_CTRLMGR_KEY_VERSION, &version);
-   ctrlm_db_read_uint64(CTRLM_DB_TABLE_CTRLMGR, CTRLM_DB_DEVICE_UPDATE_KEY_SESSION_ID, &device_update_session_id);
+   ctrlm_db_read_uint64(CTRLM_DB_TABLE_CTRLMGR, CTRLM_DB_DEVICE_UPDATE_KEY_SESSION_ID, (sqlite_uint64*)&device_update_session_id);
 
    db->version                     = version;
    db->device_update_session_id    = device_update_session_id;
@@ -1839,7 +1839,7 @@ void ctrlm_db_rf4ce_read_polling_methods(ctrlm_network_id_t network_id, ctrlm_co
    guint64 temp_polling_methods = 0;
    ctrlm_db_rf4ce_controller_entry_table_name(network_id, controller_id, table);
 
-   ctrlm_db_read_uint64(table, "polling_methods", &temp_polling_methods);
+   ctrlm_db_read_uint64(table, "polling_methods", (sqlite_uint64*)&temp_polling_methods);
    if(polling_methods) *polling_methods = (guint8) temp_polling_methods;
 }
 

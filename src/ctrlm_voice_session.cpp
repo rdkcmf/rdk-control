@@ -171,7 +171,7 @@ static int vrex_response_timeout(void *data) {
 
 int vrex_request_progress(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
    voice_session_t *session = (voice_session_t *)clientp;
-   if(session->abort_vrex_request_get() && session->voice_data_qty_sent_get() <= ulnow) {
+   if(session->abort_vrex_request_get() && session->voice_data_qty_sent_get() <= (long unsigned int)ulnow) {
       LOG_INFO("%s: Aborting CURL session due to vrex response timeout\n", __FUNCTION__);
       session->abort_vrex_request_set(false);
       session->vrex_response_timeout_reset();

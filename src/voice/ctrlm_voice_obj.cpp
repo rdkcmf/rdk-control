@@ -226,8 +226,8 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    xrsr_capture_config_t capture_config = {
          .delete_files  = false,
          .enable        = this->prefs.utterance_save,
-         .file_qty_max  = this->prefs.utterance_file_qty_max,
-         .file_size_max = this->prefs.utterance_file_size_max,
+         .file_qty_max  = (uint32_t)this->prefs.utterance_file_qty_max,
+         .file_size_max = (uint32_t)this->prefs.utterance_file_size_max,
          .dir_path      = this->prefs.utterance_path.c_str()
    };
 
