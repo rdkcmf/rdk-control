@@ -110,6 +110,7 @@ using namespace std;
 #define NETWORK_ID_BASE_BLE     21
 #define NETWORK_ID_BASE_CUSTOM  41
 
+#define CTRLM_MAIN_FIRST_BOOT_TIME_MAX (180) // maximum amount of uptime allowed (in seconds) for declaring "first boot"
 
 typedef void (*ctrlm_queue_push_t)(gpointer);
 typedef void (*ctrlm_monitor_poll)(void *data);
@@ -671,11 +672,14 @@ int main(int argc, char *argv[]) {
    // Check if recently booted
    struct sysinfo s_info;
    if(sysinfo(&s_info) != 0) {
-      LOG_ERROR("%s: Unable to get system uptime\n", __FUNCTION__);
+      LOG_ERROR("ctrlm_main: Unable to get system uptime\n");
    } else {
-      LOG_INFO("%s: System up for %lu seconds\n", __FUNCTION__, s_info.uptime);
+      LOG_INFO("ctrlm_main: System up for %lu seconds\n", s_info.uptime);
+      if(s_info.uptime < CTRLM_MAIN_FIRST_BOOT_TIME_MAX) { // System first boot
+         LOG_INFO("ctrlm_main: System first boot\n");
+      }
       if(s_info.uptime < (long)(g_ctrlm.recently_booted_timeout_val / 1000)) { // System just booted
-         LOG_INFO("%s: Setting recently booted to true\n", __FUNCTION__);
+         LOG_INFO("ctrlm_main: Setting recently booted to true\n");
          g_ctrlm.recently_booted = TRUE;
       }
    }
@@ -701,7 +705,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.main_thread = g_thread_new("ctrlm_main", ctrlm_main_thread, NULL);
 
    // Block until initialization is complete or a timeout occurs
-   LOG_INFO("%s: Waiting for ctrlm main thread initialization...\n", __FUNCTION__);
+   LOG_INFO("ctrlm_main: Waiting for ctrlm main thread initialization...\n");
    sem_wait(&g_ctrlm.semaphore);
 
 
