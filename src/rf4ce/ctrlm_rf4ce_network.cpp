@@ -3020,7 +3020,9 @@ void ctrlm_obj_network_rf4ce_t::polling_config_tr181_read() {
                  &controller_polling_configuration.time_interval)) {
               //If MAC polling bit is set, save the mac config
               if(controller_polling_methods_[i] & POLLING_METHODS_FLAG_MAC) {
-                 controller_polling_configuration_mac_[i] = controller_polling_configuration;
+                 controller_polling_configuration_mac_[i].trigger = controller_polling_configuration.trigger;
+                 controller_polling_configuration_mac_[i].kp_counter = controller_polling_configuration.kp_counter;
+                 // The MAC polling period has been set above when MAC was enabled
               }
               //If Heartbeat polling bit is set, save the heartbeat config
               if(controller_polling_methods_[i] & POLLING_METHODS_FLAG_HEARTBEAT) {
