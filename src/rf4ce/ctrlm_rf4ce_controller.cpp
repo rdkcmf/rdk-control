@@ -5503,7 +5503,7 @@ gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar ne
 }
 
 void ctrlm_obj_controller_rf4ce_t::ota_failure_count_set(uint8_t ota_failures) {
-   ota_failures_  = (ota_failures_ >= 4) ? 0 : ota_failures;
+   ota_failures_  = (ota_failures >= 4) ? 0 : ota_failures;
    ctrlm_db_rf4ce_write_ota_failures_count(network_id_get(), controller_id_get(), ota_failures_);
 }
 
