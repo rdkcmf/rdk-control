@@ -28,6 +28,7 @@
 #include <memory>
 #include <algorithm>
 #include <fstream>
+#include <secure_wrapper.h>
 #include <rdkversion.h>
 #include "jansson.h"
 #include "libIBus.h"
@@ -97,6 +98,9 @@ using namespace std;
 #define VERSION_TXT_BUILD_TIME  "BUILD_TIME="
 
 #define CTRLM_DEFAULT_DEVICE_MAC_INTERFACE "eth0"
+
+#define CTRLM_RESTART_DELAY_SHORT    "0"
+#define CTRLM_RESTART_UPDATE_TIMEOUT (5000)
 
 #define CTRLM_RF4CE_LEN_IR_REMOTE_USAGE 14
 #define CTRLM_RF4CE_LEN_LAST_KEY_INFO   sizeof(ctrlm_last_key_info)
@@ -308,6 +312,7 @@ static gboolean ctrlm_message_queue_delay(gpointer data);
 static gpointer ctrlm_main_thread(gpointer param);
 static void     ctrlm_queue_msg_destroy(gpointer msg);
 static gboolean ctrlm_timeout_recently_booted(gpointer user_data);
+static gboolean ctrlm_timeout_systemd_restart_delay(gpointer user_data);
 static gboolean ctrlm_thread_monitor(gpointer user_data);
 static gboolean ctrlm_start_iarm(gpointer user_data);
 #ifdef AUTH_ENABLED
@@ -688,6 +693,8 @@ int main(int argc, char *argv[]) {
    if(TRUE == g_ctrlm.recently_booted) {
       g_ctrlm.recently_booted_timeout_tag   = ctrlm_timeout_create(g_ctrlm.recently_booted_timeout_val - (s_info.uptime * 1000), ctrlm_timeout_recently_booted, NULL);
    }
+
+   ctrlm_timeout_create(CTRLM_RESTART_UPDATE_TIMEOUT, ctrlm_timeout_systemd_restart_delay, NULL);
 
    LOG_INFO("ctrlm_main: init validation\n");
    ctrlm_validation_init(json_obj_validation);
@@ -2930,6 +2937,12 @@ gboolean ctrlm_timeout_recently_booted(gpointer user_data) {
    LOG_INFO("%s: Timeout - Recently booted.\n", __FUNCTION__);
    g_ctrlm.recently_booted             = FALSE;
    g_ctrlm.recently_booted_timeout_tag = 0;
+   return(FALSE);
+}
+
+gboolean ctrlm_timeout_systemd_restart_delay(gpointer user_data) {
+   LOG_INFO("%s: Timeout - Update systemd restart delay to " CTRLM_RESTART_DELAY_SHORT "\n", __FUNCTION__);
+   v_secure_system("systemctl set-environment CTRLM_RESTART_DELAY=" CTRLM_RESTART_DELAY_SHORT);
    return(FALSE);
 }
 
