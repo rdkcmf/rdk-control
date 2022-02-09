@@ -51,9 +51,11 @@
 using namespace std;
 
 
+#define CTRLM_BLE_STALE_REMOTE_TIMEOUT    60 * 60 * 1000    // in ms
 
 static gboolean ctrlm_ble_network_continue_upgrade(gpointer user_data);
 static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrade_image_info_t &image_info);
+static gboolean ctrlm_ble_check_for_stale_remote(gpointer user_data);
 
 
 // Network class factory
@@ -99,6 +101,8 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t(ctrlm_network_type_t type, ctrl
    ir_state_                    = CTRLM_IR_STATE_IDLE;
    upgrade_in_progress_         = false;
    unpair_on_remote_request_    = true;
+   upgrade_timer_tag_           = 0;
+   stale_remote_timer_tag_      = 0;
 
    hal_thread_                  = NULL;
    hal_api_main_                = NULL;
@@ -120,6 +124,9 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t() {
 
 ctrlm_obj_network_ble_t::~ctrlm_obj_network_ble_t() {
    LOG_INFO("ctrlm_obj_network_ble_t destructor - Type (%u) Id (%u) Name (%s)\n", type_, id_, name_.c_str());
+
+   ctrlm_timeout_destroy(&upgrade_timer_tag_);
+   ctrlm_timeout_destroy(&stale_remote_timer_tag_);
 
    ctrlm_ble_iarm_terminate();
    
@@ -318,6 +325,8 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
       it->second->print_status();
       LOG_INFO("%s: -----------------------\n", __FUNCTION__);
    }
+
+   stale_remote_timer_tag_ = ctrlm_timeout_create(CTRLM_BLE_STALE_REMOTE_TIMEOUT, ctrlm_ble_check_for_stale_remote, &id_);
 
    if (hal_api_start_threads_) {
       hal_api_start_threads_();
@@ -1014,6 +1023,43 @@ void ctrlm_obj_network_ble_t::req_process_get_last_keypress(void *data, int size
    if(dqm->semaphore) {
       sem_post(dqm->semaphore);
    }
+}
+
+void ctrlm_obj_network_ble_t::req_process_check_for_stale_remote(void *data, int size) {
+   LOG_DEBUG("%s: Enter...\n", __FUNCTION__);
+   THREAD_ID_VALIDATE();
+
+   ctrlm_main_iarm_call_last_key_info_t params;
+   ctrlm_main_queue_msg_get_last_keypress_t msg;
+   errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+   ERR_CHK(safec_rc);
+   msg.params            = &params;
+   msg.params->result    = CTRLM_IARM_CALL_RESULT_ERROR;
+   // we are already in ctrlm-main context, so call directly
+   req_process_get_last_keypress(&msg, sizeof(msg));
+
+   if (msg.params->result == CTRLM_IARM_CALL_RESULT_SUCCESS) {
+      if (msg.params->source_type == IARM_BUS_IRMGR_KEYSRC_IR) {
+         for (auto &controller : controllers_) {
+            if (BLE_CONTROLLER_TYPE_IR != controller.second->getControllerType() && !controller.second->getConnected()) {
+               // The idea here is to print something for telemetry to keep track of remotes that are paired but in a disconnected
+               // state, while the user is attempting to actually use the remote.  This results in the remote sending IR.  Without
+               // checking for the last keypress being IR, there would be many false positives reported such as when the batteries die, 
+               // remote taken out of BLE range, or the user simply not using the remote for a while.
+               LOG_WARN("%s: Last keypress is from an IR remote, while a BLE remote is paired but NOT connected.  Stale remote suspected: <0x%llX>\n", __FUNCTION__, controller.second->getMacAddress());
+            }
+         }
+      }
+   }
+}
+
+static gboolean ctrlm_ble_check_for_stale_remote(gpointer user_data) {
+   ctrlm_network_id_t* net_id =  (ctrlm_network_id_t*) user_data;
+   if (net_id != NULL) {
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_ble_t::req_process_check_for_stale_remote, NULL, 0, NULL, *net_id);
+   }
+   //This is a recurring timer, so just restart it by returning true
+   return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -134,6 +134,7 @@ public:
    void                          req_process_get_rcu_last_wakeup_key(void *data, int size);
    void                          req_process_send_rcu_action(void *data, int size);
    void                          req_process_write_rcu_wakeup_config(void *data, int size);
+   void                          req_process_check_for_stale_remote(void *data, int size);
 
    virtual void                  req_process_network_managed_upgrade(void *data, int size);
    virtual void                  req_process_network_continue_upgrade(void *data, int size);
@@ -192,6 +193,7 @@ private:
 
    bool                                   upgrade_in_progress_;
    guint                                  upgrade_timer_tag_;
+   guint                                  stale_remote_timer_tag_;
 
    bool                                   unpair_on_remote_request_;
 
