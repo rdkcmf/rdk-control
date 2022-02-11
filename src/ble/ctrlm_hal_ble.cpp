@@ -1462,13 +1462,13 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_FW_REVISION;
     } else if (0 == prop.compare("SoftwareRevision")) {
         g_variant_get (value, "s", &str_variant);
-        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
+        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), str_variant);
         safec_rc = strcpy_s(rcu_status.rcu_data.sw_revision, sizeof(rcu_status.rcu_data.sw_revision), str_variant);
         ERR_CHK(safec_rc);
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_SW_REVISION;
     } else if (0 == prop.compare("BatteryLevel")) {
         g_variant_get (value, "y", &char_variant);
-        LOG_DEBUG("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
+        LOG_INFO("%s: Item '%s' = <%u>\n", __FUNCTION__, prop.c_str(), char_variant);
         rcu_status.rcu_data.battery_level = (int)char_variant;
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_BATTERY_LEVEL;
     } else if (0 == prop.compare("Connected")) {
