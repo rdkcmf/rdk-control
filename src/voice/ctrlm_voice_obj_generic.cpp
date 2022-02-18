@@ -183,9 +183,9 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].url             = url->c_str();
                 routes[i].dsts[0].handlers        = handlers_xrsr;
                 #ifdef AUDIO_DECODE
-                routes[i].dsts[0].format          = XRSR_AUDIO_FORMAT_PCM;
+                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM;
                 #else
-                routes[i].dsts[0].format          = XRSR_AUDIO_FORMAT_NATIVE;
+                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM | XRSR_AUDIO_FORMAT_ADPCM;
                 #endif
                 routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
                 routes[i].dsts[0].stream_from     = stream_from;
@@ -209,7 +209,7 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dst_qty                 = 1;
                 routes[i].dsts[0].url             = url->c_str();
                 routes[i].dsts[0].handlers        = handlers_xrsr;
-                routes[i].dsts[0].format          = XRSR_AUDIO_FORMAT_PCM;
+                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM;
                 routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
@@ -234,7 +234,7 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dst_qty                 = 1;
                 routes[i].dsts[0].url             = urls_translated[translated_index].c_str();
                 routes[i].dsts[0].handlers        = handlers_xrsr;
-                routes[i].dsts[0].format          = XRSR_AUDIO_FORMAT_PCM;
+                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM;
                 routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
@@ -261,7 +261,7 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dst_qty                 = 1;
                 routes[i].dsts[0].url             = url->c_str();
                 routes[i].dsts[0].handlers        = handlers_xrsr;
-                routes[i].dsts[0].format          = XRSR_AUDIO_FORMAT_PCM;
+                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM;
                 routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
