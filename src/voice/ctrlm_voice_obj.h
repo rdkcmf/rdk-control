@@ -72,11 +72,12 @@ typedef struct {
 } ctrlm_voice_audio_settings_t;
 
 typedef enum {
-    CTRLM_VOICE_FORMAT_ADPCM     = VOICE_SESSION_AUDIO_FORMAT_ADPCM_16K,
-    CTRLM_VOICE_FORMAT_ADPCM_SKY = VOICE_SESSION_AUDIO_FORMAT_ADPCM_SKY_16K,
-    CTRLM_VOICE_FORMAT_PCM       = VOICE_SESSION_AUDIO_FORMAT_PCM_16K,
-    CTRLM_VOICE_FORMAT_OPUS      = VOICE_SESSION_AUDIO_FORMAT_OPUS_16K,
-    CTRLM_VOICE_FORMAT_INVALID   = VOICE_SESSION_AUDIO_FORMAT_INVALID
+    CTRLM_VOICE_FORMAT_ADPCM,
+    CTRLM_VOICE_FORMAT_ADPCM_SKY,
+    CTRLM_VOICE_FORMAT_PCM,
+    CTRLM_VOICE_FORMAT_OPUS_XVP,
+    CTRLM_VOICE_FORMAT_OPUS,
+    CTRLM_VOICE_FORMAT_INVALID
 } ctrlm_voice_format_t;
 
 typedef enum {
@@ -170,7 +171,7 @@ typedef struct {
    ctrlm_controller_id_t                 controller_id;
    ctrlm_timestamp_t                     timestamp;
    voice_session_type_t                  type;
-   voice_session_audio_format_t          audio_format;
+   ctrlm_voice_format_t                  audio_format;
    unsigned char                         data_len;
    unsigned char                         data[VOICE_SESSION_REQ_DATA_LEN_MAX];
    ctrlm_voice_session_response_status_t status;

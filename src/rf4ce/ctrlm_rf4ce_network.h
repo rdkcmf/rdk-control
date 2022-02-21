@@ -92,6 +92,13 @@ typedef enum {
    RF4CE_DEVICE_UPDATE_CMD_IMAGE_DOWNLOAD_COMPLETE = 0x08
 } ctrlm_rf4ce_device_update_cmd_t;
 
+typedef enum {
+   RF4CE_AUDIO_FORMAT_ADPCM_16K      = 0x00,
+   RF4CE_AUDIO_FORMAT_PCM_16K        = 0x01,
+   RF4CE_AUDIO_FORMAT_OPUS_16K       = 0x02,
+   RF4CE_AUDIO_FORMAT_INVALID        = 0x03
+} ctrlm_rf4ce_audio_format_t;
+
 typedef struct {
    GCond *                            cond;
    ctrlm_hal_rf4ce_rsp_discovery_t    cb;

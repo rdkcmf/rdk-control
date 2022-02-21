@@ -3675,7 +3675,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
 
    ctrlm_voice_session_response_status_t session;
    ctrlm_voice_device_t device_type  = (dqm->type == VOICE_SESSION_TYPE_FAR_FIELD) ? CTRLM_VOICE_DEVICE_FF : CTRLM_VOICE_DEVICE_PTT;
-   ctrlm_voice_format_t voice_format = (ctrlm_voice_format_t)dqm->audio_format;
+   ctrlm_voice_format_t voice_format = dqm->audio_format;
    gint16 offset       = 0;
    version_software_t sw_version_obj;
    version_hardware_t hw_version_obj;

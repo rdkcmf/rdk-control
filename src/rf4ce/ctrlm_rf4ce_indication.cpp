@@ -36,6 +36,9 @@ static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_async(ctrlm_network_id_t id, 
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_sync(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_pair_params_t params, ctrlm_hal_rf4ce_rsp_pair_params_t *rsp_params);
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_unpair_async(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_unpair_params_t params, ctrlm_hal_rf4ce_rsp_unpair_t cb, void *cb_data);
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_unpair_sync(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_unpair_params_t params, ctrlm_hal_rf4ce_rsp_unpair_params_t *rsp_params);
+#ifdef USE_VOICE_SDK
+ctrlm_voice_format_t ctrlm_rf4ce_audio_fmt_to_voice_fmt(ctrlm_rf4ce_audio_format_t format);
+#endif
 
 ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_disc_params_t params, ctrlm_hal_rf4ce_rsp_disc_params_t *rsp_params, ctrlm_hal_rf4ce_rsp_discovery_t cb, void *cb_data, GCond *cond) {
 
@@ -370,8 +373,8 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
    if(command_id == MSO_VOICE_CMD_ID_VOICE_SESSION_REQUEST) {
 #ifdef USE_VOICE_SDK
       guchar local_data[data_length]            = {'\0'};
-      voice_session_type_t         type         = VOICE_SESSION_TYPE_STANDARD;
-      voice_session_audio_format_t audio_format = VOICE_SESSION_AUDIO_FORMAT_ADPCM_16K;
+      voice_session_type_t    type         = VOICE_SESSION_TYPE_STANDARD;
+      ctrlm_voice_format_t    audio_format = ctrlm_rf4ce_audio_fmt_to_voice_fmt(RF4CE_AUDIO_FORMAT_ADPCM_16K);
       guchar  request_data_len = 0;
       guchar *request_data     = NULL;
       if(data_length >= 3) {
@@ -382,7 +385,7 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
             data = local_data;
          }
          type         = (voice_session_type_t) data[1];
-         audio_format = (voice_session_audio_format_t) data[2];
+         audio_format = ctrlm_rf4ce_audio_fmt_to_voice_fmt((ctrlm_rf4ce_audio_format_t)data[2]);
          if(type == VOICE_SESSION_TYPE_FAR_FIELD) {
             request_data_len = data_length - 3;
             if(request_data_len > VOICE_SESSION_REQ_DATA_LEN_MAX) {
@@ -505,3 +508,16 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
    }
    return(CTRLM_HAL_RESULT_SUCCESS);
 }
+
+#ifdef USE_VOICE_SDK
+ctrlm_voice_format_t ctrlm_rf4ce_audio_fmt_to_voice_fmt(ctrlm_rf4ce_audio_format_t format) {
+   ctrlm_voice_format_t ret = CTRLM_VOICE_FORMAT_INVALID;
+   switch(format) {
+      case RF4CE_AUDIO_FORMAT_ADPCM_16K: {ret = CTRLM_VOICE_FORMAT_ADPCM;    break;}
+      case RF4CE_AUDIO_FORMAT_PCM_16K:   {ret = CTRLM_VOICE_FORMAT_PCM;      break;}
+      case RF4CE_AUDIO_FORMAT_OPUS_16K:  {ret = CTRLM_VOICE_FORMAT_OPUS_XVP; break;}
+      default: {break;}
+   }
+   return(ret);
+}
+#endif

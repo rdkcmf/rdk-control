@@ -1246,7 +1246,7 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
     this->audio_sent_bytes += bytes_sent;
 
     // Handle input format
-    if(this->format == CTRLM_VOICE_FORMAT_OPUS) {
+    if(this->format == CTRLM_VOICE_FORMAT_OPUS_XVP) {
        this->audio_sent_samples += this->opus_samples_per_packet; // From opus encoding parameters
     } else if(this->format == CTRLM_VOICE_FORMAT_ADPCM || this->format == CTRLM_VOICE_FORMAT_ADPCM_SKY) {
        this->audio_sent_samples += (bytes_sent - 4) * 2; // 4 byte header, one nibble per sample
@@ -1355,7 +1355,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
     const char *action = "dumped";
     if(this->state_dst != CTRLM_VOICE_STATE_DST_READY) { // destination is accepting more data
        action = "sent";
-       if(this->format == CTRLM_VOICE_FORMAT_OPUS) {
+       if(this->format == CTRLM_VOICE_FORMAT_OPUS || this->format == CTRLM_VOICE_FORMAT_OPUS_XVP) {
            // Copy to local buffer to perform a single write to the pipe.  TODO: have the caller reserve 1 bytes at the beginning
            // of the buffer to eliminate this copy
            local_buf[0] = length;
@@ -2269,6 +2269,7 @@ const char *ctrlm_voice_format_str(ctrlm_voice_format_t format) {
         case CTRLM_VOICE_FORMAT_ADPCM:       return("ADPCM");
         case CTRLM_VOICE_FORMAT_ADPCM_SKY:   return("ADPCM_SKY");
         case CTRLM_VOICE_FORMAT_PCM:         return("PCM");
+        case CTRLM_VOICE_FORMAT_OPUS_XVP:    return("OPUS_XVP");
         case CTRLM_VOICE_FORMAT_OPUS:        return("OPUS");
         case CTRLM_VOICE_FORMAT_INVALID:     return("INVALID");
     }
@@ -2424,8 +2425,12 @@ xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format) {
             ret = XRAUDIO_ENCODING_ADPCM_SKY;
             break;
         }
-        case CTRLM_VOICE_FORMAT_OPUS: {
+        case CTRLM_VOICE_FORMAT_OPUS_XVP: {
             ret = XRAUDIO_ENCODING_OPUS_XVP;
+            break;
+        }
+        case CTRLM_VOICE_FORMAT_OPUS: {
+            ret = XRAUDIO_ENCODING_OPUS;
             break;
         }
         case CTRLM_VOICE_FORMAT_PCM: {
