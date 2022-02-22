@@ -1193,7 +1193,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_Get
 }
 
 static uint16_t ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(unsigned char usb_code) {
-    return usb_kbd_keycode[usb_code];
+    return usb_kbd_keycode[usb_code] ? usb_kbd_keycode[usb_code] : CTRLM_KEY_CODE_INVALID;
 }
 static unsigned char ctrlm_hal_ble_ConvertLinuxCodeToUsbKdb(uint16_t linux_code) {
     for (unsigned int i = 0; i < sizeof(usb_kbd_keycode)/sizeof(usb_kbd_keycode[0]); i++) {
