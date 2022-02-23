@@ -44,6 +44,9 @@
 
 #define CTRLM_INVALID_STR_LEN (24)
 
+#define CRC_BUFF_SIZE         (1024)
+#define CTRLM_NVM_SECURE_PATH "/opt/secure/"
+
 static char ctrlm_invalid_str[CTRLM_INVALID_STR_LEN];
 
 #ifdef BREAKPAD_SUPPORT
@@ -1245,11 +1248,21 @@ const char *ctrlm_wakeup_reason_str(DeepSleep_WakeupReason_t wakeup_reason) {
 #endif
 
 
-bool ctrlm_file_copy(const char* src, const char* dst, bool overwrite) {
+bool ctrlm_file_copy(const char* src, const char* dst, bool overwrite, bool follow_dst_symbolic_link) {
    bool    ret   = FALSE;
    GFile  *g_src = g_file_new_for_path(src);
    GFile  *g_dst = g_file_new_for_path(dst);
    GError *error = NULL;
+
+   if (follow_dst_symbolic_link) {
+      string link_target;
+      if (ctrlm_file_get_symlink_target(dst, link_target)) {
+         g_object_unref(g_dst);
+         g_dst = g_file_new_for_path(link_target.c_str());
+      } else {
+         LOG_WARN("%s: Failed to get link target for <%s>, not following symlink\n", __FUNCTION__, dst);
+      }
+   }
 
    ret = g_file_copy(g_src, g_dst, (overwrite ? G_FILE_COPY_OVERWRITE : G_FILE_COPY_NONE), NULL, NULL, NULL, &error);
    if(FALSE == ret && error) {
@@ -1260,6 +1273,59 @@ bool ctrlm_file_copy(const char* src, const char* dst, bool overwrite) {
    g_object_unref(g_src);
    g_object_unref(g_dst);
 
+   return ret;
+}
+
+bool ctrlm_file_delete(const char* path, bool follow_symbolic_link) {
+   bool    ret    = FALSE;
+   GFile  *g_path = g_file_new_for_path(path);
+   GError *error  = NULL;
+
+   if (follow_symbolic_link) {
+      string link_target;
+      if (ctrlm_file_get_symlink_target(path, link_target)) {
+         g_object_unref(g_path);
+         g_path = g_file_new_for_path(link_target.c_str());
+      } else {
+         LOG_WARN("%s: Failed to get link target for <%s>, not following symlink\n", __FUNCTION__, path);
+      }
+   }
+
+   ret = g_file_delete(g_path, NULL, &error);
+   if(FALSE == ret && error) {
+      LOG_ERROR("%s: Failed to delete file <%s> because %s\n", __FUNCTION__, path, error->message);
+      g_error_free(error);
+   }
+
+   g_object_unref(g_path);
+
+   return ret;
+}
+
+bool ctrlm_file_get_symlink_target(const char* path, string &link_target) {
+   bool ret = false;
+
+   char link_dst[PATH_MAX];
+   struct stat link_stat;
+   errno = 0;
+   int rc = lstat(path, &link_stat);
+   if (rc != 0) {
+      int errsv = errno;
+      LOG_WARN("%s: lstat failed on path <%s>, error = <%s>\n", __FUNCTION__, path, strerror(errsv));
+   } else if (S_ISLNK(link_stat.st_mode)) {
+      // get the target location of the link
+      ssize_t len = readlink(path, link_dst, sizeof(link_dst)-1);
+      if(len < 0) {
+         int errsv = errno;
+         LOG_ERROR("%s: readlink failed on path <%s>, error = <%s>\n", __FUNCTION__, path, strerror(errsv));
+      } else {
+         //readlink does not append a null byte
+         link_dst[len] = '\0';
+         LOG_DEBUG("%s: path <%s> is a link pointing to <%s>\n", __FUNCTION__, path, link_dst);
+         link_target = link_dst;
+         ret = true;
+      }
+   }
    return ret;
 }
 
@@ -1819,4 +1885,155 @@ const char *ctrlm_rcu_wakeup_config_str(ctrlm_rcu_wakeup_config_t config) {
         case CTRLM_RCU_WAKEUP_CONFIG_INVALID:   return("INVALID");
         default:                                return("INVALID__TYPE");
     }
+}
+
+bool ctrlm_utils_calc_crc32( const char *filename, uLong *crc_ret ) {
+   uLong crc = 0;
+   bool status = true;
+   size_t read_size;
+   Bytef crc_buff[CRC_BUFF_SIZE];
+   FILE *fp = NULL;
+
+   do {
+      errno = 0;
+      fp = fopen(filename, "r");
+      if (NULL == fp) {
+         int errsv = errno;
+         LOG_ERROR("%s: could not open %s, error = %d, <%s>\n", __FUNCTION__, filename, errsv, strerror(errsv));
+         status = false;
+         break;
+      }
+
+      crc = crc32(0L, Z_NULL, 0);
+      while (!feof(fp)) {
+         read_size = fread((void *)&crc_buff[0], 1, CRC_BUFF_SIZE, fp);
+         if (read_size != CRC_BUFF_SIZE) {
+            if (ferror(fp)) {
+               //fread does not set errno
+               LOG_ERROR("%s: error reading file <%s>\n", __FUNCTION__, filename);
+               status = false;
+               break;
+            }
+         }
+         crc = crc32(crc, (const Bytef *)&crc_buff[0], read_size);
+      } // end of crc calculation loop
+
+      if (status) {
+         LOG_DEBUG("%s: file <%s> successfully calculated CRC = 0x%lx\n", __FUNCTION__, filename, crc);
+      } else {
+         LOG_ERROR("%s: failed to calculate CRC of file <%s>\n", __FUNCTION__, filename);
+      }
+   } while (0);
+
+   if (NULL != fp) {
+      fclose(fp);
+   }
+   *crc_ret = crc;
+   return status;
+}
+
+bool ctrlm_utils_move_file_to_secure_nvm(const char *path) {
+   int rc;
+   int retry = 0, max_retries = 3;
+
+   string path_str = path;
+   size_t idx = path_str.rfind('/');
+   string filename = path_str.substr(idx + 1);
+   string secure_path = CTRLM_NVM_SECURE_PATH + filename;
+
+   if (ctrlm_file_exists(path)) {
+      struct stat link_stat;
+      errno = 0;
+      rc = lstat(path, &link_stat);
+      if(rc != 0) {
+         int errsv = errno;
+         LOG_ERROR("%s: lstat failed on path <%s>, error = <%s>\n", __FUNCTION__, path, strerror(errsv));
+         return false;
+      }
+
+      LOG_DEBUG("%s: path <%s> is regular file? <%s>, is symbolic link? <%s>\n", __FUNCTION__, path, S_ISREG(link_stat.st_mode) ? "TRUE":"FALSE", S_ISLNK(link_stat.st_mode) ? "TRUE":"FALSE");
+      if (S_ISLNK(link_stat.st_mode)) {
+         LOG_DEBUG("%s: File <%s> already is a link to secure area, nothing to be done.\n", __FUNCTION__, path);
+         return true;
+      } else {
+         LOG_WARN("%s: Moving file <%s> to <%s>\n", __FUNCTION__, path, secure_path.c_str());
+         uLong crc_src, crc_dest;
+         // Calculate CRC of the file first
+         for (retry = 0; retry < max_retries; retry++) {
+            if (ctrlm_utils_calc_crc32(path, &crc_src)) { break; }
+         }
+         if (retry >= max_retries) { LOG_ERROR("%s: Failed to calc CRC after <%d> retries, returning false.\n", __FUNCTION__, max_retries); return false; }
+
+         // Copy file to secure area and ensure CRCs match
+         for (retry = 0; retry < max_retries; retry++) {
+            if (false == ctrlm_file_copy(path, secure_path.c_str(), true, false)) {
+               continue;
+            }
+            if (ctrlm_utils_calc_crc32(secure_path.c_str(), &crc_dest)) {
+               if (crc_src == crc_dest) {
+                  LOG_DEBUG("%s: CRCs match\n", __FUNCTION__);
+                  break;
+               } else {
+                  LOG_ERROR("%s: CRCs do NOT match, try copy again!!!!!!!!!!!!\n", __FUNCTION__);
+                  continue;
+               }
+            } else {
+               continue;
+            }
+         }
+         if (retry >= max_retries) {
+            LOG_ERROR("%s: Failed to copy file to secure area after <%d> retries, deleting it and returning false.\n", __FUNCTION__, max_retries);
+            rc = remove(secure_path.c_str());
+            if (rc != 0) {
+               int errsv = errno; LOG_ERROR("%s: failed to delete <%s>, error = <%s>\n", __FUNCTION__, secure_path.c_str(), strerror(errsv));
+            }
+            return false; 
+         }
+
+         LOG_INFO("%s: Successfully copied file <%s> to <%s>\n", __FUNCTION__, path, secure_path.c_str());
+
+         // Delete the file in unsecure area
+         for (retry = 0; retry < max_retries; retry++) {
+            rc = remove(path);
+            if (rc != 0) {
+               int errsv = errno; LOG_ERROR("%s: failed to delete <%s>, error = <%s>\n", __FUNCTION__, path, strerror(errsv));
+            } else {
+               break;
+            }
+         }
+         if (retry >= max_retries) { LOG_ERROR("%s: Failed to remove <%s> after <%d> retries, returning false.\n", __FUNCTION__, path, max_retries); return false; }
+
+         LOG_INFO("%s: Successfully deleted file <%s>, creating symlink.\n", __FUNCTION__, path);
+         for (retry = 0; retry < max_retries; retry++) {
+            rc = symlink(secure_path.c_str(), path);
+            if (rc != 0) {
+               int errsv = errno; LOG_ERROR("%s: failed to create symbolic link <%s> -> <%s>, error = <%s>\n", __FUNCTION__, path, secure_path.c_str(), strerror(errsv));
+            } else {
+               break;
+            }
+         }
+         if (retry >= max_retries) {
+            LOG_ERROR("%s: Failed to create symlink after <%d> retries, moving file back to <%s>\n", __FUNCTION__, max_retries, path);
+            ctrlm_file_copy(secure_path.c_str(), path, true, false);
+            rc = remove(secure_path.c_str());
+            if (rc != 0) {
+               int errsv = errno; LOG_ERROR("%s: failed to delete <%s>, error = <%s>\n", __FUNCTION__, secure_path.c_str(), strerror(errsv));
+            }
+            return false;
+         }
+         LOG_INFO("%s: Successfully moved file to secure area and created symbolic link <%s> -> <%s>\n", __FUNCTION__, path, secure_path.c_str());
+      }
+   } else {
+      LOG_INFO("%s: file <%s> does not exist, creating link to secure area.\n", __FUNCTION__, path);
+      for (retry = 0; retry < max_retries; retry++) {
+         rc = symlink(secure_path.c_str(), path);
+         if (rc != 0) {
+            int errsv = errno; LOG_ERROR("%s: failed to create symbolic link <%s> -> <%s>, error = <%s>\n", __FUNCTION__, path, secure_path.c_str(), strerror(errsv));
+         } else {
+            break;
+         }
+      }
+      if (retry >= max_retries) { LOG_ERROR("%s: Failed to create symlink after <%d> retries, returning false.\n", __FUNCTION__, max_retries); return false; } 
+   }
+   return true;
 }

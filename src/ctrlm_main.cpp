@@ -5493,7 +5493,7 @@ void ctrlm_crash_recovery_check() {
    if(crash_count >= 2 * g_ctrlm.crash_recovery_threshold && (invalid_hal_nvm || invalid_ctrlm_db)) { // Using the backup did not work.. Worst case scenario
       LOG_FATAL("%s: failed to recover with backup NVM, %s\n", __FUNCTION__, (invalid_hal_nvm ? "failure due to hal NVM.. Worst case scenario removing HAL NVM and ctrlm DB" : "failure due to ctrlm DB.. Removing ctrlm DB"));
       // Remove both NVM and ctrlm DB
-      if(!remove(g_ctrlm.db_path.c_str())) {
+      if(!ctrlm_file_delete(g_ctrlm.db_path.c_str(), true)) {
          LOG_WARN("%s: Failed to remove ctrlm DB.. It is possible it no longer exists\n", __FUNCTION__);
       }
       // Set recovery mode in rf4ce object
@@ -5550,9 +5550,9 @@ void ctrlm_crash_recovery_check() {
          }
       }
       // Restore backup for ctrlm NVM
-      if(FALSE == ctrlm_file_copy(CTRLM_NVM_BACKUP, g_ctrlm.db_path.c_str(), TRUE)) {
+      if(FALSE == ctrlm_file_copy(CTRLM_NVM_BACKUP, g_ctrlm.db_path.c_str(), TRUE, TRUE)) {
          LOG_WARN("%s: Failed to restore ctrlm DB backup, removing current DB...\n", __FUNCTION__);
-         remove(g_ctrlm.db_path.c_str());
+         ctrlm_file_delete(g_ctrlm.db_path.c_str(), true);
       }
       // Increment crash count
       crash_count = crash_count + 1;
@@ -5586,7 +5586,7 @@ void ctrlm_backup_data() {
 
    // Back up ctrlm db
    if(FALSE == ctrlm_db_backup()) {
-      remove(CTRLM_NVM_BACKUP);
+      ctrlm_file_delete(CTRLM_NVM_BACKUP, true);
 #ifdef CTRLM_NETWORK_HAS_HAL_NVM
       remove(HAL_NVM_BACKUP);
 #endif
@@ -5603,14 +5603,14 @@ glong tv_sec = 0;
 #endif
 #ifdef CTRLM_NETWORK_HAS_HAL_NVM
    if(FALSE == ctrlm_file_timestamp_set(HAL_NVM_BACKUP, tv_sec)) {
-      remove(CTRLM_NVM_BACKUP);
+      ctrlm_file_delete(CTRLM_NVM_BACKUP, true);
       remove(HAL_NVM_BACKUP);
       return;
    }
 #endif
 
    if(FALSE == ctrlm_file_timestamp_set(CTRLM_NVM_BACKUP, tv_sec)) {
-      remove(CTRLM_NVM_BACKUP);
+      ctrlm_file_delete(CTRLM_NVM_BACKUP, true);
 #ifdef CTRLM_NETWORK_HAS_HAL_NVM
       remove(HAL_NVM_BACKUP);
 #endif

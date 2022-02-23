@@ -117,7 +117,7 @@ void ctrlm_recovery_property_get(ctrlm_recovery_property_t property, void *value
 }
 
 void ctrlm_recovery_factory_reset() {
-   if (remove(CTRLM_NVM_BACKUP) != 0) {
+   if (!ctrlm_file_delete(CTRLM_NVM_BACKUP, true)) {
         LOG_ERROR("%s: CTRLM_NVM_BACKUP failed \n", __FUNCTION__);  //CID:87883 - checked return
    }
 #ifdef CTRLM_NETWORK_HAS_HAL_NVM

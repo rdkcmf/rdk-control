@@ -21,6 +21,7 @@
 
 #include <semaphore.h>
 #include <string>
+#include <zlib.h>
 #include "ctrlm_ipc.h"
 #include "ctrlm_ipc_rcu.h"
 #include "ctrlm_ipc_voice.h"
@@ -119,7 +120,9 @@ const char *ctrlm_wakeup_reason_str(DeepSleep_WakeupReason_t wakeup_reason);
 #endif
 const char *ctrlm_rcu_wakeup_config_str(ctrlm_rcu_wakeup_config_t config);
 
-bool        ctrlm_file_copy(const char* src, const char* dst, bool overwrite);
+bool        ctrlm_file_copy(const char* src, const char* dst, bool overwrite, bool follow_symbolic_link);
+bool        ctrlm_file_delete(const char* path, bool follow_symbolic_link);
+bool        ctrlm_file_get_symlink_target(const char *path, std::string &link_target);
 bool        ctrlm_file_exists(const char* path);
 bool        ctrlm_file_timestamp_get(const char *path, guint64 *ts);
 bool        ctrlm_file_timestamp_set(const char *path, guint64  ts);
@@ -151,6 +154,10 @@ bool        ctrlm_archive_extract_ble_check_dir_exists(std::string path);
 std::string ctrlm_xml_tag_text_get(std::string xml, std::string tag);
 
 ctrlm_power_state_t ctrlm_iarm_power_state_map(IARM_Bus_PowerState_t iarm_power_state);
+
+bool ctrlm_utils_calc_crc32( const char *filename, uLong *crc_ret );
+bool ctrlm_utils_move_file_to_secure_nvm(const char *path);
+
 #ifdef __cplusplus
 }
 #endif

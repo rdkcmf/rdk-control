@@ -27,6 +27,9 @@
 #include <fstream>
 #include <vector>
 #include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "ctrlm.h"
 #include "ctrlm_utils.h"
 #include "ctrlm_ipc.h"
@@ -240,6 +243,11 @@ bool ctrlm_db_open(const char *db_path) {
 
    g_ctrlm_db.created_default_db = false;
    g_ctrlm_db.voice_is_valid     = true; // This gets set to false IF the voice table is created when creating default DB
+
+   if (false == ctrlm_utils_move_file_to_secure_nvm(db_path)) {
+      LOG_ERROR("%s: Failed to move file <%s> to secure area!!!!!!!!!!!!!!!!!!!\n", __FUNCTION__, db_path);
+      return(false);
+   }
 
    // check for presence of database file and if not present, create it
    rc = sqlite3_open(db_path, &g_ctrlm_db.handle);
@@ -490,12 +498,17 @@ gpointer ctrlm_db_thread(gpointer param) {
          case CTRLM_DB_QUEUE_MSG_TYPE_BACKUP: {
             ctrlm_db_queue_msg_backup_t *backup = (ctrlm_db_queue_msg_backup_t *)msg;
             LOG_DEBUG("%s: BACKUP DATABASE\n", __FUNCTION__);
-            if(FALSE == ctrlm_file_copy(sqlite3_db_filename(g_ctrlm_db.handle, "main"), CTRLM_NVM_BACKUP, TRUE)) {
-               LOG_ERROR("%s: Failed to back up ctrlm DB\n", __FUNCTION__);
+            if (false == ctrlm_utils_move_file_to_secure_nvm(CTRLM_NVM_BACKUP)) {
+               LOG_ERROR("%s: Failed to move file <%s> to secure area!!!!!!!!!!!!!!!!!!!\n", __FUNCTION__, CTRLM_NVM_BACKUP);
                *(backup->ret) = FALSE;
             } else {
-               LOG_INFO("%s: ctrlm DB backed up successfully\n", __FUNCTION__);
-               *(backup->ret) = TRUE;
+               if(FALSE == ctrlm_file_copy(sqlite3_db_filename(g_ctrlm_db.handle, "main"), CTRLM_NVM_BACKUP, TRUE, TRUE)) {
+                  LOG_ERROR("%s: Failed to back up ctrlm DB\n", __FUNCTION__);
+                  *(backup->ret) = FALSE;
+               } else {
+                  LOG_INFO("%s: ctrlm DB backed up successfully\n", __FUNCTION__);
+                  *(backup->ret) = TRUE;
+               }
             }
             sem_post(&g_ctrlm_db.semaphore);
             break;
