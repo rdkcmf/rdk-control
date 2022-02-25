@@ -4483,7 +4483,7 @@ void ctrlm_obj_network_rf4ce_t::req_process_ir_set_code(void *data, int size) {
       }
       if(dqm->ir_codes->get_key_map()) {
          LOG_INFO("%s: Setting IR Codes on Controller %u\n", __FUNCTION__, dqm->controller_id);
-         unsigned char status[1] = {IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES};
+         unsigned char status[1] = {IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES | IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD};
          for(const auto &itr : *dqm->ir_codes->get_key_map()) {
             ctrlm_rf4ce_ir_rf_db_entry_t *entry = ctrlm_rf4ce_ir_rf_db_entry_t::from_raw_ir_code(dev_type, itr.first, (uint8_t *)itr.second.data(), (uint16_t)itr.second.size());
             if(entry) {
@@ -4519,7 +4519,7 @@ void ctrlm_obj_network_rf4ce_t::req_process_ir_clear_codes(void *data, int size)
 
    if(controller_exists(dqm->controller_id)) {
       LOG_INFO("%s: Clearing IR Codes on Controller %u\n", __FUNCTION__, dqm->controller_id);
-      unsigned char status[1] = {IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES};
+      unsigned char status[1] = {IR_RF_DATABASE_STATUS_DB_DOWNLOAD_YES | IR_RF_DATABASE_STATUS_FORCE_DOWNLOAD};
       this->ir_rf_database_.clear_ir_codes();
       this->ir_rf_database_.store_db();
       LOG_INFO("%s:\n%s\n", __FUNCTION__, this->ir_rf_database_.to_string(true).c_str());
