@@ -397,7 +397,7 @@ class ctrlm_voice_t {
     std::string                           voice_stb_data_sat_get() const;
     bool                                  voice_stb_data_test_get() const;
 
-    virtual bool                          voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk);
+    virtual bool                          voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk, bool local_conf);
     virtual bool                          voice_configure(ctrlm_voice_iarm_call_settings_t *settings, bool db_write);
     virtual bool                          voice_configure(json_t *settings, bool db_write);
     virtual bool                          voice_status(ctrlm_voice_status_t *status);
@@ -407,7 +407,7 @@ class ctrlm_voice_t {
     void                                  voice_params_qos_get(voice_params_qos_t *params);
     void                                  voice_params_opus_encoder_get(voice_params_opus_encoder_t *params);
     void                                  voice_params_par_get(voice_params_par_t *params);
-    virtual void                          process_xconf(json_t **json_obj_vsdk);
+    virtual void                          process_xconf(json_t **json_obj_vsdk, bool local_conf);
     virtual void                          query_strings_updated();
 
     bool                                  voice_device_streaming(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);

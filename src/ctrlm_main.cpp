@@ -265,6 +265,7 @@ typedef struct {
 #endif
    ctrlm_power_state_t                power_state;
    gboolean                           auto_ack;
+   gboolean                           local_conf;
 } ctrlm_global_t;
 
 static ctrlm_global_t g_ctrlm;
@@ -549,6 +550,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.return_code                    = 0;
    g_ctrlm.power_state                    = ctrlm_main_iarm_call_get_power_state();
    g_ctrlm.auto_ack                       = true;
+   g_ctrlm.local_conf                     = false;
 
    g_ctrlm.service_access_token.clear();
    g_ctrlm.has_receiver_id                = false;
@@ -727,7 +729,7 @@ int main(int argc, char *argv[]) {
 
    LOG_INFO("ctrlm_main: init voice\n");
 #ifdef USE_VOICE_SDK
-   g_ctrlm.voice_session->voice_configure_config_file_json(json_obj_voice, json_obj_vsdk);
+   g_ctrlm.voice_session->voice_configure_config_file_json(json_obj_voice, json_obj_vsdk, g_ctrlm.local_conf );
 #else
    ctrlm_voice_init(json_obj_voice);
 #endif
@@ -1580,13 +1582,16 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
    std::string config_fn_etc = "/etc/ctrlm_config.json";
    json_t *json_obj_ctrlm;
    ctrlm_config_t *ctrlm_config = ctrlm_config_t::get_instance();
-
+   gboolean local_conf = false;
+   
    LOG_INFO("%s\n", __FUNCTION__);
+
    if(ctrlm_config == NULL) {
       LOG_ERROR("%s: Failed to get config manager instance\n", __FUNCTION__);
       return(false);
    } else if(!ctrlm_is_production_build() && g_file_test(config_fn_opt.c_str(), G_FILE_TEST_EXISTS) && ctrlm_config->load_config(config_fn_opt)) {
       LOG_INFO("%s: Read configuration from <%s>\n", __FUNCTION__, config_fn_opt.c_str());
+      local_conf = true;
    } else if(g_file_test(config_fn_etc.c_str(), G_FILE_TEST_EXISTS) && ctrlm_config->load_config(config_fn_etc)) {
       LOG_INFO("%s: Read configuration from <%s>\n", __FUNCTION__, config_fn_etc.c_str());
    } else {
@@ -1864,6 +1869,8 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
    LOG_INFO("%s: Mask Key Codes               <%s>\n",  __FUNCTION__, g_ctrlm.mask_key_codes_json ? "YES" : "NO");
    LOG_INFO("%s: Crash Recovery Threshold     <%u>\n",  __FUNCTION__, g_ctrlm.crash_recovery_threshold);
    LOG_INFO("%s: Auth Service URL             <%s>\n",  __FUNCTION__, g_ctrlm.server_url_authservice.c_str());
+
+   g_ctrlm.local_conf = local_conf;
 
    return true;
 }

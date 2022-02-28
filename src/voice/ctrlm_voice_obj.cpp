@@ -267,7 +267,7 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    this->state_dst   = CTRLM_VOICE_STATE_DST_READY;
 }
 
-bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk) {
+bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk, bool local_conf) {
     json_config                       conf;
     ctrlm_voice_iarm_call_settings_t *voice_settings     = NULL;
     uint32_t                          voice_settings_len = 0;
@@ -382,8 +382,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
     }
 
     this->set_audio_mode(&audio_settings);
-
-    this->process_xconf(&json_obj_vsdk);
+    this->process_xconf(&json_obj_vsdk, local_conf);
 
     // Disable muting/ducking to recover in case ctrlm restarts while muted/ducked.
     this->audio_state_set(false);
@@ -713,7 +712,7 @@ bool ctrlm_voice_t::voice_init_set(const char *init, bool db_write) {
     return(ret);
 }
 
-void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
+void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk, bool local_conf) {
    LOG_INFO("%s: Voice XCONF Settings\n", __FUNCTION__);
    int result;
 
@@ -788,7 +787,15 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
                   LOG_ERROR("%s: found VSDK in text but invalid object\n", __FUNCTION__);
                   break;
                }
-               //If execution reaches here we have XCONF overrides for the text file
+
+               //If execution reaches here we have XCONF settings to use. If developer has used local conf settings, keep them.
+               if(local_conf) {
+                  if(!json_object_update(jvsdk, *json_obj_vsdk)) {
+                     LOG_ERROR("%s: failed to update json_obj_vsdk\n", __FUNCTION__);
+                     break;
+                  }
+               }
+
                *json_obj_vsdk = json_deep_copy(jvsdk);
                if(NULL == *json_obj_vsdk)
                {
@@ -798,7 +805,6 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk) {
                    */
                   break;
                }
-               LOG_INFO("%s: received vsdk JSON object copied it to json_obj_vsdk\n", __FUNCTION__);
             }while(0);
          } else {
             LOG_WARN("%s: incorrect length\n", __FUNCTION__);
