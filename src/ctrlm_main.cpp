@@ -366,6 +366,18 @@ static void     ctrlm_property_read_shutdown_time(void);
 static void     control_service_values_read_from_db();
 static void     ctrlm_check_for_key_tag(int key_tag);
 
+#ifdef MEMORY_LOCK
+const char *memory_lock_progs[] = {
+"/usr/bin/controlMgr",
+"/usr/lib/libctrlm_hal_rf4ce.so.0.0.0",
+"/usr/lib/libxraudio.so.0.0.0",
+"/usr/lib/libxraudio-hal.so.0.0.0",
+"/usr/lib/libxr_mq.so.0.0.0",
+"/usr/lib/libxr-timer.so.0.0.0",
+"/usr/lib/libxr-timestamp.so.0.0.0"
+};
+#endif
+
 #if CTRLM_HAL_RF4CE_API_VERSION >= 9
 static void ctrlm_crash_recovery_check();
 static void ctrlm_backup_data();
@@ -406,30 +418,17 @@ int main(int argc, char *argv[]) {
 
 #ifdef MEMORY_LOCK
    clnl_init();
-   if(clnl_lock("/usr/bin/controlMgr", SECTION_TEXT)) { // returns 1 on error, 0 on success
-      LOG_ERROR("%s: failed to lock controlMgr instructions to memory\n", __FUNCTION__);
-   } else {
-      LOG_INFO("%s: locked controlMgr instructions to memory\n", __FUNCTION__);
+   for(unsigned int i = 0; i < (sizeof(memory_lock_progs) / sizeof(memory_lock_progs[0])); i++) {
+      if(ctrlm_file_exists(memory_lock_progs[i])) {
+         if(clnl_lock(memory_lock_progs[i], SECTION_TEXT)) {
+            LOG_ERROR("%s: failed to lock instructions to memory <%s>\n", __FUNCTION__, memory_lock_progs[i]);
+         } else {
+            LOG_INFO("%s: successfully locked to memory <%s>\n", __FUNCTION__, memory_lock_progs[i]);
+         }
+      } else {
+         LOG_DEBUG("%s: file doesn't exist, cannot lock to memory <%s>\n", memory_lock_progs[i]);
+      }
    }
-#ifdef USE_VOICE_SDK
-   if(clnl_lock("/usr/lib/libxraudio-hal.so.0", SECTION_TEXT)) { // returns 1 on error, 0 on success
-      LOG_ERROR("%s: failed to lock xraudio-hal instructions to memory\n", __FUNCTION__);
-   } else {
-      LOG_INFO("%s: locked xraudio-hal instructions to memory\n", __FUNCTION__);
-   }
-#endif
-#ifdef CTRLM_NETWORK_RF4CE
-   const char *rf4ce_hal_lib = "/usr/lib/libctrlm_hal_rf4ce.so";
-   if(!ctrlm_file_exists(rf4ce_hal_lib)) {
-      LOG_INFO("%s: skipping ctrlm_hal_rf4ce library\n", __FUNCTION__);
-      rf4ce_hal_lib = NULL;
-   } else if(clnl_lock(rf4ce_hal_lib, SECTION_TEXT)) { // returns 1 on error, 0 on success
-      LOG_ERROR("%s: failed to lock ctrlm_hal_rf4ce instructions to memory\n", __FUNCTION__);
-      rf4ce_hal_lib = NULL;
-   } else {
-      LOG_INFO("%s: locked ctrlm_hal_rf4ce instructions to memory\n", __FUNCTION__);
-   }
-#endif
 #endif
 
    ctrlm_signals_register();
@@ -810,15 +809,11 @@ int main(int argc, char *argv[]) {
    sem_destroy(&g_ctrlm.ctrlm_utils_sem);
 
 #ifdef MEMORY_LOCK
-   clnl_unlock("/usr/bin/controlMgr", SECTION_TEXT);
-#ifdef USE_VOICE_SDK
-   clnl_unlock("/usr/lib/libxraudio-hal.so.0", SECTION_TEXT);
-#endif
-#ifdef CTRLM_NETWORK_RF4CE
-   if(rf4ce_hal_lib != NULL) {
-      clnl_unlock(rf4ce_hal_lib, SECTION_TEXT);
+   for(unsigned int i = 0; i < (sizeof(memory_lock_progs) / sizeof(memory_lock_progs[0])); i++) {
+      if(ctrlm_file_exists(memory_lock_progs[i])) {
+         clnl_unlock(memory_lock_progs[i], SECTION_TEXT);
+      }
    }
-#endif
    clnl_destroy();
 #endif
 
