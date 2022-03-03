@@ -545,15 +545,16 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_download_complete(ctrlm_t
       }
    }
 
-   if (result == RF4CE_DEVICE_UPDATE_RESULT_SUCCESS) {
-      // Reset controller ota counter to zero
-      ota_failure_count_set(0);
-   }
-   else {
-      if (is_controller_type_z() || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_CRC || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH) {
-         // Increment ota counter
-         ota_failure_count_set(ota_failure_count_get() + 1);
-         LOG_WARN("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_count_get());
+   if (controller_type_get() == RF4CE_CONTROLLER_TYPE_XR15V2 || controller_type_get() == RF4CE_CONTROLLER_TYPE_XR16) {
+      if (result == RF4CE_DEVICE_UPDATE_RESULT_SUCCESS) {
+         // Reset controller ota counter to zero
+         ota_failure_count_set(0);
+      } else {
+         if (is_controller_type_z() || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_CRC || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH) {
+            // Increment ota counter
+            ota_failure_count_set(ota_failure_count_get() + 1);
+            LOG_WARN("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_count_get());
+         }
       }
    }
 
