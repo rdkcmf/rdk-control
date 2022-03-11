@@ -1504,12 +1504,12 @@ void ctrlm_voice_t::voice_session_stats_print() {
       return;
    }
 
-   signed long long ctrl_response, ctrl_audio_rxd_first, ctrl_audio_rxd_final, ctrl_audio_rxd_stop, ctrl_cmd_status_wr, ctrl_cmd_status_rd;
+   signed long long ctrl_response, ctrl_audio_rxd_first, ctrl_audio_rxd_final, ctrl_audio_rxd_stop, ctrl_cmd_status_wr;
    ctrl_response        = rdkx_timestamp_subtract_us(timing->ctrl_request,         timing->ctrl_response);
    ctrl_audio_rxd_first = rdkx_timestamp_subtract_us(timing->ctrl_response,        timing->ctrl_audio_rxd_first);
 
    ctrl_cmd_status_wr   = rdkx_timestamp_subtract_us(timing->ctrl_request,         timing->ctrl_cmd_status_wr);
-   ctrl_cmd_status_rd   = rdkx_timestamp_subtract_us(timing->ctrl_cmd_status_wr,   timing->ctrl_cmd_status_rd);
+   
 
    char str_keyword[40];
    str_keyword[0] = '\0';
@@ -1528,7 +1528,7 @@ void ctrlm_voice_t::voice_session_stats_print() {
    ctrl_audio_rxd_stop = rdkx_timestamp_subtract_us(timing->ctrl_audio_rxd_final, timing->ctrl_stop);
 
    LOG_INFO("%s: ctrl rsp <%lld> first <%lld> %sfinal <%lld> stop <%lld> us\n", __FUNCTION__, ctrl_response, ctrl_audio_rxd_first, str_keyword, ctrl_audio_rxd_final, ctrl_audio_rxd_stop);
-   LOG_INFO("%s: ctrl cmd status wr <%lld> rd <%lld> us\n", __FUNCTION__, ctrl_cmd_status_wr, ctrl_cmd_status_rd);
+   LOG_INFO("%s: ctrl cmd status wr <%lld> us\n", __FUNCTION__, ctrl_cmd_status_wr);
 
    if(timing->connect_attempt) { // Attempted connection
       signed long long srvr_request, srvr_init_txd, srvr_disconnect;
