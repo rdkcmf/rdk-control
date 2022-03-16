@@ -244,6 +244,10 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
       if(!image_available) {
          next_check_time = update_polling_period_get() * 60 * 60; // Use update polling rib entry - convert to seconds
          LOG_INFO("%s: Image Check response - No image is available.  Check again in %u seconds.\n", __FUNCTION__, next_check_time);
+
+         if (is_controller_type_z()) {
+            ota_failure_count_set(ota_failure_count_get() + 1);
+         }
       }
 #ifdef XR15_704
       // HACK: We need to make XR15s running < 2.0.0.0 do not get an image pending flag to avoid bug on device.
@@ -545,16 +549,13 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_download_complete(ctrlm_t
       }
    }
 
-   if (controller_type_get() == RF4CE_CONTROLLER_TYPE_XR15V2 || controller_type_get() == RF4CE_CONTROLLER_TYPE_XR16) {
-      if (result == RF4CE_DEVICE_UPDATE_RESULT_SUCCESS) {
-         // Reset controller ota counter to zero
-         ota_failure_count_set(0);
-      } else {
-         if (is_controller_type_z() || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_CRC || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH) {
-            // Increment ota counter
-            ota_failure_count_set(ota_failure_count_get() + 1);
-            LOG_WARN("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_count_get());
-         }
+   if (result == RF4CE_DEVICE_UPDATE_RESULT_SUCCESS) {
+      // Reset controller ota counter to zero
+      ota_failure_count_set(0);
+   } else {
+      if (is_controller_type_z() || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_CRC || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH) {
+         // Increment ota counter
+         ota_failure_count_set(ota_failure_count_get() + 1);
       }
    }
 

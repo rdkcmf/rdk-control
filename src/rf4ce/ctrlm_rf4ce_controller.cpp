@@ -3371,15 +3371,25 @@ gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar ne
 }
 
 void ctrlm_obj_controller_rf4ce_t::ota_failure_count_set(uint8_t ota_failures) {
+   if (controller_type_ != RF4CE_CONTROLLER_TYPE_XR15V2 && controller_type_ != RF4CE_CONTROLLER_TYPE_XR16) {
+      return ;
+   }
    ota_failures_  = (ota_failures >= 4) ? 0 : ota_failures;
    ctrlm_db_rf4ce_write_ota_failures_count(network_id_get(), controller_id_get(), ota_failures_);
+   LOG_INFO("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_count_get());
 }
 
 uint8_t ctrlm_obj_controller_rf4ce_t::ota_failure_count_get(void) {
+   if (controller_type_ != RF4CE_CONTROLLER_TYPE_XR15V2 && controller_type_ != RF4CE_CONTROLLER_TYPE_XR16) {
+      return 0;
+   }
    return ota_failures_;
 }
 
 bool ctrlm_obj_controller_rf4ce_t::is_controller_type_z(void) {
+   if (controller_type_ != RF4CE_CONTROLLER_TYPE_XR15V2 && controller_type_ != RF4CE_CONTROLLER_TYPE_XR16) {
+      return false;
+   }
    bool is_type_z = (ota_failures_ >= 2) ? true : false;
    LOG_INFO("%s: Controller id %d (%s) is %s\n", __FUNCTION__, controller_id_get(), ctrlm_rf4ce_controller_type_str(controller_type_), is_type_z ? "TYPE Z" : "NOT TYPE Z");
    return is_type_z;
