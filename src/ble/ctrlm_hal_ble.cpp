@@ -171,6 +171,27 @@ static ctrlm_hal_result_t ctrlm_hal_ble_SetDbusProperty(GDBusProxy   *gdbus_prox
 // Structs and Globals
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// @brief keymapping for USB Keyboard usage page 0x07.  Index is the keyboard
+/// code sent from the remote, and the value is the linux code
+static const unsigned char hid_keyboard_to_linux[256] = {
+      0,   0,   0,   0,   30,  48,  46,  32,  18,  33,  34,  35,  23,  36,  37,  38,
+      50,  49,  24,  25,  16,  19,  31,  20,  22,  47,  17,  45,  21,  44,  2,   3,
+      4,   5,   6,   7,   8,   9,   10,  11,  28,  1,   14,  15,  57,  12,  13,  26,
+      27,  43,  43,  39,  40,  41,  51,  52,  53,  58,  59,  60,  61,  62,  63,  64,
+      65,  66,  67,  68,  87,  88,  99,  70,  119, 110, 102, 104, 111, 107, 109, 106,
+      105, 108, 103, 69,  98,  55,  74,  78,  96,  79,  80,  81,  75,  76,  77,  71,
+      72,  73,  82,  83,  86,  127, 116, 117, 183, 184, 185, 186, 187, 188, 189, 190,
+      191, 192, 193, 194, 134, 138, 130, 132, 128, 129, 131, 137, 133, 135, 136, 113,
+      115, 114, 0,   0,   0,   121, 0,   89,  93,  124, 92,  94,  95,  0,   0,   0,
+      122, 123, 90,  91,  85,  0,   0,   0,   0,   0,   0,   0,   111, 0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   179, 180, 0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,   111, 0,   0,   0,   0,   0,   0,   0,
+      29,  42,  56,  125, 97,  54,  100, 126, 164, 166, 165, 163, 161, 115, 114, 113,
+      150, 158, 159, 128, 136, 177, 178, 176, 142, 152, 173, 140, 0,   0,   0,   0
+};
+
 class rcu_metadata_t {
     public:
         rcu_metadata_t() {
@@ -1193,11 +1214,11 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_Get
 }
 
 static uint16_t ctrlm_hal_ble_ConvertUsbKbdCodeToLinux(unsigned char usb_code) {
-    return usb_kbd_keycode[usb_code] ? usb_kbd_keycode[usb_code] : CTRLM_KEY_CODE_INVALID;
+    return hid_keyboard_to_linux[usb_code] ? hid_keyboard_to_linux[usb_code] : CTRLM_KEY_CODE_INVALID;
 }
 static unsigned char ctrlm_hal_ble_ConvertLinuxCodeToUsbKdb(uint16_t linux_code) {
-    for (unsigned int i = 0; i < sizeof(usb_kbd_keycode)/sizeof(usb_kbd_keycode[0]); i++) {
-        if (usb_kbd_keycode[i] == linux_code) {
+    for (unsigned int i = 0; i < sizeof(hid_keyboard_to_linux)/sizeof(hid_keyboard_to_linux[0]); i++) {
+        if (hid_keyboard_to_linux[i] == linux_code) {
             return i;
         }
     }
