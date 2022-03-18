@@ -78,7 +78,7 @@ bool ctrlm_db_obj_t::write_db(ctrlm_db_ctx_t ctx) {
                     ret = true;
                 } else {
                     LOG_ERROR("%s: failed to SQL step <%d, %s>\n", __FUNCTION__, rc, sqlite3_errmsg(handle));
-                    LOG_DEBUG("%s: statement <%s>\n", __FUNCTION__, sqlite3_expanded_sql(stmt));
+                    LOG_DEBUG("%s: statement <%s>\n", __FUNCTION__, sqlite3_sql(stmt));
                 }
             } else {
                 LOG_ERROR("%s: failed to SQL bind <%d, %s>\n", __FUNCTION__, rc, sqlite3_errmsg(handle));
