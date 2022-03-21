@@ -156,7 +156,7 @@ bool ctrlm_db_blob_t::from_buffer(char *data, size_t length) {
             std::copy(data, data + length, std::back_inserter(this->blob));
             ret = true;
         } else {
-            LOG_WARN("%s: empty buffer");
+            LOG_WARN("%s: empty buffer", __FUNCTION__);
         }
     } else {
         LOG_ERROR("%s: buffer is NULL\n", __FUNCTION__);
