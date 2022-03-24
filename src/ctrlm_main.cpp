@@ -761,7 +761,7 @@ int main(int argc, char *argv[]) {
    IARM_BUS_SYSMGR_KEYCodeLoggingInfo_Param_t param;
    IARM_Result_t iarm_result = IARM_Bus_Call(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_API_GetKeyCodeLoggingPref, &param, sizeof(IARM_BUS_SYSMGR_KEYCodeLoggingInfo_Param_t));
    if(IARM_RESULT_SUCCESS == iarm_result) {
-      g_ctrlm.mask_key_codes_iarm = (param.logStatus == 1);
+      g_ctrlm.mask_key_codes_iarm = (param.logStatus == 0);
       LOG_INFO("%s: Keycode mask logging iarm <%s>.\n", __FUNCTION__, g_ctrlm.mask_key_codes_iarm ? "ON" : "OFF");
    } else {
       LOG_WARN("%s: IARM Bus Call Failed <%s>. Starting polling SYSMgr for keycode logging status\n", __FUNCTION__, ctrlm_iarm_result_str(iarm_result));
@@ -1038,7 +1038,7 @@ gboolean ctrlm_keycode_logging_poll(gpointer user_data) {
    IARM_BUS_SYSMGR_KEYCodeLoggingInfo_Param_t param;
    IARM_Result_t iarm_result = IARM_Bus_Call(IARM_BUS_SYSMGR_NAME, IARM_BUS_SYSMGR_API_GetKeyCodeLoggingPref, &param, sizeof(IARM_BUS_SYSMGR_KEYCodeLoggingInfo_Param_t));
    if(IARM_RESULT_SUCCESS == iarm_result) {
-      g_ctrlm.mask_key_codes_iarm = (param.logStatus == 1);
+      g_ctrlm.mask_key_codes_iarm = (param.logStatus == 0);
       LOG_INFO("%s: Keycode mask logging iarm <%s>.\n", __FUNCTION__, g_ctrlm.mask_key_codes_iarm ? "ON" : "OFF");
       g_ctrlm.keycode_logging_poll_tag = 0;
       return false;
@@ -4344,7 +4344,7 @@ void ctrlm_event_handler_system(const char *owner, IARM_EventId_t event_id, void
          case IARM_BUS_SYSMGR_EVENT_KEYCODE_LOGGING_CHANGED: {
                IARM_Bus_SYSMgr_EventData_t *system_event = (IARM_Bus_SYSMgr_EventData_t *)data;
 
-               g_ctrlm.mask_key_codes_iarm = (system_event->data.keyCodeLogData.logStatus == 1);
+               g_ctrlm.mask_key_codes_iarm = (system_event->data.keyCodeLogData.logStatus == 0);
                LOG_INFO("%s: Keycode mask logging change event <%s>.\n", __FUNCTION__, g_ctrlm.mask_key_codes_iarm ? "ON" : "OFF");
                break;
          }
