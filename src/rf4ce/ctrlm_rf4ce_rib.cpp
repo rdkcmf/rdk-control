@@ -1019,8 +1019,7 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set(gboolean target, ctrlm_timestam
          LOG_INFO("%s: Skipping iarm message.\n", __FUNCTION__);
          return;
       }
-      if(identifier != CTRLM_RF4CE_RIB_ATTR_ID_MEMORY_DUMP && 
-         identifier != CTRLM_RF4CE_RIB_ATTR_ID_BATTERY_STATUS) { // Send an IARM event for controller RIB write access
+      if(identifier != CTRLM_RF4CE_RIB_ATTR_ID_MEMORY_DUMP) { // Send an IARM event for controller RIB write access
          ctrlm_rcu_iarm_event_rib_access_controller(network_id_get(), controller_id_get(), (ctrlm_rcu_rib_attr_id_t)identifier, index, CTRLM_ACCESS_TYPE_WRITE);
       }
    }
