@@ -718,6 +718,8 @@ std::string ctrlm_rf4ce_voice_metrics_t::get_value() const {
     ss << "Voice Cmd Count Yesterday <" << this->voice_cmd_count_yesterday << "> ";
     ss << "Voice Cmd Short Today <" << this->voice_cmd_short_today << "> ";
     ss << "Voice Cmd Short Yesterday <" << this->voice_cmd_short_yesterday << "> "; 
+    ss << "Voice Packets Sent Today <" << this->voice_packets_sent_today << "> ";
+    ss << "Voice Packets Sent Yesterday <" << this->voice_packets_sent_yesterday << "> ";	
     ss << "Packets Lost Today <" << this->voice_packets_lost_today << "> "; 
     ss << "Packets Lost Yesterday <" << this->voice_packets_lost_yesterday << "> ";
     ss << "Utterances Exceeding Pkt Loss Threshold Today <" << this->utterances_exceeding_packet_loss_threshold_today << "> ";

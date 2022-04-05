@@ -265,6 +265,26 @@ void ctrlm_print_controller_status(const char *prefix, ctrlm_controller_status_t
    LOG_INFO("%s: Voice Cmd Short Yesterday %lu\n", prefix, status->voice_cmd_short_yesterday);
 }
 
+void ctrlm_print_voice_stats(const char *prefix, ctrlm_voice_util_stats_t *voice_util_metrics){
+   if(prefix == NULL || voice_util_metrics == NULL) {
+      LOG_ERROR("%s: NULL parameter\n", __FUNCTION__);
+      return;
+   }
+   std::stringstream ss;
+   ss << "Voice Cmd Count Today <" << voice_util_metrics->voice_cmd_count_today   << "> ";
+   ss << "Voice Cmd Count Yesterday <" << voice_util_metrics->voice_cmd_count_yesterday << "> ";
+   ss << "Voice Cmd Short Today <" << voice_util_metrics->voice_cmd_short_today  << "> ";
+   ss << "Voice Cmd Short Yesterday <" << voice_util_metrics->voice_cmd_short_yesterday << "> ";
+   ss << "Voice Packets Sent Today <" << voice_util_metrics->voice_packets_sent_today << "> ";
+   ss << "Voice Packets Sent Yesterday <" << voice_util_metrics->voice_packets_sent_yesterday << "> ";	
+   ss << "Packets Lost Today <" << voice_util_metrics->voice_packets_lost_today << "> "; 
+   ss << "Packets Lost Yesterday <" << voice_util_metrics->voice_packets_lost_yesterday << "> ";
+   ss << "Utterances Exceeding Pkt Loss Threshold Today <" << voice_util_metrics->utterances_exceeding_packet_loss_threshold_today << "> ";
+   ss << "Utterances Exceeding Pkt Loss Threshold Yesterday <" << voice_util_metrics->utterances_exceeding_packet_loss_threshold_yesterday << "> ";
+   LOG_INFO("%s: %s\n",prefix, ss.str().c_str());	     
+}		
+
+
 const char *ctrlm_invalid_return(int value) {
    errno_t safec_rc = sprintf_s(ctrlm_invalid_str, CTRLM_INVALID_STR_LEN, "INVALID(%d)", value);
    if(safec_rc < EOK) {

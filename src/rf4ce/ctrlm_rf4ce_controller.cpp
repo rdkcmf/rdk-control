@@ -2732,12 +2732,25 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_dsp_metrics(guchar *data, guc
 
 void ctrlm_obj_controller_rf4ce_t::update_voice_metrics(ctrlm_rf4ce_voice_utterance_type_t voice_utterance_type, guint32 voice_packets_sent, guint32 voice_packets_lost) {
    voice_metrics_.process_time(false);
+   ctrlm_voice_util_stats_t voice_util_metrics;
+
    if(voice_utterance_type == RF4CE_VOICE_NORMAL_UTTERANCE) {
       voice_metrics_.increment_voice_count(voice_packets_sent, voice_packets_lost);
    } else {
       voice_metrics_.increment_short_voice_count(voice_packets_sent, voice_packets_lost);
    }
-   LOG_INFO("%s: %s\n", __FUNCTION__, voice_metrics_.get_value().c_str());
+   voice_util_metrics.voice_cmd_count_today                                = voice_metrics_.get_commands_today();
+   voice_util_metrics.voice_cmd_count_yesterday                            = voice_metrics_.get_commands_yesterday();
+   voice_util_metrics.voice_cmd_short_today                                = voice_metrics_.get_short_commands_today();
+   voice_util_metrics.voice_cmd_short_yesterday                            = voice_metrics_.get_short_commands_yesterday();
+   voice_util_metrics.voice_packets_sent_today                             = voice_metrics_.get_packets_sent_today();
+   voice_util_metrics.voice_packets_sent_yesterday                         = voice_metrics_.get_packets_sent_yesterday();	
+   voice_util_metrics.voice_packets_lost_today                             = voice_metrics_.get_packets_lost_today();
+   voice_util_metrics.voice_packets_lost_yesterday                         = voice_metrics_.get_packets_lost_yesterday(); 
+   voice_util_metrics.utterances_exceeding_packet_loss_threshold_today     = voice_metrics_.get_packet_loss_exceeding_threshold_today(); 
+   voice_util_metrics.utterances_exceeding_packet_loss_threshold_yesterday = voice_metrics_.get_packet_loss_exceeding_threshold_yesterday();
+  
+   ctrlm_print_voice_stats(__FUNCTION__, &voice_util_metrics);
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_uptime_privacy_info(guchar *data, guchar length) {

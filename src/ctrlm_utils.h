@@ -39,6 +39,19 @@
 
 #define Q_NOTATION_TO_DOUBLE(input, bits) ((double)((double)input) / (double)(1 << bits))
 
+typedef struct {
+   uint32_t voice_cmd_count_today;
+   uint32_t voice_cmd_count_yesterday;
+   uint32_t voice_cmd_short_today;
+   uint32_t voice_cmd_short_yesterday;
+   uint32_t voice_packets_sent_today;
+   uint32_t voice_packets_sent_yesterday;
+   uint32_t voice_packets_lost_today;
+   uint32_t voice_packets_lost_yesterday;
+   uint32_t utterances_exceeding_packet_loss_threshold_today;
+   uint32_t utterances_exceeding_packet_loss_threshold_yesterday;
+} ctrlm_voice_util_stats_t;
+
 typedef enum
 {
    CTRLM_IR_REMOTE_TYPE_XR11V2,
@@ -71,6 +84,7 @@ void ctrlm_timeout_destroy(guint *p_timeout_tag);
 
 void ctrlm_print_data_hex(const char *prefix, guchar *data, unsigned int length, unsigned int width);
 void ctrlm_print_controller_status(const char *prefix, ctrlm_controller_status_t *status);
+void ctrlm_print_voice_stats(const char *prefix, ctrlm_voice_util_stats_t *voice_util_metrics);
 
 const char *ctrlm_main_queue_msg_type_str(ctrlm_main_queue_msg_type_t type);
 const char *ctrlm_controller_status_cmd_result_str(ctrlm_controller_status_cmd_result_t result);

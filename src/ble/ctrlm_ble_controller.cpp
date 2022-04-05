@@ -510,8 +510,8 @@ void ctrlm_obj_controller_ble_t::last_key_time_update() {
 
 // EGTODO: move to base controller class
 void ctrlm_obj_controller_ble_t::update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost) {
-   int32_t packet_loss_threshold = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD; //TODO Allow overrides from config file/RFC
-
+   int32_t packet_loss_threshold = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD; //TODO Allow overrides from config file
+   ctrlm_voice_util_stats_t voice_util_metrics;
    handle_day_change();
    voice_packets_sent_today_       += voice_packets_sent;
    voice_packets_lost_today_       += voice_packets_lost;
@@ -521,11 +521,22 @@ void ctrlm_obj_controller_ble_t::update_voice_metrics(bool is_short_utterance, g
 
    if(false == is_short_utterance) {
       voice_cmd_count_today_++;
-      LOG_INFO("%s: Voice Cmd Count Today <%u>  Voice Packets Sent Today <%u>  Voice Packets Lost Today <%u>  Utterances Exceeding Packet Loss Threshold Today <%u>\n", __FUNCTION__, voice_cmd_count_today_, voice_packets_sent_today_, voice_packets_lost_today_, utterances_exceeding_packet_loss_threshold_today_);
    } else {
       voice_cmd_short_today_++;
-      LOG_INFO("%s: Voice Cmd Short Today <%u>  Voice Packets Sent Today <%u>  Voice Packets Lost Today <%u>  Utterances Exceeding Packet Loss Threshold Today <%u>\n", __FUNCTION__, voice_cmd_short_today_, voice_packets_sent_today_, voice_packets_lost_today_, utterances_exceeding_packet_loss_threshold_today_);
    }
+
+   voice_util_metrics.voice_cmd_count_today                                = voice_cmd_count_today_;
+   voice_util_metrics.voice_cmd_count_yesterday                            = voice_cmd_count_yesterday_;
+   voice_util_metrics.voice_cmd_short_today                                = voice_cmd_short_today_;
+   voice_util_metrics.voice_cmd_short_yesterday                            = voice_cmd_short_yesterday_;
+   voice_util_metrics.voice_packets_sent_today                             = voice_packets_sent_today_;
+   voice_util_metrics.voice_packets_sent_yesterday                         = voice_packets_sent_yesterday_;
+   voice_util_metrics.voice_packets_lost_today                             = voice_packets_lost_today_;
+   voice_util_metrics.voice_packets_lost_yesterday                         = voice_packets_lost_yesterday_;
+   voice_util_metrics.utterances_exceeding_packet_loss_threshold_today     = utterances_exceeding_packet_loss_threshold_today_;
+   voice_util_metrics.utterances_exceeding_packet_loss_threshold_yesterday = utterances_exceeding_packet_loss_threshold_yesterday_;
+
+   ctrlm_print_voice_stats(__FUNCTION__, &voice_util_metrics);
 
    property_write_voice_metrics();
 }
