@@ -131,7 +131,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_discovery(void *data, int size) {
          ctrlm_timestamp_get(&discovery_deadline.timestamp);
          // replace older timestamp for the same ieee address
          asb_discovery_deadlines_.erase(dqm->params.src_ieee_addr);
-         asb_discovery_deadlines_.insert(make_pair(dqm->params.src_ieee_addr, discovery_deadline));
+         asb_discovery_deadlines_.insert(std::make_pair(dqm->params.src_ieee_addr, discovery_deadline));
          // clean up expired discovery deadlines
          for(auto it = asb_discovery_deadlines_.begin(), end_it = asb_discovery_deadlines_.end(); it != end_it;) {
             if(CTRLM_RF4CE_DISCOVERY_ASB_EXPIRATION_TIME_MS < ctrlm_timestamp_since_ms(it->second.timestamp)) {
@@ -225,7 +225,7 @@ void ctrlm_obj_network_rf4ce_t::process_discovery_stb(ctrlm_main_queue_msg_rf4ce
       ctrlm_timestamp_get(&user_string_entry.timestamp);
       // replace user string with older timestamp for the same ieee address
       discovered_user_strings_.erase(dqm->params.src_ieee_addr);
-      discovered_user_strings_.insert(make_pair(dqm->params.src_ieee_addr, user_string_entry));
+      discovered_user_strings_.insert(std::make_pair(dqm->params.src_ieee_addr, user_string_entry));
       // clean up expired user strings
       for(auto it = discovered_user_strings_.begin(), end_it = discovered_user_strings_.end(); it != end_it;) {
          if(CTRLM_RF4CE_DISCOVERY_USER_STRING_EXPIRATION_TIME_MS < ctrlm_timestamp_since_ms(it->second.timestamp)) {
@@ -302,7 +302,7 @@ void ctrlm_obj_network_rf4ce_t::process_discovery_autobind(ctrlm_main_queue_msg_
       ctrlm_timestamp_get(&discovery_deadline.timestamp);
       // replace older timestamp for the same ieee address
       discovery_deadlines_autobind_.erase(dqm->params.src_ieee_addr);
-      discovery_deadlines_autobind_.insert(make_pair(dqm->params.src_ieee_addr, discovery_deadline));
+      discovery_deadlines_autobind_.insert(std::make_pair(dqm->params.src_ieee_addr, discovery_deadline));
       // clean up expired discovery deadlines
       for(auto it = discovery_deadlines_autobind_.begin(), end_it = discovery_deadlines_autobind_.end(); it != end_it;) {
          if(CTRLM_RF4CE_DISCOVERY_EXPIRATION_TIME_MS < ctrlm_timestamp_since_ms(it->second.timestamp)) {
@@ -353,7 +353,7 @@ void ctrlm_obj_network_rf4ce_t::process_discovery_screen_bind(ctrlm_main_queue_m
          ctrlm_timestamp_get(&discovery_deadline.timestamp);
          // replace older timestamp for the same ieee address
          discovery_deadlines_screen_bind_.erase(dqm->params.src_ieee_addr);
-         discovery_deadlines_screen_bind_.insert(make_pair(dqm->params.src_ieee_addr, discovery_deadline));
+         discovery_deadlines_screen_bind_.insert(std::make_pair(dqm->params.src_ieee_addr, discovery_deadline));
       } else {
          LOG_INFO("%s: Binding Screen discovery - Already in progress for another controller.  ignore.\n", __FUNCTION__);
       }

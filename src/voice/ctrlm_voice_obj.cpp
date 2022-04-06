@@ -1451,6 +1451,44 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     }
 }
 
+void ctrlm_voice_t::voice_session_stats(ctrlm_voice_stats_session_t session, ctrlm_voice_stats_reboot_t reboot) {
+   // TODO implement for voice object
+/*   m_stats_reboot  = reboot;
+
+   // Add or clear the statistics to the session stats
+   if(!session.available) {
+      // Clear out entries in case they contained values
+      m_stats_session.dropped_retry  = SESSION_STATS_INVALID_VALUE;
+      m_stats_session.dropped_buffer = SESSION_STATS_INVALID_VALUE;
+      m_stats_session.retry_mac      = SESSION_STATS_INVALID_VALUE;
+      m_stats_session.retry_network  = SESSION_STATS_INVALID_VALUE;
+      m_stats_session.cca_sense      = SESSION_STATS_INVALID_VALUE;
+   } else {
+      m_stats_session.packets_total  = session.packets_total;
+      m_stats_session.dropped_retry  = session.dropped_retry;
+      m_stats_session.dropped_buffer = session.dropped_buffer;
+      m_stats_session.retry_mac      = session.retry_mac;
+      m_stats_session.retry_network  = session.retry_network;
+      m_stats_session.cca_sense      = session.cca_sense;
+   }
+
+   if(reboot.available && reboot.voltage == 0xFF) { // Voltage was not reported (old remote firmware).  Use locally stored value.
+      m_stats_reboot.voltage            = m_remote_battery_value;
+      m_stats_reboot.battery_percentage = m_remote_battery_percentage;
+   }
+
+   #ifdef PRINT_STATS_LAG_TIME
+   struct timespec session_stats_time;
+   clock_gettime(CLOCK_REALTIME, &session_stats_time);
+   unsigned long long delta_time;
+   delta_time = time_diff(&m_session_end_time, &session_stats_time);
+   LOG_INFO("%s: Stream end to stats lag time <%llu ms>\n", __FUNCTION__, delta_time / 1000000);
+   #endif
+
+   // Send the notification
+   notify_stats();*/
+}
+
 void ctrlm_voice_t::voice_session_timeout() {
    this->timeout_packet_tag = 0;
    ctrlm_voice_session_end_reason_t reason = CTRLM_VOICE_SESSION_END_REASON_TIMEOUT_INTERPACKET;

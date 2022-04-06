@@ -62,7 +62,6 @@
 #include "ctrlm_tr181.h"
 #include "rf4ce/ctrlm_rf4ce_network.h"
 #include "ctrlm_voice.h"
-#include "ctrlm_voice_session.h"
 #include "ctrlm_device_update.h"
 #include "ctrlm_vendor_network_factory.h"
 #include "dsMgr.h"
@@ -71,12 +70,10 @@
 #ifdef SYSTEMD_NOTIFY
 #include <systemd/sd-daemon.h>
 #endif
-#ifdef USE_VOICE_SDK
 #include "xr_voice_sdk.h"
 #include "ctrlm_voice_obj.h"
 #include "ctrlm_voice_obj_generic.h"
 #include "ctrlm_voice_endpoint.h"
-#endif
 #include "ctrlm_irdb_factory.h"
 #ifdef FDC_ENABLED
 #include "xr_fdc.h"
@@ -253,11 +250,7 @@ typedef struct {
    map<ctrlm_network_id_t, ctrlm_network_type_t>  network_type; // Map to hold the Network types that will be used by Control Manager
    vector<ctrlm_thread_monitor_t>     monitor_threads;
    int                                return_code;
-#ifdef USE_VOICE_SDK
    ctrlm_voice_t                     *voice_session;
-#else
-   unique_ptr<voice_session_t>        voice_session;
-#endif
    ctrlm_irdb_t                      *irdb;
    ctrlm_cs_values_t                  cs_values;
 #ifdef AUTH_ENABLED
@@ -385,10 +378,8 @@ static void ctrlm_crash_recovery_check();
 static void ctrlm_backup_data();
 #endif
 
-#ifdef USE_VOICE_SDK
 static void ctrlm_vsdk_thread_poll(void *data);
 static void ctrlm_vsdk_thread_response(void *data);
-#endif
 
 #ifdef MEM_DEBUG
 static gboolean ctrlm_memory_profile(gpointer user_data) {
@@ -480,7 +471,6 @@ int main(int argc, char *argv[]) {
    // init device manager
    ctrlm_dsmgr_init();
 
-#ifdef USE_VOICE_SDK
    vsdk_version_info_t version_info[VSDK_VERSION_QTY_MAX] = {0};
 
    uint32_t qty_vsdk = VSDK_VERSION_QTY_MAX;
@@ -493,7 +483,6 @@ int main(int argc, char *argv[]) {
       }
    }
    vsdk_init();
-#endif
 
    //struct sched_param param;
    //param.sched_priority = 10;
@@ -586,14 +575,8 @@ int main(int argc, char *argv[]) {
       // Do not crash the program here
    }
 
-#ifdef USE_VOICE_SDK
    LOG_INFO("ctrlm_main: create Voice object\n");
    g_ctrlm.voice_session = new ctrlm_voice_generic_t();
-#else
-   LOG_INFO("ctrlm_main: create Voice session object\n");
-   voice_session_prefs_t *vrex_prefs = ctrlm_voice_vrex_prefs_get();
-   g_ctrlm.voice_session.reset(new voice_session_t(vrex_prefs->server_url_vrex, vrex_prefs->aspect_ratio, vrex_prefs->guide_language, g_ctrlm.stb_name, vrex_prefs->timeout_vrex_response, vrex_prefs->query_strings));
-#endif
 
    LOG_INFO("ctrlm_main: create IRDB object\n");
    g_ctrlm.irdb = ctrlm_irdb_create();
@@ -621,9 +604,7 @@ int main(int argc, char *argv[]) {
    }
 #endif // AUTH_ENABLED
 
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_stb_name_set(g_ctrlm.stb_name);
-#endif
 
    LOG_INFO("ctrlm_main: load config\n");
    // Load configuration from the filesystem
@@ -728,11 +709,7 @@ int main(int argc, char *argv[]) {
    }
 
    LOG_INFO("ctrlm_main: init voice\n");
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_configure_config_file_json(json_obj_voice, json_obj_vsdk, g_ctrlm.local_conf );
-#else
-   ctrlm_voice_init(json_obj_voice);
-#endif
    LOG_INFO("ctrlm_main: networks init complete\n");
 
 #if CTRLM_HAL_RF4CE_API_VERSION >= 9
@@ -789,14 +766,12 @@ int main(int argc, char *argv[]) {
 
    ctrlm_dsmgr_deinit();
 
-#ifdef USE_VOICE_SDK
    if(g_ctrlm.voice_session != NULL) {
       delete g_ctrlm.voice_session;
       g_ctrlm.voice_session = NULL;
    }
 
    vsdk_term();
-#endif
 
    if(g_ctrlm.irdb != NULL) {
       delete g_ctrlm.irdb;
@@ -864,14 +839,12 @@ void ctrlm_thread_monitor_init(void) {
    thread_monitor.response    = CTRLM_THREAD_MONITOR_RESPONSE_ALIVE;
    g_ctrlm.monitor_threads.push_back(thread_monitor);
 
-   #ifdef USE_VOICE_SDK
    thread_monitor.name        = "Voice SDK";
    thread_monitor.queue_push  = NULL;
    thread_monitor.obj_network = NULL;
    thread_monitor.function    = ctrlm_vsdk_thread_poll;
    thread_monitor.response    = CTRLM_THREAD_MONITOR_RESPONSE_ALIVE;
    g_ctrlm.monitor_threads.push_back(thread_monitor);
-   #endif
 
    for(auto const &itr : g_ctrlm.networks) {
       if(CTRLM_HAL_RESULT_SUCCESS == itr.second->init_result_) {
@@ -982,7 +955,6 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
    return(TRUE);
 }
 
-#ifdef USE_VOICE_SDK
 void ctrlm_vsdk_thread_response(void *data) {
    ctrlm_thread_monitor_response_t *response = (ctrlm_thread_monitor_response_t *)data;
    if(response != NULL) {
@@ -993,7 +965,6 @@ void ctrlm_vsdk_thread_response(void *data) {
 void ctrlm_vsdk_thread_poll(void *data) {
    vsdk_thread_poll(ctrlm_vsdk_thread_response, data);
 }
-#endif
 
 #ifdef AUTH_ENABLED
 static gboolean ctrlm_authservice_expired(gpointer user_data) {
@@ -1149,11 +1120,6 @@ void ctrlm_terminate(void) {
    LOG_INFO("%s: Rcu\n", __FUNCTION__);
    ctrlm_rcu_terminate();
 
-   #ifndef USE_VOICE_SDK
-   LOG_INFO("%s: Voice\n", __FUNCTION__);
-   ctrlm_voice_terminate();
-   #endif
-
    LOG_INFO("%s: Device Update\n", __FUNCTION__);
    ctrlm_device_update_terminate();
 
@@ -1271,11 +1237,7 @@ gboolean ctrlm_load_receiver_id(void) {
       return(false);
    }
 
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_receiver_id_set(g_ctrlm.receiver_id);
-#else
-   g_ctrlm.voice_session->receiver_id_set(g_ctrlm.receiver_id.c_str());
-#endif
 
    for(auto const &itr : g_ctrlm.networks) {
       itr.second->receiver_id_set(g_ctrlm.receiver_id);
@@ -1299,11 +1261,7 @@ gboolean ctrlm_load_device_id(void) {
       ctrlm_main_has_device_id_set(false);
       return(false);
    }
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_device_id_set(g_ctrlm.device_id);
-#else
-   g_ctrlm.voice_session->device_id_set(g_ctrlm.device_id.c_str());
-#endif
 
    for(auto const &itr : g_ctrlm.networks) {
       itr.second->device_id_set(g_ctrlm.device_id);
@@ -1331,11 +1289,7 @@ gboolean ctrlm_load_service_account_id(const char *account_id) {
    } else {
       g_ctrlm.service_account_id = account_id;
    }
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_account_number_set(g_ctrlm.service_account_id);
-#else
-   g_ctrlm.voice_session->service_account_id_set(g_ctrlm.service_account_id.c_str());
-#endif
 
    for(auto const &itr : g_ctrlm.networks) {
       itr.second->service_account_id_set(g_ctrlm.service_account_id);
@@ -1359,11 +1313,7 @@ gboolean ctrlm_load_partner_id(void) {
       ctrlm_main_has_partner_id_set(false);
       return(false);
    }
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_partner_id_set(g_ctrlm.partner_id);
-#else
-   g_ctrlm.voice_session->partner_id_set(g_ctrlm.partner_id.c_str());
-#endif
 
    for(auto const &itr : g_ctrlm.networks) {
       itr.second->partner_id_set(g_ctrlm.partner_id);
@@ -1387,11 +1337,7 @@ gboolean ctrlm_load_experience(void) {
       ctrlm_main_has_experience_set(false);
       return(false);
    }
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_experience_set(g_ctrlm.experience);
-#else
-   g_ctrlm.voice_session->experience_set(g_ctrlm.experience.c_str());
-#endif
 
    for(auto const &itr : g_ctrlm.networks) {
       itr.second->experience_set(g_ctrlm.experience);
@@ -1433,11 +1379,7 @@ gboolean ctrlm_load_service_access_token(void) {
    ctrlm_main_has_service_access_token_set(true);
    LOG_INFO("%s: SAT Token retrieved and expires in %ld seconds\n", __FUNCTION__, g_ctrlm.service_access_token_expiration - current);
    LOG_DEBUG("%s: <%s>\n", __FUNCTION__, g_ctrlm.service_access_token.c_str());
-#ifdef USE_VOICE_SDK
    g_ctrlm.voice_session->voice_stb_data_sat_set(g_ctrlm.service_access_token);
-#else
-   ctrlm_voice_service_access_token_set(g_ctrlm.service_access_token, g_ctrlm.service_access_token_expiration);
-#endif
 
    if(!g_ctrlm.authservice->supports_sat_expiration()) {
       time_t timeout = g_ctrlm.service_access_token_expiration - current;
@@ -2319,19 +2261,6 @@ gpointer ctrlm_main_thread(gpointer param) {
             ctrlm_configuration_complete(hdr->network_id, dqm->controller_id, obj_net->ctrlm_controller_type_get(dqm->controller_id), obj_net->ctrlm_binding_type_get(dqm->controller_id), &status, dqm->result);
             break;
          }
-         case CTRLM_MAIN_QUEUE_MSG_TYPE_VOICE_SETTINGS_UPDATE: {
-            ctrlm_main_queue_msg_voice_settings_update_t *dqm = (ctrlm_main_queue_msg_voice_settings_update_t *)msg;
-            LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_VOICE_SETTINGS_UPDATE\n", __FUNCTION__);
-#ifdef USE_VOICE_SDK
-            // TODO
-            LOG_INFO("%s: %u\n", __FUNCTION__, dqm->query_strings.pair_count);
-#else
-            if (g_ctrlm.voice_session.get() != 0) {
-                g_ctrlm.voice_session->server_details_update(dqm->server_url_vrex, dqm->aspect_ratio, dqm->guide_language, dqm->query_strings, dqm->server_url_vrex_src_ff);
-            }
-#endif
-            break;
-         }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_NETWORK_PROPERTY_SET: {
             ctrlm_main_queue_msg_network_property_set_t *dqm = (ctrlm_main_queue_msg_network_property_set_t *)msg;
             LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_NETWORK_PROPERTY_SET\n", __FUNCTION__);
@@ -2502,7 +2431,6 @@ gpointer ctrlm_main_thread(gpointer param) {
                LOG_ERROR("%s: Power State Change msg NULL\n", __FUNCTION__);
                break;
             }
-            #ifdef USE_VOICE_SDK
             #ifdef ENABLE_DEEP_SLEEP
             //Deep Sleep may set Networked Standby, may need other power state modifications later
             if(dqm->system) {
@@ -2524,7 +2452,6 @@ gpointer ctrlm_main_thread(gpointer param) {
                 }
             }
             #endif
-            #endif
 
             if(g_ctrlm.power_state == dqm->new_state) {
                LOG_INFO("%s: already in power state %s\n", __FUNCTION__, ctrlm_power_state_str(g_ctrlm.power_state));
@@ -2534,7 +2461,6 @@ gpointer ctrlm_main_thread(gpointer param) {
             dqm->old_state = g_ctrlm.power_state;
             g_ctrlm.power_state = dqm->new_state;
 
-            #ifdef USE_VOICE_SDK
             #ifdef ENABLE_DEEP_SLEEP
             /* We have a problem in that if a voice command fails and the EPG does not come up, then
              * the user will use the remote to bring up the EPG in which case we get a wake up message
@@ -2548,8 +2474,6 @@ gpointer ctrlm_main_thread(gpointer param) {
                break;
             }
             #endif
-            #endif
-
 
             // Set Power change in Networks
             for(auto const &itr : g_ctrlm.networks) {
@@ -2559,9 +2483,7 @@ gpointer ctrlm_main_thread(gpointer param) {
             // Set Power change in DB
             ctrlm_db_power_state_change(dqm);
 
-            #ifdef USE_VOICE_SDK
             g_ctrlm.voice_session->voice_power_state_change(g_ctrlm.power_state);
-            #endif
 
             break;
          }
@@ -2837,17 +2759,13 @@ gpointer ctrlm_main_thread(gpointer param) {
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_START: {
             LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_START\n", __FUNCTION__);
-            #ifdef USE_VOICE_SDK
             ctrlm_main_queue_msg_audio_capture_start_t *start_msg = (ctrlm_main_queue_msg_audio_capture_start_t *)msg;
             ctrlm_voice_xrsr_session_capture_start(start_msg);
-            #endif
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_STOP: {
             LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_AUDIO_CAPTURE_STOP\n", __FUNCTION__);
-            #ifdef USE_VOICE_SDK
             ctrlm_voice_xrsr_session_capture_stop();
-            #endif
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_ACCOUNT_ID_UPDATE: {
@@ -2889,12 +2807,8 @@ gpointer ctrlm_main_thread(gpointer param) {
                   break;
                }
                case CTRLM_HANDLER_VOICE: {
-#ifdef USE_VOICE_SDK
                   ctrlm_voice_endpoint_t *voice = (ctrlm_voice_endpoint_t *)dqm->obj;
                   (voice->*dqm->msg_handler.v)(dqm->data, dqm->data_len);
-#else
-                  LOG_ERROR("%s: Voice handler not supported in pre-VSDK builds\n", __FUNCTION__);
-#endif
                   break;
                }
                case CTRLM_HANDLER_CONTROLLER: {
@@ -4594,14 +4508,6 @@ gboolean ctrlm_main_successful_init_get(void) {
    return(g_ctrlm.successful_init);
 }
 
-voice_session_t* ctrlm_main_voice_session_get(){
-#ifdef USE_VOICE_SDK
-   return((voice_session_t *)NULL);
-#else
-   return g_ctrlm.voice_session.get();
-#endif
-}
-
 ctrlm_irdb_t* ctrlm_main_irdb_get() {
    return(g_ctrlm.irdb);
 }
@@ -5850,11 +5756,9 @@ void control_service_values_read_from_db() {
    }
 }
 
-#ifdef USE_VOICE_SDK
 ctrlm_voice_t *ctrlm_get_voice_obj() {
    return(g_ctrlm.voice_session);
 }
-#endif
 
 gboolean ctrlm_start_iarm(gpointer user_data) {
    // Register iarm calls and events

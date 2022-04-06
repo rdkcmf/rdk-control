@@ -420,7 +420,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_load_request(ctrlm_timest
    // Determine when to load the image
    ctrlm_device_update_rf4ce_load_info(network_id, controller_id, image_id, &load_info);
 
-   string log_string = ctrlm_device_update_get_software_version(image_id) + ". ";
+   std::string log_string = ctrlm_device_update_get_software_version(image_id) + ". ";
 
 #ifdef XR15_704
    // HACK: We need to make XR15s running < 2.0.0.0 load ASAP to avoid bug on device.
@@ -491,7 +491,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_load_request(ctrlm_timest
 
 void ctrlm_obj_controller_rf4ce_t::device_update_image_download_complete(ctrlm_timestamp_t timestamp, guint16 image_id, ctrlm_rf4ce_device_update_result_t result) {
    ctrlm_device_update_iarm_load_result_t load_result = CTRLM_DEVICE_UPDATE_IARM_LOAD_RESULT_ERROR_OTHER;
-   string log_string = ctrlm_device_update_get_software_version(image_id);
+   std::string log_string = ctrlm_device_update_get_software_version(image_id);
 
    //Explicitly set the download rate to background in case the remote downloaded in the foreground
    guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE];

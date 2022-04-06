@@ -31,9 +31,7 @@
 #include "ctrlm_validation.h"
 #include "ctrlm_irdb.h"
 #include "ctrlm_ipc_device_update.h"
-#ifdef USE_VOICE_SDK
 #include "ctrlm_voice_obj.h"
-#endif
 
 #define THREAD_ID_VALIDATE() thread_id_validate(__FUNCTION__)
 

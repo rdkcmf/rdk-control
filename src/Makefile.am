@@ -40,7 +40,6 @@ controlMgr_SOURCES = ctrlm_main.cpp                           \
                      ctrlm_main_iarm.cpp                      \
                      ctrlm_voice.cpp                          \
                      ctrlm_voice_iarm.cpp                     \
-                     ctrlm_voice_session.cpp                  \
                      ctrlm_utils.cpp                          \
                      ctrlm_network.cpp                        \
                      ctrlm_network_iarm.cpp                   \
@@ -49,7 +48,7 @@ controlMgr_SOURCES = ctrlm_main.cpp                           \
                      ctrlm_rcu_iarm.cpp                       \
                      attributes/ctrlm_attr.cpp                \
                      attributes/ctrlm_version.cpp             \
-                     attributes/ctrlm_attr_general.cpp     \
+                     attributes/ctrlm_attr_general.cpp        \
                      config/ctrlm_config.cpp                  \
                      config/ctrlm_config_types.cpp            \
                      config/ctrlm_config_attr.cpp             \
@@ -76,9 +75,6 @@ if PLATFORM_TV
 AM_CPPFLAGS += -DPLATFORM_TV
 endif
 
-if VOICE_SDK_ENABLED
-AM_CPPFLAGS += -DUSE_VOICE_SDK
-
 controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \
                        voice/ctrlm_voice_obj_generic.cpp                   \
                        voice/ipc/ctrlm_voice_ipc_iarm_legacy.cpp           \
@@ -88,7 +84,6 @@ controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \
                        voice/endpoints/ctrlm_voice_endpoint_http.cpp       \
                        voice/endpoints/ctrlm_voice_endpoint_ws.cpp         \
                        voice/endpoints/ctrlm_voice_endpoint_ws_nextgen.cpp
-endif
 
 if SUPPORT_VOICE_DEST_ALSA
 controlMgr_SOURCES  += voice/endpoints/ctrlm_voice_endpoint_sdt.cpp

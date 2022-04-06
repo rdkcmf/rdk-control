@@ -370,6 +370,7 @@ class ctrlm_voice_t {
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd);
     void                                  voice_session_data_post_processing(int bytes_sent, const char *action, ctrlm_timestamp_t *timestamp);
     void                                  voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp=NULL);
+    void                                  voice_session_stats(ctrlm_voice_stats_session_t session, ctrlm_voice_stats_reboot_t reboot);
     void                                  voice_session_term();
     void                                  voice_session_info(ctrlm_voice_session_info_t *data);
     bool                                  voice_session_id_is_current(uuid_t uuid);

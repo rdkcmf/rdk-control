@@ -46,7 +46,6 @@ class ctrlm_voice_t;
 class ctrlm_voice_endpoint_t;
 class ctrlm_irdb_t;
 class ctrlm_auth_t;
-class voice_session_t;
 typedef enum {
    CTRLM_THREAD_MONITOR_RESPONSE_DEAD  = 0,
    CTRLM_THREAD_MONITOR_RESPONSE_ALIVE = 1
@@ -71,8 +70,7 @@ typedef enum {
    // End vendor messages
 
    // Global messages
-   CTRLM_MAIN_QUEUE_MSG_TYPE_VOICE_SETTINGS_UPDATE                   = CTRLM_MAIN_QUEUE_MSG_TYPE_GLOBAL + 1,
-   CTRLM_MAIN_QUEUE_MSG_TYPE_TERMINATE,
+   CTRLM_MAIN_QUEUE_MSG_TYPE_TERMINATE                             = CTRLM_MAIN_QUEUE_MSG_TYPE_GLOBAL + 1,
    CTRLM_MAIN_QUEUE_MSG_TYPE_MAIN_STATUS,
    CTRLM_MAIN_QUEUE_MSG_TYPE_MAIN_PROPERTY_SET,
    CTRLM_MAIN_QUEUE_MSG_TYPE_MAIN_PROPERTY_GET,
@@ -440,13 +438,10 @@ gboolean ctrlm_main_iarm_call_chip_status_get(ctrlm_main_iarm_call_chip_status_t
 
 ctrlm_power_state_t ctrlm_main_iarm_call_get_power_state(void);
 ctrlm_power_state_t ctrlm_main_get_power_state(void);
-#ifdef USE_VOICE_SDK
 #ifdef ENABLE_DEEP_SLEEP
 gboolean ctrlm_main_iarm_networked_standby(void);
 gboolean ctrlm_main_iarm_wakeup_reason_voice(void);
 #endif
-#endif
-
 
 void        ctrlm_main_iarm_event_binding_line_of_sight(gboolean active);
 void        ctrlm_main_iarm_event_autobind_line_of_sight(gboolean active);
@@ -456,7 +451,6 @@ void        ctrlm_on_network_assert(ctrlm_network_id_t network_id);
 void        ctrlm_on_network_assert(ctrlm_network_id_t network_id, const char* assert_info);
 ctrlm_network_id_t network_id_get_next(ctrlm_network_type_t network_type);
 void        ctrlm_update_last_key_info(int controller_id, guchar source_type, guint32 source_key_code, const char *source_name, gboolean is_screen_bind_mode, gboolean write_last_key_info);
-voice_session_t* ctrlm_main_voice_session_get();
 ctrlm_irdb_t* ctrlm_main_irdb_get();
 ctrlm_auth_t* ctrlm_main_auth_get();
 void          ctrlm_main_auth_start_poll();
@@ -468,9 +462,7 @@ ctrlm_controller_id_t ctrlm_last_used_controller_get(ctrlm_network_type_t networ
 
 bool ctrlm_is_key_adjacent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long key_code);
 
-#ifdef USE_VOICE_SDK
 ctrlm_voice_t *ctrlm_get_voice_obj();
-#endif
 
 template <typename T>
 void ctrlm_main_queue_handler_push(ctrlm_handler_type_t type, T handler, void *data, int size, void *obj = NULL, ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_INVALID) {

@@ -50,11 +50,9 @@
 #include "../cpc/asb/advanced_secure_binding.h"
 #endif
 #include <zlib.h>
-#ifdef USE_VOICE_SDK
 #include "../ctrlm_voice_obj.h"
 #include "comcastIrKeyCodes.h"
 #include "irMgr.h"
-#endif
 
 #if (JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS > 7) || (JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS < 1)
 #error RF4CE AUTOBIND PASS THRESHOLD IS OUT OF RANGE
@@ -110,10 +108,7 @@ static ctrlm_hal_rf4ce_deepsleep_arguments_t dpi_args_test = {3, {{CTRLM_RF4CE_P
                                                                  {CTRLM_RF4CE_PROFILE_ID_DEVICE_UPDATE, CTRLM_RF4CE_DPI_FRAME_CONTROL, 0x01, {RF4CE_DEVICE_UPDATE_CMD_IMAGE_DATA_REQUEST}}}}; // Data requests
 #endif
 
-
-#ifdef USE_VOICE_SDK
 static void ctrlm_network_rf4ce_cfm_voice_session_rsp(ctrlm_hal_rf4ce_result_t result, void *user_data);
-#endif
 
 using namespace std;
 
@@ -211,7 +206,6 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    // End ASB Config
 #endif
 
-   #ifdef USE_VOICE_SDK
    voice_session_rsp_confirm_ = NULL;
    voice_session_rsp_confirm_param_ = NULL;
    safec_rc = memset_s(&voice_session_rsp_params_, sizeof(voice_session_rsp_params_), 0, sizeof(voice_session_rsp_params_));
@@ -219,7 +213,6 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    voice_session_rsp_params_.network_id = (ctrlm_network_id_t *)malloc(sizeof(ctrlm_network_id_t));
    (*voice_session_rsp_params_.network_id) = network_id_get();
    voice_session_active_count_ = 0;
-   #endif
 
    stream_begin_                 = (voice_session_response_stream_t)JSON_INT_VALUE_NETWORK_RF4CE_VOICE_STREAM_BEGIN;
    stream_offset_                = JSON_INT_VALUE_NETWORK_RF4CE_VOICE_STREAM_OFFSET;
@@ -313,12 +306,10 @@ ctrlm_obj_network_rf4ce_t::~ctrlm_obj_network_rf4ce_t() {
    }
    g_mutex_clear(&reverse_cmd_event_pending_mutex_);
 
-   #ifdef USE_VOICE_SDK
    if(voice_session_rsp_params_.network_id != NULL) {
       free(voice_session_rsp_params_.network_id);
       voice_session_rsp_params_.network_id = NULL;
    }
-   #endif
    #if CTRLM_HAL_RF4CE_API_VERSION >= 15 && !defined(CTRLM_HOST_DECRYPTION_NOT_SUPPORTED)
    sec_deinit();
    #endif
@@ -2737,7 +2728,6 @@ void ctrlm_obj_network_rf4ce_t::voice_command_status_set(void *data, int size){
    }
    guchar status_data[CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS] = {0};
    status_data[0] = dqm->status; // Voice Command Status
-#ifdef USE_VOICE_SDK
    if(dqm->status == VOICE_COMMAND_STATUS_TV_AVR_CMD) {
       status_data[2] = dqm->data.tv_avr.cmd; // TV/AVR Command
       if(status_data[2] == CTRLM_VOICE_TV_AVR_CMD_POWER_ON || status_data[2] == CTRLM_VOICE_TV_AVR_CMD_POWER_OFF) {
@@ -2746,7 +2736,6 @@ void ctrlm_obj_network_rf4ce_t::voice_command_status_set(void *data, int size){
          status_data[3] = dqm->data.tv_avr.ir_repeats;
       }
    }
-#endif
    controllers_[dqm->controller_id]->rf4ce_rib_set_target((ctrlm_rf4ce_rib_attr_id_t)CTRLM_RF4CE_RIB_ATTR_ID_VOICE_COMMAND_STATUS, 0, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_STATUS, status_data);
 }
 
@@ -3577,7 +3566,6 @@ void ctrlm_obj_network_rf4ce_t::process_voice_controller_metrics(void *data, int
    g_assert(dqm);
    g_assert(size == sizeof(ctrlm_main_queue_msg_controller_voice_metrics_t));
 
-#ifdef USE_VOICE_SDK
    THREAD_ID_VALIDATE();
    ctrlm_controller_id_t controller_id = dqm->controller_id;
 
@@ -3593,12 +3581,8 @@ void ctrlm_obj_network_rf4ce_t::process_voice_controller_metrics(void *data, int
       voice_utterance_type = RF4CE_VOICE_NORMAL_UTTERANCE;
    }
    controllers_[controller_id]->update_voice_metrics(voice_utterance_type, dqm->packets_total, dqm->packets_lost);
-#else
-   LOG_INFO("%s: NOT IMPLEMENTED\n", __FUNCTION__);
-#endif
 }
 
-#ifdef USE_VOICE_SDK
 void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, int size) {
    ctrlm_main_queue_msg_voice_session_request_t *dqm = (ctrlm_main_queue_msg_voice_session_request_t *)data;
    g_assert(dqm);
@@ -3925,7 +3909,6 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_end(void *data, int si
       ctrlm_network_property_set(network_id_get(), CTRLM_HAL_NETWORK_PROPERTY_FREQUENCY_AGILITY, (void *)&property, sizeof(property));
    }
 }
-#endif
 
 void ctrlm_obj_network_rf4ce_t::set_timers() {
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {

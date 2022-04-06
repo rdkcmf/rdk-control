@@ -26,11 +26,7 @@
 #include "ctrlm_database.h"
 #include "ctrlm_voice.h"
 #include "ctrlm_config_types.h"
-#ifdef USE_VOICE_SDK
 #include "ctrlm_voice_obj.h"
-#else
-#include "ctrlm_voice.h"
-#endif
 
 // ctrlm_rf4ce_controller_audio_profiles_t
 #define AUDIO_PROFILES_ID    (0x17)
@@ -408,7 +404,6 @@ std::string ctrlm_rf4ce_voice_command_status_t::tv_avr_command_str(ctrlm_rf4ce_v
 std::string ctrlm_rf4ce_voice_command_status_t::get_value() const {
     std::stringstream ss;
     ss << "Status <" << this->status_str(this->vcs) << "> ";
-#ifdef USE_VOICE_SDK
     if(this->vcs == ctrlm_rf4ce_voice_command_status_t::status::TV_AVR_COMMAND) {
         ss << "Flags <";
         if(this->flags & ctrlm_rf4ce_voice_command_status_t::tv_avr_command_flag::TOGGLE_FALLBACK) {
@@ -422,7 +417,6 @@ std::string ctrlm_rf4ce_voice_command_status_t::get_value() const {
             ss << "IR Repeats <" << this->ir_repeats << "> ";
         }
     }
-#endif
     return(ss.str());
 }
 

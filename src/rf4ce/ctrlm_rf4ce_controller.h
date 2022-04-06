@@ -24,6 +24,7 @@
 #include "ctrlm_hal_rf4ce.h"
 #include "ctrlm_ipc_device_update.h"
 #include "ctrlm_ipc_voice.h"
+#include "ctrlm_controller.h"
 #include "rf4ce/rib/ctrlm_rf4ce_rib.h"
 #include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_version.h"
 #include "rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_general.h"
@@ -34,10 +35,7 @@
 #include "../cpc/asb/advanced_secure_binding.h"
 #endif
 #include "ctrlm_voice.h"
-#include "ctrlm_voice_session.h"
-#ifdef USE_VOICE_SDK
 #include "ctrlm_voice_obj.h"
-#endif
 
 class ctrlm_obj_network_rf4ce_t;
 
@@ -637,7 +635,7 @@ public:
    time_t                 time_binding_get(void);
    guint8                 polling_methods_get() const;
 
-   void print_remote_firmware_debug_info(ctrlm_rf4ce_controller_firmware_log_t, string message = "");
+   void print_remote_firmware_debug_info(ctrlm_rf4ce_controller_firmware_log_t, std::string message = "");
 
    // Polling Functions
    void                   polling_action_push(ctrlm_rf4ce_polling_action_msg_t *action);

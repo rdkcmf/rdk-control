@@ -1737,13 +1737,11 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_targ_audio_profiles(guc
    guint16 audio_profiles_ctrl = VOICE_AUDIO_PROFILE_ADPCM_16BIT_16KHZ;
    guint16 audio_profiles_ctrl_support = (guint16)audio_profiles_ctrl_.get_profiles();
 
-   #ifdef USE_VOICE_SDK
    guint16 audio_profiles_targ = audio_profiles_targ_get(); // RF4CE Network profiles supported
 
    if(audio_profiles_targ & audio_profiles_ctrl_support & VOICE_AUDIO_PROFILE_OPUS_16BIT_16KHZ)  { // network and controller support OPUS
       audio_profiles_ctrl = VOICE_AUDIO_PROFILE_OPUS_16BIT_16KHZ;
    }
-   #endif
 
    // Tell the controller which format to use
    data[0]  = (guchar) (audio_profiles_ctrl);
@@ -1822,16 +1820,11 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_opus_encoding_params(guchar *
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   #ifndef USE_VOICE_SDK
-   LOG_INFO("%s: NOT SUPPORTED\n", __FUNCTION__);
-   return(0);
-   #else
    voice_params_opus_encoder_t params;
    ctrlm_get_voice_obj()->voice_params_opus_encoder_get(&params);
    errno_t safec_rc = memcpy_s(data, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE, params.data, CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
    ERR_CHK(safec_rc);
    return(CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
-   #endif
 }
 
 guchar ctrlm_obj_controller_rf4ce_t::property_write_voice_session_qos(guchar *data, guchar length) {
@@ -1849,10 +1842,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_session_qos(guchar *dat
       LOG_ERROR("%s: INVALID PARAMETERS\n", __FUNCTION__);
       return(0);
    }
-   #ifndef USE_VOICE_SDK
-   LOG_INFO("%s: NOT SUPPORTED\n", __FUNCTION__);
-   return(0);
-   #else
    voice_params_qos_t params;
    ctrlm_get_voice_obj()->voice_params_qos_get(&params);
 
@@ -1867,7 +1856,6 @@ guchar ctrlm_obj_controller_rf4ce_t::property_read_voice_session_qos(guchar *dat
    LOG_INFO("%s: Timeout First %u Inter %u Bitrate min %u Time Threshold %u\n", __FUNCTION__, params.timeout_packet_initial, params.timeout_packet_subsequent, params.bitrate_minimum, params.time_threshold);
 
    return(CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS);
-   #endif
 }
 
 void ctrlm_obj_controller_rf4ce_t::property_write_download_rate(download_rate_t download_rate) {
@@ -3081,11 +3069,9 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_heartbeat(ctrlm_timestamp_t timestamp, 
       time_last_heartbeat_update();
       switch(trigger) {
          case POLLING_TRIGGER_FLAG_VOICE_SESSION: {
-#ifdef USE_VOICE_SDK
             if(false == ctrlm_get_voice_obj()->voice_device_streaming(network_id_get(), controller_id_get())) {
                action = RF4CE_POLLING_ACTION_EOS;
             }
-#endif
             break;
          }
          default: {

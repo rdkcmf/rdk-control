@@ -101,7 +101,7 @@ IARM_Result_t ctrlm_device_update_update_available(void *arg) {
       tok  = strtok_s(params->firmwareNames, &len, ",", &saveptr);
    }
    while(tok!=NULL){
-      string filename=params->firmwareLocation;
+      std::string filename=params->firmwareLocation;
       filename+="/";
       filename+=tok;
       LOG_INFO("%s: filename %s\n", __FUNCTION__, filename.c_str());

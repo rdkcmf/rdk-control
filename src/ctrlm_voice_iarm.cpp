@@ -26,12 +26,9 @@
 #include "ctrlm_rcu.h"
 #include "rf4ce/ctrlm_rf4ce_network.h"
 #include "ctrlm_voice.h"
-#include "ctrlm_voice_session.h"
-#ifdef USE_VOICE_SDK
 #include "ctrlm_voice_obj.h"
 #include "pwrMgr.h"
 #include "comcastIrKeyCodes.h" //just for the power button code
-#endif
 
 IARM_Result_t ctrlm_voice_handle_settings_from_server(void *arg);
 
@@ -145,7 +142,6 @@ void ctrlm_voice_iarm_event_media_service(ctrlm_voice_iarm_event_media_service_t
    }
 }
 
-#ifdef USE_VOICE_SDK
 IARM_Result_t ctrlm_voice_handle_settings_from_server(void *arg) {
    ctrlm_voice_iarm_call_settings_t *voice_settings = (ctrlm_voice_iarm_call_settings_t *)arg;
 
@@ -168,7 +164,6 @@ IARM_Result_t ctrlm_voice_handle_settings_from_server(void *arg) {
 
    return(IARM_RESULT_SUCCESS);
 }
-#endif
 
 void ctrlm_voice_iarm_terminate(void) {
    // Change to stopped or terminated state, so we do not accept new calls

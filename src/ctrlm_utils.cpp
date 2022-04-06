@@ -65,22 +65,6 @@ void ctrlm_hal_free(void *ptr) {
    g_free(ptr);
 }
 
-void ctrlm_get_log_time(char *log_buffer) {
-   struct tm *local;
-   struct timeval tv;
-   guint16 msecs;
-   gettimeofday(&tv, NULL);
-   local = localtime(&tv.tv_sec);
-   msecs = (guint16)(tv.tv_usec/1000);
-   strftime(log_buffer, 9, "%T", local);
-   //printing milliseconds as ":XXX "
-   log_buffer[12] = '\0';                             //Null terminate milliseconds
-   log_buffer[11] = (msecs % 10) + '0'; msecs  /= 10; //get the 1's digit
-   log_buffer[10] = (msecs % 10) + '0'; msecs  /= 10; //get the 10's digit
-   log_buffer[9]  = (msecs % 10) + '0';               //get the 100's digit
-   log_buffer[8]  = ':';
-}
-
 guint ctrlm_timeout_create(guint timeout, GSourceFunc function, gpointer user_data) {
    return g_timeout_add(timeout, function, user_data);
 }
@@ -296,7 +280,6 @@ const char *ctrlm_main_queue_msg_type_str(ctrlm_main_queue_msg_type_t type) {
       case CTRLM_MAIN_QUEUE_MSG_TYPE_BIND_VALIDATION_FAILED_TIMEOUT:          return("BIND_VALIDATION_FAILED_TIMEOUT");
       case CTRLM_MAIN_QUEUE_MSG_TYPE_BIND_CONFIGURATION_COMPLETE:             return("BIND_CONFIGURATION_COMPLETE");
       case CTRLM_MAIN_QUEUE_MSG_TYPE_NETWORK_PROPERTY_SET:                    return("NETWORK_PROPERTY_SET");
-      case CTRLM_MAIN_QUEUE_MSG_TYPE_VOICE_SETTINGS_UPDATE:                   return("VOICE_SETTINGS_UPDATE");
       case CTRLM_MAIN_QUEUE_MSG_TYPE_TERMINATE:                               return("TERMINATE");
       case CTRLM_MAIN_QUEUE_MSG_TYPE_MAIN_STATUS:                             return("MAIN_STATUS");
       case CTRLM_MAIN_QUEUE_MSG_TYPE_MAIN_PROPERTY_SET:                       return("MAIN_PROPERTY_SET");

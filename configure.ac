@@ -84,15 +84,6 @@ AC_ARG_ENABLE([cpc],
 esac],[cpc=false])
 AM_CONDITIONAL([CPC_ENABLED], [test x$cpc = xtrue])
 
-AC_ARG_ENABLE([voicesdk],
-[  --enable-voicesdk    Turn on voice SDK support],
-[case "${enableval}" in
-  yes) voicesdk=true ;;
-  no)  voicesdk=false ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-voicesdk]) ;;
-esac],[voicesdk=false])
-AM_CONDITIONAL([VOICE_SDK_ENABLED], [test x$voicesdk = xtrue])
-
 AC_ARG_ENABLE([asb],
 [  --enable-asb    Turn on advanced secure binding support],
 [case "${enableval}" in

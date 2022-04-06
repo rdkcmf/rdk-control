@@ -302,10 +302,7 @@ public:
    void                                 ind_process_unpair(void *data, int size);     
    void                                 ind_process_data(void *data, int size);
    void                                 ind_process_voice_session_request(void *data, int size);
-   #ifdef USE_VOICE_SDK
    void                                 ind_process_voice_session_stop(void *data, int size);
-   #endif
-   void                                 ind_process_voice_session_begin(void *data, int size);
    void                                 ind_process_voice_session_end(void *data, int size);
    void                                 ind_process_voice_session_stats(void *data, int size);
    void                                 process_voice_controller_metrics(void *data, int size);
@@ -429,12 +426,10 @@ public:
    ctrlm_rf4ce_polling_configuration_t  controller_polling_configuration_heartbeat_get(ctrlm_rf4ce_controller_type_t controller_type);
    ctrlm_rf4ce_polling_generic_config_t controller_generic_polling_configuration_get();
 
-   vector<rf4ce_device_update_session_resume_info_t> *device_update_session_resume_list_get();
+   std::vector<rf4ce_device_update_session_resume_info_t> *device_update_session_resume_list_get();
    guint32                              device_update_session_timeout_get();
 
-   #ifdef USE_VOICE_SDK
    void                                 cfm_voice_session_rsp(void *data, int size);
-   #endif
 
    void                                 req_process_ir_set_code(void *data, int size);
    void                                 req_process_ir_clear_codes(void *data, int size);
@@ -532,12 +527,10 @@ private:
    // End ASB Variables
 #endif
 
-   #ifdef USE_VOICE_SDK
    ctrlm_voice_session_rsp_confirm_t       voice_session_rsp_confirm_;
    void *                                  voice_session_rsp_confirm_param_;
    ctrlm_rf4ce_voice_session_rsp_params_t  voice_session_rsp_params_;
    guint32                                 voice_session_active_count_;
-   #endif
    voice_session_response_stream_t         stream_begin_;
    gint16                                  stream_offset_;
 

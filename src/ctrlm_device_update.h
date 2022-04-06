@@ -126,7 +126,7 @@ void     ctrlm_device_update_iarm_event_download_status(ctrlm_device_update_sess
 void     ctrlm_device_update_iarm_event_load_begin(ctrlm_device_update_session_id_t session_id);
 void     ctrlm_device_update_iarm_event_load_end(ctrlm_device_update_session_id_t session_id, ctrlm_device_update_iarm_load_result_t result);
 gboolean ctrlm_device_update_is_controller_updating(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, bool ignore_load_waiting);
-gboolean ctrlm_device_update_process_xconf_update(string fileLocation);
+gboolean ctrlm_device_update_process_xconf_update(std::string fileLocation);
 device_update_check_locations_t ctrlm_device_update_check_locations_get(void);
 const char * ctrlm_device_update_get_xconf_path(void);
 void ctrlm_device_update_check_for_update_file_delete(ctrlm_device_update_image_id_t image_id, ctrlm_controller_id_t controller_id, ctrlm_network_id_t network_it);
@@ -134,8 +134,8 @@ void     ctrlm_device_update_timeout_update_activity(ctrlm_network_id_t network_
 gboolean ctrlm_device_update_rf4ce_is_software_version_higher(version_software_t current, version_software_t proposed);
 gboolean ctrlm_device_update_rf4ce_is_software_version_min_met(version_software_t current, version_software_t minimum);
 gboolean ctrlm_device_update_rf4ce_is_hardware_version_min_met(version_hardware_t current, version_hardware_t minimum);
-string   ctrlm_device_update_get_software_version(guint16 image_id);
-void     ctrlm_device_update_rf4ce_session_resume(vector<rf4ce_device_update_session_resume_info_t> *sessions);
+std::string ctrlm_device_update_get_software_version(guint16 image_id);
+void     ctrlm_device_update_rf4ce_session_resume(std::vector<rf4ce_device_update_session_resume_info_t> *sessions);
 guint32 ctrlm_device_update_request_timeout_get(void);
 
 #ifdef XR15_704

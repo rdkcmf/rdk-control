@@ -510,12 +510,12 @@ void ctrlm_obj_controller_ble_t::last_key_time_update() {
 
 // EGTODO: move to base controller class
 void ctrlm_obj_controller_ble_t::update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost) {
-   voice_session_prefs_t *vrex_prefs = ctrlm_voice_vrex_prefs_get();
+   int32_t packet_loss_threshold = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD; //TODO Allow overrides from config file/RFC
 
    handle_day_change();
    voice_packets_sent_today_       += voice_packets_sent;
    voice_packets_lost_today_       += voice_packets_lost;
-   if((((float)voice_packets_lost/(float)voice_packets_sent)*100.0) > (float)(vrex_prefs->packet_loss_threshold)) {
+   if((((float)voice_packets_lost/(float)voice_packets_sent)*100.0) > (float)(packet_loss_threshold)) {
       utterances_exceeding_packet_loss_threshold_today_++;
    }
 

@@ -24,9 +24,7 @@
 #include "../ctrlm_rcu.h"
 #include "ctrlm_rf4ce_network.h"
 #include "../ctrlm_voice.h"
-#ifdef USE_VOICE_SDK
 #include "../ctrlm_voice_obj.h"
-#endif
 
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_disc_params_t params, ctrlm_hal_rf4ce_rsp_disc_params_t *rsp_params, ctrlm_hal_rf4ce_rsp_discovery_t cb, void *cb_data, GCond *cond);
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_int(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_pair_params_t params, ctrlm_hal_rf4ce_rsp_pair_params_t *rsp_params, ctrlm_hal_rf4ce_rsp_pair_t cb, void *cb_data, GCond *cond);
@@ -36,9 +34,7 @@ static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_async(ctrlm_network_id_t id, 
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_sync(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_pair_params_t params, ctrlm_hal_rf4ce_rsp_pair_params_t *rsp_params);
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_unpair_async(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_unpair_params_t params, ctrlm_hal_rf4ce_rsp_unpair_t cb, void *cb_data);
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_unpair_sync(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_unpair_params_t params, ctrlm_hal_rf4ce_rsp_unpair_params_t *rsp_params);
-#ifdef USE_VOICE_SDK
-ctrlm_voice_format_t ctrlm_rf4ce_audio_fmt_to_voice_fmt(ctrlm_rf4ce_audio_format_t format);
-#endif
+static ctrlm_voice_format_t ctrlm_rf4ce_audio_fmt_to_voice_fmt(ctrlm_rf4ce_audio_format_t format);
 
 ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_disc_params_t params, ctrlm_hal_rf4ce_rsp_disc_params_t *rsp_params, ctrlm_hal_rf4ce_rsp_discovery_t cb, void *cb_data, GCond *cond) {
 
@@ -355,12 +351,8 @@ ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_data(ctrlm_network_id_t network_id, ctrlm
 // Note this thread is not called in control manager's context so it can't use global state unless a mutex is put in place
 ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_timestamp_t timestamp, guchar command_id, unsigned long data_length, guchar *data, ctrlm_hal_rf4ce_data_read_t cb_data_read, void *cb_data_param, unsigned char lqi, ctrlm_hal_frequency_agility_t *frequency_agility) {
    ctrlm_hal_frequency_agility_t agility_state = CTRLM_HAL_FREQUENCY_AGILITY_NO_CHANGE;
-#ifdef USE_VOICE_SDK
    ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
    if(NULL == voice_obj) {
-#else
-   if(ctrlm_voice_is_initialized() == false) {
-#endif
       LOG_ERROR("%s: Voice command cannot be processed until initialization is complete.\n", __FUNCTION__);
       return(CTRLM_HAL_RESULT_ERROR);
    }
@@ -371,7 +363,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
       return(CTRLM_HAL_RESULT_ERROR);
    }
    if(command_id == MSO_VOICE_CMD_ID_VOICE_SESSION_REQUEST) {
-#ifdef USE_VOICE_SDK
       guchar local_data[data_length]            = {'\0'};
       voice_session_type_t    type         = VOICE_SESSION_TYPE_STANDARD;
       ctrlm_voice_format_t    audio_format = ctrlm_rf4ce_audio_fmt_to_voice_fmt(RF4CE_AUDIO_FORMAT_ADPCM_16K);
@@ -414,19 +405,13 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
 
       // Always disable frequency agility by default (if the session is denied for any reason, frequency agility will be enabled again)
       agility_state = CTRLM_HAL_FREQUENCY_AGILITY_DISABLE;
-#else
-      if(ctrlm_voice_ind_voice_session_request(network_id, controller_id, timestamp)) {
-         // Need to disable frequency agility (channel hopping)
-         agility_state = CTRLM_HAL_FREQUENCY_AGILITY_DISABLE;
-      }
-#endif
    } else if(command_id == MSO_VOICE_CMD_ID_CHANNEL_CHECK_REQUEST) {
       LOG_INFO("%s: channel check request\n", __FUNCTION__);
       // Need to disable frequency agility (channel hopping)
       agility_state = CTRLM_HAL_FREQUENCY_AGILITY_DISABLE;
    } else if(command_id == MSO_VOICE_CMD_ID_VOICE_SESSION_STOP) {
       if(data_length == 1 || data_length == 3) {  // Remote supports old stop command (TODO: Do not accept 3 byte packet after XR15 is fixed)
-#ifdef USE_VOICE_SDK // TODO add stop reason to voice sdk implementation
+         // TODO add stop reason to voice sdk implementation
          ctrlm_main_queue_msg_voice_session_stop_t msg = {0};
 
          msg.controller_id      = controller_id;
@@ -435,10 +420,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
          msg.key_code           = 0;
 
          ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_stop, &msg, sizeof(msg), NULL, network_id);
-#else
-         LOG_INFO("%s: session stop - regular\n", __FUNCTION__);
-         agility_state = ctrlm_voice_ind_voice_session_end(network_id, controller_id, CTRLM_VOICE_SESSION_END_REASON_DONE, 0);
-#endif
       } else if(data_length == 4) { // Remote supports enhanced stop command
          LOG_INFO("%s: session stop - enhanced\n", __FUNCTION__);
          guchar local_data[data_length];
@@ -453,7 +434,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
          ctrlm_voice_remote_voice_end_reason_t reason = (ctrlm_voice_remote_voice_end_reason_t)(data[1]);
 
          if(reason == CRTLM_VOICE_REMOTE_VOICE_END_SECONDARY_KEY_PRESS) {
-#ifdef USE_VOICE_SDK
             ctrlm_main_queue_msg_voice_session_stop_t msg = {0};
 
             msg.controller_id      = controller_id;
@@ -462,10 +442,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
             msg.key_code           = data[2];
 
             ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_stop, &msg, sizeof(msg), NULL, network_id);
-#else
-            guchar key_code = data[2];
-            agility_state = ctrlm_voice_ind_voice_session_end(network_id, controller_id, CTRLM_VOICE_SESSION_END_REASON_OTHER_KEY_PRESSED, key_code);
-#endif
          } else { // CRTLM_VOICE_REMOTE_*
             ctrlm_voice_session_end_reason_t session_end_reason = CTRLM_VOICE_SESSION_END_REASON_DONE;
 
@@ -474,7 +450,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
             } else if(reason == CRTLM_VOICE_REMOTE_VOICE_END_MINIMUM_QOS) {
                session_end_reason = CTRLM_VOICE_SESSION_END_REASON_MINIMUM_QOS;
             }
-#ifdef USE_VOICE_SDK
             ctrlm_main_queue_msg_voice_session_stop_t msg = {0};
 
             msg.controller_id      = controller_id;
@@ -483,13 +458,9 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
             msg.key_code           = 0;
 
             ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_stop, &msg, sizeof(msg), NULL, network_id);
-#else
-            agility_state = ctrlm_voice_ind_voice_session_end(network_id, controller_id, session_end_reason, 0);
-#endif
          }
       }
    } else { // Voice fragment
-#ifdef USE_VOICE_SDK
    if(NULL == data) {
       unsigned char buf[data_length] = {'\0'};
       if(data_length != cb_data_read(data_length, buf, cb_data_param)) {
@@ -499,9 +470,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
    } else {
       voice_obj->voice_session_data(network_id, controller_id, (char *)data, data_length, &timestamp);
    }
-#else
-      ctrlm_voice_ind_voice_session_fragment(network_id, controller_id, command_id, data_length, data, cb_data_read, cb_data_param, lqi);
-#endif
    }
    if(NULL != frequency_agility) {
       *frequency_agility = agility_state;
@@ -509,7 +477,6 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
    return(CTRLM_HAL_RESULT_SUCCESS);
 }
 
-#ifdef USE_VOICE_SDK
 ctrlm_voice_format_t ctrlm_rf4ce_audio_fmt_to_voice_fmt(ctrlm_rf4ce_audio_format_t format) {
    ctrlm_voice_format_t ret = CTRLM_VOICE_FORMAT_INVALID;
    switch(format) {
@@ -520,4 +487,3 @@ ctrlm_voice_format_t ctrlm_rf4ce_audio_fmt_to_voice_fmt(ctrlm_rf4ce_audio_format
    }
    return(ret);
 }
-#endif
