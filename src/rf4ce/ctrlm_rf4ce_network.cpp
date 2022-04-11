@@ -1341,7 +1341,7 @@ void ctrlm_obj_network_rf4ce_t::rf_channel_info_get(ctrlm_rf4ce_rf_channel_info_
    ctrlm_hal_network_property_network_stats_t network_stats;
    ctrlm_hal_result_t result;
 
-   if(is_audio_stream_in_progress() && network_stats_is_cached){ // Read from cache if voice session in progress
+   if(is_voice_session_in_progress() && network_stats_is_cached){ // Read from cache if voice session in progress
       network_stats.rf_channel = network_stats_cache.rf_channel;
       network_stats.rf_quality = network_stats_cache.rf_quality;
       result = CTRLM_HAL_RESULT_SUCCESS;
@@ -4592,4 +4592,8 @@ void ctrlm_obj_network_rf4ce_t::power_state_change(ctrlm_main_queue_power_state_
       property_set(msg.property, msg.value);
    }
 #endif
+}
+
+gboolean ctrlm_obj_network_rf4ce_t::is_voice_session_in_progress() {
+   return(voice_session_active_count_ > 0);
 }

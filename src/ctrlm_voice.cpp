@@ -42,11 +42,6 @@
 #include "ctrlm_voice_packet_analysis.h"
 #include "json_config.h"
 
-gboolean is_audio_stream_in_progress(void) {
-   // TODO Get this value from VSDK
-   return(false);
-}
-
 void ctrlm_voice_device_update_in_progress_set(bool in_progress) {
    // This function was used to disable voice when foreground download is active
    //LOG_INFO("%s: Voice is <%s>\n", __FUNCTION__, in_progress ? "DISABLED" : "ENABLED");

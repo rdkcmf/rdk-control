@@ -582,6 +582,8 @@ private:
    gboolean              is_xr11_hardware_version(version_hardware_t version_hardware);
    gboolean              is_xr15_hardware_version(version_hardware_t version_hardware);
    gboolean              is_autobind_active(ctrlm_hal_rf4ce_ieee_address_t ieee_address);
+   gboolean              is_voice_session_in_progress();
+
    unsigned int          restore_hal_nvm(unsigned char **nvm_backup_data);
    gboolean              is_screen_bind_active(ctrlm_hal_rf4ce_ieee_address_t ieee_address);
    // Bastille 37 vulnerability private function

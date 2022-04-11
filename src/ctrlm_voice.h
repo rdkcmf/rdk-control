@@ -74,7 +74,6 @@ extern "C"
 void ctrlm_voice_notify_stats_reboot(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_reset_type_t type, unsigned char voltage, unsigned char battery_percentage);
 void ctrlm_voice_notify_stats_session(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint16 total_packets, guint16 drop_retry, guint16 drop_buffer, guint16 mac_retries, guint16 network_retries, guint16 cca_sense);
 void ctrlm_voice_device_update_in_progress_set(bool in_progress);
-gboolean is_audio_stream_in_progress(void);
 
 #ifdef __cplusplus
 }
