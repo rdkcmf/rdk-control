@@ -182,6 +182,7 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    audio_profiles_targ_          = JSON_INT_VALUE_NETWORK_RF4CE_AUDIO_PROFILES_TARGET;
    voice_command_encryption_     = (voice_command_encryption_t)JSON_INT_VALUE_NETWORK_RF4CE_VOICE_COMMAND_ENCRYPTION;
    host_decryption_              = JSON_BOOL_VALUE_NETWORK_RF4CE_HOST_DECRYPTION;
+   single_channel_rsp_           = JSON_BOOL_VALUE_NETWORK_RF4CE_SINGLE_CHANNEL_RSP;
    controller_id_to_remove_      = CTRLM_HAL_CONTROLLER_ID_INVALID;
 
    mfg_test_.enabled             = JSON_BOOL_VALUE_NETWORK_RF4CE_MFG_TEST_ENABLE;
@@ -584,7 +585,8 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
       conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_AUTO_CHECK_VALIDATION_PERIOD,auto_check_validation_period_,0);
       conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_LINK_LOST_WAIT_TIME,link_lost_wait_time_,0);
       conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_UPDATE_POLLING_PERIOD,update_polling_period_,0);
-      conf.config_value_get(JSON_BOOL_NAME_NETWORK_RF4CE_HOST_DECRYPTION,host_decryption_,host_decryption_);
+      conf.config_value_get(JSON_BOOL_NAME_NETWORK_RF4CE_HOST_DECRYPTION,host_decryption_);
+      conf.config_value_get(JSON_BOOL_NAME_NETWORK_RF4CE_SINGLE_CHANNEL_RSP,single_channel_rsp_);
       conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_DATA_REQUEST_WAIT_TIME,data_request_wait_time_, 0);
       conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_AUDIO_PROFILES_TARGET,audio_profiles_targ_,0,7);
       conf.config_value_get(JSON_INT_NAME_NETWORK_RF4CE_CLASS_INC_LINE_OF_SIGHT,class_inc_line_of_sight_,0,15);
@@ -699,6 +701,7 @@ gboolean ctrlm_obj_network_rf4ce_t::load_config(json_t *json_obj_net_rf4ce) {
    LOG_INFO("%s: Link Lost Wait Time           %u ms\n",    __FUNCTION__, link_lost_wait_time_);
    LOG_INFO("%s: Update Polling Period         %u hours\n", __FUNCTION__, update_polling_period_);
    LOG_INFO("%s: RF4CE Packet Host Decryption  <%s>\n",     __FUNCTION__, host_decryption_ ? "YES" : "NO");
+   LOG_INFO("%s: RF4CE Single Channel Response <%s>\n",     __FUNCTION__, single_channel_rsp_ ? "YES" : "NO");
    LOG_INFO("%s: Data Request Wait Time        %u ms\n",    __FUNCTION__, data_request_wait_time_);
    LOG_INFO("%s: Audio Profiles Target         0x%04X\n",   __FUNCTION__, audio_profiles_targ_);
    LOG_INFO("%s: Class Inc Line of Sight       %u\n",       __FUNCTION__, class_inc_line_of_sight_);
@@ -3797,7 +3800,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
       ctrlm_timestamp_get(&voice_session_rsp_params_.timestamp_rsp_req);
    }
 
-   req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, dqm->controller_id, dqm->timestamp, response_len, response, NULL, NULL, false, true, cb_confirm_rf4ce, cb_confirm_param);
+   req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, dqm->controller_id, dqm->timestamp, response_len, response, NULL, NULL, false, single_channel_rsp_, cb_confirm_rf4ce, cb_confirm_param);
 
    LOG_INFO("%s: session response delivered\n", __FUNCTION__);
 
@@ -3851,7 +3854,7 @@ void ctrlm_obj_network_rf4ce_t::cfm_voice_session_rsp(void *data, int size) {
    if(dqm->result != CTRLM_HAL_RF4CE_RESULT_SUCCESS) {
        if(ctrlm_timestamp_until_ms(voice_session_rsp_params_.timestamp_end) > 0) { // Still within transmission window.  Retransmit the packet.
           voice_session_rsp_params_.retries++;
-          req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, voice_session_rsp_params_.controller_id, voice_session_rsp_params_.timestamp_begin, voice_session_rsp_params_.response_len, voice_session_rsp_params_.response, NULL, NULL, false, true, ctrlm_network_rf4ce_cfm_voice_session_rsp, voice_session_rsp_params_.network_id);
+          req_data(CTRLM_RF4CE_PROFILE_ID_VOICE, voice_session_rsp_params_.controller_id, voice_session_rsp_params_.timestamp_begin, voice_session_rsp_params_.response_len, voice_session_rsp_params_.response, NULL, NULL, false, single_channel_rsp_, ctrlm_network_rf4ce_cfm_voice_session_rsp, voice_session_rsp_params_.network_id);
           LOG_ERROR("%s: result <%s> session response retransmitted\n", __FUNCTION__, ctrlm_hal_rf4ce_result_str(dqm->result));
           return;
        }

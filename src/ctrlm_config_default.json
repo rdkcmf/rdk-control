@@ -51,6 +51,7 @@
       "class_inc_bind_table_empty"       :         0,
       "binding_state_timeout"            :        30,
       "host_decryption"                  :     false,
+      "single_channel_rsp"               :      true,
       "discovery_config" : {
          "enable"                        :      true,
          "require_line_of_sight"         :     false

@@ -481,6 +481,7 @@ private:
    guint16                            data_request_wait_time_;
    voice_command_encryption_t         voice_command_encryption_;
    bool                               host_decryption_;
+   bool                               single_channel_rsp_;
    #endif
    guint16                            audio_profiles_targ_;
    gboolean                           is_import_;
