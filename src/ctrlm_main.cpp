@@ -209,6 +209,9 @@ typedef struct {
    string                             server_url_authservice;
    guint                              authservice_poll_val;
    guint                              authservice_poll_tag;
+   guint                              authservice_fast_poll_val;
+   guint                              authservice_fast_retries;
+   guint                              authservice_fast_retries_max;
    guint                              keycode_logging_poll_val;
    guint                              keycode_logging_poll_tag;
    guint                              keycode_logging_retries;
@@ -503,6 +506,9 @@ int main(int argc, char *argv[]) {
    g_ctrlm.thread_monitor_minidump        = JSON_BOOL_VALUE_CTRLM_GLOBAL_THREAD_MONITOR_MINIDUMP;
    g_ctrlm.server_url_authservice         = JSON_STR_VALUE_CTRLM_GLOBAL_URL_AUTH_SERVICE;
    g_ctrlm.authservice_poll_val           = JSON_INT_VALUE_CTRLM_GLOBAL_AUTHSERVICE_POLL_PERIOD * 1000;
+   g_ctrlm.authservice_fast_poll_val      = JSON_INT_VALUE_CTRLM_GLOBAL_AUTHSERVICE_FAST_POLL_PERIOD;
+   g_ctrlm.authservice_fast_retries       = 0;
+   g_ctrlm.authservice_fast_retries_max   = JSON_INT_VALUE_CTRLM_GLOBAL_AUTHSERVICE_FAST_MAX_RETRIES;
    g_ctrlm.bound_controller_qty           = 0;
    g_ctrlm.recently_booted                = FALSE;
    g_ctrlm.recently_booted_timeout_val    = JSON_INT_VALUE_CTRLM_GLOBAL_TIMEOUT_RECENTLY_BOOTED;
@@ -589,22 +595,20 @@ int main(int argc, char *argv[]) {
    // TODO: We could possibly schedule this to run once every few hours or whatever
    //       the team decides is best.
 
-#ifdef AUTH_ENABLED
-   LOG_INFO("ctrlm_main: ctrlm_auth init\n");
-#ifdef AUTH_THUNDER
-   g_ctrlm.authservice = new ctrlm_auth_thunder_t();
-#else
-   g_ctrlm.authservice = new ctrlm_auth_legacy_t(g_ctrlm.server_url_authservice);
-#endif
-   if(!ctrlm_has_authservice_data() && g_ctrlm.authservice->is_ready()) {
-       LOG_INFO("%s: Starting polling authservice for device data\n", __FUNCTION__);
-       g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+   // Check if recently booted
+   struct sysinfo s_info;
+   if(sysinfo(&s_info) != 0) {
+      LOG_ERROR("ctrlm_main: Unable to get system uptime\n");
    } else {
-      LOG_WARN("%s: Authservice not ready, no reason to poll\n", __FUNCTION__);
+      LOG_INFO("ctrlm_main: System up for %lu seconds\n", s_info.uptime);
+      if(s_info.uptime < CTRLM_MAIN_FIRST_BOOT_TIME_MAX) { // System first boot
+         LOG_INFO("ctrlm_main: System first boot\n");
+      }
+      if(s_info.uptime < (long)(g_ctrlm.recently_booted_timeout_val / 1000)) { // System just booted
+         LOG_INFO("ctrlm_main: Setting recently booted to true\n");
+         g_ctrlm.recently_booted = TRUE;
+      }
    }
-#endif // AUTH_ENABLED
-
-   g_ctrlm.voice_session->voice_stb_data_stb_name_set(g_ctrlm.stb_name);
 
    LOG_INFO("ctrlm_main: load config\n");
    // Load configuration from the filesystem
@@ -616,6 +620,32 @@ int main(int argc, char *argv[]) {
    json_obj_validation    = NULL;
    json_obj_vsdk          = NULL;
    ctrlm_load_config(&json_obj_root, &json_obj_net_rf4ce, &json_obj_voice, &json_obj_device_update, &json_obj_validation, &json_obj_vsdk);
+
+#ifdef AUTH_ENABLED
+   LOG_INFO("ctrlm_main: ctrlm_auth init\n");
+#ifdef AUTH_THUNDER
+   g_ctrlm.authservice = new ctrlm_auth_thunder_t();
+#else
+   g_ctrlm.authservice = new ctrlm_auth_legacy_t(g_ctrlm.server_url_authservice);
+#endif
+   if (!ctrlm_has_authservice_data()) {
+      if (!g_ctrlm.authservice->is_ready()) {
+         LOG_WARN("%s: Authservice not ready, no reason to poll\n", __FUNCTION__);
+      } else {
+         if (!ctrlm_load_authservice_data()) {
+            LOG_INFO("%s: Starting polling authservice for device data\n", __FUNCTION__);
+            g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted ? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
+                                                                ctrlm_authservice_poll,
+                                                                NULL);
+            if (!g_ctrlm.recently_booted) {
+               g_ctrlm.authservice_fast_retries = g_ctrlm.authservice_fast_retries_max;
+            }
+         }
+      }
+   }
+#endif // AUTH_ENABLED
+
+   g_ctrlm.voice_session->voice_stb_data_stb_name_set(g_ctrlm.stb_name);
 
 #if defined(BREAKPAD_SUPPORT) && !defined(BREAKPAD_MINIDUMP_PATH_OVERRIDE)
    if(g_ctrlm.minidump_path != JSON_STR_VALUE_CTRLM_GLOBAL_MINIDUMP_PATH) {
@@ -659,21 +689,6 @@ int main(int argc, char *argv[]) {
    //Read last key info from the db
    ctrlm_property_read_last_key_info();
    g_ctrlm.loading_db = false;
-
-   // Check if recently booted
-   struct sysinfo s_info;
-   if(sysinfo(&s_info) != 0) {
-      LOG_ERROR("ctrlm_main: Unable to get system uptime\n");
-   } else {
-      LOG_INFO("ctrlm_main: System up for %lu seconds\n", s_info.uptime);
-      if(s_info.uptime < CTRLM_MAIN_FIRST_BOOT_TIME_MAX) { // System first boot
-         LOG_INFO("ctrlm_main: System first boot\n");
-      }
-      if(s_info.uptime < (long)(g_ctrlm.recently_booted_timeout_val / 1000)) { // System just booted
-         LOG_INFO("ctrlm_main: Setting recently booted to true\n");
-         g_ctrlm.recently_booted = TRUE;
-      }
-   }
 
    // This needs to happen after the DB is init, but before voice
    if(TRUE == g_ctrlm.recently_booted) {
@@ -976,6 +991,7 @@ static gboolean ctrlm_authservice_expired(gpointer user_data) {
 gboolean ctrlm_authservice_poll(gpointer user_data) {
    ctrlm_main_queue_msg_authservice_poll_t *msg = (ctrlm_main_queue_msg_authservice_poll_t *)g_malloc(sizeof(ctrlm_main_queue_msg_authservice_poll_t));
    gboolean ret = FALSE;
+   gboolean switch_poll_interval = FALSE;
 
    if(NULL == msg) {
       LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
@@ -988,9 +1004,10 @@ gboolean ctrlm_authservice_poll(gpointer user_data) {
    sem_t semaphore;
    sem_init(&semaphore, 0, 0);
 
-   msg->type        = CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL;
-   msg->ret         = &ret;
-   msg->semaphore   = &semaphore;
+   msg->type                 = CTRLM_MAIN_QUEUE_MSG_TYPE_AUTHSERVICE_POLL;
+   msg->ret                  = &ret;
+   msg->switch_poll_interval = &switch_poll_interval;
+   msg->semaphore            = &semaphore;
    ctrlm_main_queue_msg_push(msg);
 
    // Wait for the result condition to be signaled
@@ -999,6 +1016,10 @@ gboolean ctrlm_authservice_poll(gpointer user_data) {
 
    if(ret == FALSE) {
       g_ctrlm.authservice_poll_tag = 0;
+   }
+
+   if(switch_poll_interval) {
+      g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
    }
 
    return ret;
@@ -1217,8 +1238,10 @@ gboolean ctrlm_load_device_mac(void) {
 
 #ifdef AUTH_ENABLED
 void ctrlm_main_auth_start_poll() {
-   if(g_ctrlm.authservice_poll_tag == 0) {
-      g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+   if(g_ctrlm.authservice_poll_tag == 0 && !ctrlm_load_authservice_data()) {
+      g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
+                                                          ctrlm_authservice_poll,
+                                                          NULL);
    }
 }
 
@@ -1652,6 +1675,32 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
             LOG_INFO("%s: %-24s - OUT OF RANGE %lld\n", __FUNCTION__, text, value);
          } else {
             g_ctrlm.authservice_poll_val = value * 1000;
+         }
+      }
+      json_obj = json_object_get(json_obj_ctrlm, JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_FAST_POLL_PERIOD);
+      text = "Authservice Fast Poll Period";
+      if(json_obj == NULL || !json_is_integer(json_obj)) {
+         LOG_INFO("%s: %-24s - ABSENT\n", __FUNCTION__, text);
+      } else {
+         json_int_t value = json_integer_value(json_obj);
+         LOG_INFO("%s: %-24s - PRESENT <%lld>\n", __FUNCTION__, text, value);
+         if(value < 1) {
+            LOG_INFO("%s: %-24s - OUT OF RANGE %lld\n", __FUNCTION__, text, value);
+         } else {
+            g_ctrlm.authservice_fast_poll_val = value;
+         }
+      }
+      json_obj = json_object_get(json_obj_ctrlm, JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_FAST_MAX_RETRIES);
+      text = "Authservice Fast Max Retries";
+      if(json_obj == NULL || !json_is_integer(json_obj)) {
+         LOG_INFO("%s: %-24s - ABSENT\n", __FUNCTION__, text);
+      } else {
+         json_int_t value = json_integer_value(json_obj);
+         LOG_INFO("%s: %-24s - PRESENT <%lld>\n", __FUNCTION__, text, value);
+         if(value < 1) {
+            LOG_INFO("%s: %-24s - OUT OF RANGE %lld\n", __FUNCTION__, text, value);
+         } else {
+            g_ctrlm.authservice_fast_retries_max = value;
          }
       }
       json_obj = json_object_get(json_obj_ctrlm, JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_POLL_PERIOD);
@@ -2494,6 +2543,16 @@ gpointer ctrlm_main_thread(gpointer param) {
             if(!ctrlm_load_authservice_data()) {
                if(dqm->ret) {
                   *dqm->ret = TRUE;
+
+                  if (g_ctrlm.authservice_fast_retries < g_ctrlm.authservice_fast_retries_max) {
+                     g_ctrlm.authservice_fast_retries++;
+                  }
+               }
+
+               if(g_ctrlm.authservice_fast_retries == g_ctrlm.authservice_fast_retries_max) {
+                  *dqm->ret = FALSE;
+                  *dqm->switch_poll_interval = TRUE;
+                  LOG_INFO("%s: Switching to normal authservice poll interval\n", __FUNCTION__);
                }
             }
 
@@ -4495,8 +4554,10 @@ void ctrlm_main_invalidate_service_access_token(void) {
          if(g_ctrlm.service_access_token_expiration_tag != 0) {
             ctrlm_timeout_destroy(&g_ctrlm.service_access_token_expiration_tag);
          }
-         if(g_ctrlm.authservice_poll_tag == 0) {
-            g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
+         if(g_ctrlm.authservice_poll_tag == 0 && !ctrlm_load_authservice_data()) {
+            g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted ? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
+                                                                ctrlm_authservice_poll,
+                                                                NULL);
          }
          #endif
       }

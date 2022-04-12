@@ -5,6 +5,8 @@
       "thread_monitor_period"            :        60,
       "thread_monitor_minidump"          :     false,
       "authservice_poll_period"          :         5,
+      "authservice_fast_poll_period"     :      1000,
+      "authservice_fast_max_retries"     :        25,
       "keycode_logging_poll_period"      :        30,
       "keycode_logging_max_retries"      :         5,
       "url_auth_service"                 : "",
