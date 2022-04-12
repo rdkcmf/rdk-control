@@ -19,6 +19,7 @@
 #include "ctrlm_voice_ipc_iarm_all.h"
 #include "ctrlm_voice_ipc_iarm_thunder.h"
 #include "ctrlm_voice_ipc_iarm_legacy.h"
+#include "ctrlm_utils.h"
 #include "jansson.h"
 
 ctrlm_voice_ipc_iarm_all_t::ctrlm_voice_ipc_iarm_all_t(ctrlm_voice_t *obj_voice): ctrlm_voice_ipc_t(obj_voice) {
@@ -125,6 +126,28 @@ bool ctrlm_voice_ipc_iarm_all_t::keyword_verification(const ctrlm_voice_ipc_even
 
 bool ctrlm_voice_ipc_iarm_all_t::session_statistics(const ctrlm_voice_ipc_event_session_statistics_t &session_stats) {
     bool ret = true;
+
+    if(session_stats.reboot.available) {
+       const ctrlm_voice_stats_reboot_t *reboot = &session_stats.reboot;
+       LOG_ERROR("%s: voice session reboot <%s> battery <%.2f V (%u %%)>\n", __FUNCTION__, ctrlm_voice_reset_type_str(reboot->reset_type), (((float)reboot->voltage) * 4.0 / 255), reboot->battery_percentage);
+    }
+    if(session_stats.session.available) {
+       const ctrlm_voice_stats_session_t *session = &session_stats.session;
+       if(session->dropped_retry != ULONG_MAX) { // Session stats provided by the controller
+          #ifdef VOICE_BUFFER_STATS
+          LOG_INFO("%s: voice session stats rf <%u> watermark <%u> pkts total <%u> lost <%u> lqi <%u> drop retry/buffer <%u/%u> retry mac/net <%u/%u> cca <%u>\n", __FUNCTION__, session->rf_channel, session->buffer_watermark, session->packets_total, session->packets_lost, session->link_quality, session->dropped_retry, session->dropped_buffer, session->retry_mac, session->retry_network, session->cca_sense);
+          #else
+          LOG_INFO("%s: voice session stats rf <%u> pkts total <%u> lost <%u> lqi <%u> drop retry/buffer <%u/%u> retry mac/net <%u/%u> cca <%u>\n", __FUNCTION__, session->rf_channel, session->packets_total, session->packets_lost, session->link_quality, session->dropped_retry, session->dropped_buffer, session->retry_mac, session->retry_network, session->cca_sense);
+          #endif
+       } else {
+          #ifdef VOICE_BUFFER_STATS
+          LOG_INFO("%s: voice session stats rf <%u> watermark <%u> pkts total <%u> lost <%u> lqi <%u>\n", __FUNCTION__, session->rf_channel, session->buffer_watermark, session->packets_total, session->packets_lost, session->link_quality);
+          #else
+          LOG_INFO("%s: voice session stats rf <%u> pkts total <%u> lost <%u> lqi <%u>\n", __FUNCTION__, session->rf_channel, session->packets_total, session->packets_lost, session->link_quality);
+          #endif
+       }
+    }
+
     for(const auto &itr : this->ipc) {
         if(itr) {
             bool temp_ret = itr->session_statistics(session_stats);

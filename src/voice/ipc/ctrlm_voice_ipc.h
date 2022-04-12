@@ -21,6 +21,7 @@
 
 #include "ctrlm.h"
 #include "ctrlm_voice_types.h"
+#include "ctrlm_ipc_voice.h"
 
 // Classes for eventing
 
@@ -162,6 +163,8 @@ public:
 class ctrlm_voice_ipc_event_session_statistics_t {
 public:
     ctrlm_voice_ipc_event_common_t common;
+    ctrlm_voice_stats_session_t    session; ///< Statistics for the session
+    ctrlm_voice_stats_reboot_t     reboot;  ///< Data associated with a reboot
 
     ctrlm_voice_ipc_event_session_statistics_t() {
     }

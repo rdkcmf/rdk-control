@@ -152,7 +152,6 @@ public:
    virtual void         ind_process_voice_session_begin(void *data, int size);
    virtual void         ind_process_voice_session_end(void *data, int size);
    virtual void         ind_process_voice_session_result(void *data, int size);
-   virtual void         ind_process_voice_session_stats(void *data, int size);
    virtual void         process_voice_controller_metrics(void *data, int size);
    virtual void         voice_command_status_set(void *data, int size);
    virtual gboolean     terminate_voice_session(ctrlm_voice_session_termination_reason_t reason);

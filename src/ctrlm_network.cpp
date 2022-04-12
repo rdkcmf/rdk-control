@@ -567,10 +567,6 @@ void ctrlm_obj_network_t::hal_init_cfm(void *data, int size) {
    }
 }
 
-void ctrlm_obj_network_t::ind_process_voice_session_stats(void *data, int size) {
-   LOG_WARN("%s: not implemented for %s network\n", __FUNCTION__, name_get());
-}
-
 void ctrlm_obj_network_t::req_process_rib_set(void *data, int size) {
    ctrlm_main_queue_msg_rib_t *dqm = (ctrlm_main_queue_msg_rib_t *)data;
 

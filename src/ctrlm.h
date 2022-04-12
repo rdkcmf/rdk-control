@@ -461,8 +461,6 @@ std::string ctrlm_stb_name_get();
 std::string ctrlm_device_mac_get();
 ctrlm_controller_id_t ctrlm_last_used_controller_get(ctrlm_network_type_t network_type);
 
-bool ctrlm_is_key_adjacent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long key_code);
-
 ctrlm_voice_t *ctrlm_get_voice_obj();
 
 template <typename T>

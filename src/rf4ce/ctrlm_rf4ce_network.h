@@ -304,7 +304,6 @@ public:
    void                                 ind_process_voice_session_request(void *data, int size);
    void                                 ind_process_voice_session_stop(void *data, int size);
    void                                 ind_process_voice_session_end(void *data, int size);
-   void                                 ind_process_voice_session_stats(void *data, int size);
    void                                 process_voice_controller_metrics(void *data, int size);
 
    void                                 hal_init_cfm(void *data, int size);
@@ -583,6 +582,7 @@ private:
    gboolean              is_xr15_hardware_version(version_hardware_t version_hardware);
    gboolean              is_autobind_active(ctrlm_hal_rf4ce_ieee_address_t ieee_address);
    gboolean              is_voice_session_in_progress();
+   bool                  is_key_adjacent(ctrlm_controller_id_t controller_id, unsigned long key_code);
 
    unsigned int          restore_hal_nvm(unsigned char **nvm_backup_data);
    gboolean              is_screen_bind_active(ctrlm_hal_rf4ce_ieee_address_t ieee_address);

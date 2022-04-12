@@ -40,6 +40,10 @@
 
 #define VOICE_SESSION_REQ_DATA_LEN_MAX (33)
 
+#ifdef VOICE_BUFFER_STATS
+#define VOICE_BUFFER_WARNING_THRESHOLD (4) // Number of packets in HW buffer before printing.  Set to zero to print all packets.
+#endif
+
 #define CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER    {(ctrlm_voice_audio_mode_t)JSON_INT_VALUE_VOICE_AUDIO_MODE, (ctrlm_voice_audio_timing_t)JSON_INT_VALUE_VOICE_AUDIO_TIMING, JSON_FLOAT_VALUE_VOICE_AUDIO_CONFIDENCE_THRESHOLD, (ctrlm_voice_audio_ducking_type_t)JSON_INT_VALUE_VOICE_AUDIO_DUCKING_TYPE, JSON_FLOAT_VALUE_VOICE_AUDIO_DUCKING_LEVEL, JSON_BOOL_VALUE_VOICE_AUDIO_DUCKING_BEEP}
 typedef enum {
    CTRLM_VOICE_AUDIO_MODE_OFF             = 0,
@@ -189,15 +193,7 @@ typedef struct {
 typedef struct {
    ctrlm_controller_id_t            controller_id;
    ctrlm_voice_session_end_reason_t reason;
-   unsigned long                    stop_data;
    unsigned char                    utterance_too_short;
-   int                              voice_data_pipe_write;
-   unsigned long                    buffer_high_watermark;
-   unsigned long                    session_packets_total;
-   unsigned long                    session_packets_lost;
-   unsigned long                    session_rf_channel;
-   unsigned char                    session_link_quality;
-   unsigned long                    session_id;
 } ctrlm_main_queue_msg_voice_session_end_t;
 
 typedef struct {
@@ -342,6 +338,10 @@ typedef struct {
 } ctrlm_voice_session_info_t;
 
 typedef struct {
+   unsigned long rf_channel;       // The rf channel that the voice session used (typically 15, 20 or 25)
+} ctrlm_voice_session_end_stats_t;
+
+typedef struct {
    bool prv;
    bool wwFeedback;
 } ctrlm_voice_status_capabilities_t;
@@ -366,11 +366,13 @@ class ctrlm_voice_t {
 
     ctrlm_voice_session_response_status_t voice_session_req(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_device_t device_type, ctrlm_voice_format_t format, voice_session_req_stream_params *stream_params, const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status=false, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_rsp_confirm_t *cb_confirm=NULL, void **cb_confirm_param=NULL, bool use_external_data_pipe=false, const char *transcription_in=NULL);
     void                                  voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp);
-    bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp=NULL);
+    bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp=NULL, uint8_t *lqi=NULL);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd);
     void                                  voice_session_data_post_processing(int bytes_sent, const char *action, ctrlm_timestamp_t *timestamp);
-    void                                  voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp=NULL);
-    void                                  voice_session_stats(ctrlm_voice_stats_session_t session, ctrlm_voice_stats_reboot_t reboot);
+    void                                  voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_end_stats_t *stats=NULL);
+    void                                  voice_session_controller_stats_rxd_timeout();
+    void                                  voice_session_stats(ctrlm_voice_stats_session_t session);
+    void                                  voice_session_stats(ctrlm_voice_stats_reboot_t reboot);
     void                                  voice_session_term();
     void                                  voice_session_info(ctrlm_voice_session_info_t *data);
     bool                                  voice_session_id_is_current(uuid_t uuid);
@@ -423,7 +425,8 @@ protected:
     void                                  voice_session_controller_command_status_read_timeout();
     void                                  voice_session_stats_clear();
     void                                  voice_session_stats_print();
-    
+    void                                  voice_session_notify_stats();
+
     ctrlm_voice_state_src_t               voice_state_src_get() const;
     ctrlm_voice_state_dst_t               voice_state_dst_get() const;
 
@@ -434,6 +437,7 @@ protected:
 
     // Static Callbacks
     static int ctrlm_voice_packet_timeout(void *data);
+    static int ctrlm_voice_controller_session_stats_rxd_timeout(void *data);
     static int ctrlm_voice_controller_command_status_read_timeout(void *data);
     #ifdef BEEP_ON_KWD_ENABLED
     static int ctrlm_voice_keyword_beep_end_timeout(void *data);
@@ -512,6 +516,10 @@ public:
     long                     server_ret_code;
     bool                     has_stream_params;
     voice_session_req_stream_params stream_params;
+
+    unsigned long               stats_session_id;
+    ctrlm_voice_stats_reboot_t  stats_reboot;
+    ctrlm_voice_stats_session_t stats_session;
     // End Session Data
 
     protected:
@@ -547,8 +555,24 @@ public:
 
     ctrlm_main_queue_msg_voice_command_status_t status;
     uint8_t                  last_cmd_id; // Needed for ADPCM over RF4CE, since duplicate packets are possible
+    uint8_t                  next_cmd_id;
     uint32_t                 packets_processed;
     uint32_t                 packets_lost;
+    uint32_t                 lqi_total;
+    #ifdef VOICE_BUFFER_STATS
+    ctrlm_timestamp_t       first_fragment;
+    unsigned char           voice_buffer_warning_triggered;
+    unsigned long           voice_buffer_high_watermark;
+    unsigned long           voice_packet_interval; // amount of time between voice packets in microseconds
+
+    #ifdef TIMING_START_TO_FIRST_FRAGMENT
+    ctrlm_timestamp_t voice_session_begin_timestamp;
+    #endif
+    #ifdef TIMING_LAST_FRAGMENT_TO_STOP
+    ctrlm_timestamp_t voice_session_last_fragment_timestamp;
+    #endif
+    #endif
+
     double                   confidence;
     bool                     dual_sensitivity_immediate;
     bool                     keyword_verified;
@@ -575,6 +599,7 @@ public:
     // End Current Session Data
     // Timeout tags
     unsigned int             timeout_packet_tag;
+    unsigned int             timeout_ctrl_session_stats_rxd;
     unsigned int             timeout_ctrl_cmd_status_read;
     unsigned int             timeout_keyword_beep;
     // End Timeout tags

@@ -379,7 +379,7 @@ bool ctrlm_voice_ipc_iarm_thunder_t::keyword_verification(const ctrlm_voice_ipc_
 }
 
 bool ctrlm_voice_ipc_iarm_thunder_t::session_statistics(const ctrlm_voice_ipc_event_session_statistics_t &session_stats) {
-    LOG_INFO("%s: Not supported\n", __FUNCTION__);
+    // Not supported
     return(true);
 }
 

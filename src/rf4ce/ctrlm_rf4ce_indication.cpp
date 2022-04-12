@@ -466,9 +466,9 @@ ctrlm_hal_result_t ctrlm_voice_ind_data_rf4ce(ctrlm_network_id_t network_id, ctr
       if(data_length != cb_data_read(data_length, buf, cb_data_param)) {
          LOG_WARN("%s: Did not read as much data as expected\n", __FUNCTION__);
       }
-      voice_obj->voice_session_data(network_id, controller_id, (char *)buf, data_length, &timestamp);
+      voice_obj->voice_session_data(network_id, controller_id, (char *)buf, data_length, &timestamp, &lqi);
    } else {
-      voice_obj->voice_session_data(network_id, controller_id, (char *)data, data_length, &timestamp);
+      voice_obj->voice_session_data(network_id, controller_id, (char *)data, data_length, &timestamp, &lqi);
    }
    }
    if(NULL != frequency_agility) {

@@ -2375,8 +2375,19 @@ guchar ctrlm_obj_controller_rf4ce_t::property_write_reboot_stats(guchar *data, g
    print_firmware_on_button_press = true;
    print_remote_firmware_debug_info(RF4CE_PRINT_FIRMWARE_LOG_REBOOT);
 
-   // Send data to vrex session
-   ctrlm_voice_notify_stats_reboot(network_id_get(), controller_id_get(), reboot_reason, data[1], battery_level_percent(controller_type_, version_hardware_, data[1]));
+   // Send data to voice object
+   ctrlm_voice_t *obj = ctrlm_get_voice_obj();
+   if(NULL != obj) {
+      ctrlm_voice_stats_reboot_t  stats_reboot;
+
+      stats_reboot.available          = 1;
+      stats_reboot.reset_type         = reboot_reason;
+      stats_reboot.voltage            = data[1];
+      stats_reboot.battery_percentage = battery_level_percent(controller_type_, version_hardware_, data[1]);
+
+      obj->voice_session_stats(stats_reboot);
+   }
+
    // Inform device update
    ctrlm_device_update_rf4ce_notify_reboot(network_id_get(), controller_id_get(), device_update_session_resume_support());
    //Save in the database

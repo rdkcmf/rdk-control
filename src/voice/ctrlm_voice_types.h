@@ -22,6 +22,10 @@
 #ifndef __CTRLM_VOICE_TYPES_H__
 #define __CTRLM_VOICE_TYPES_H__
 
+#define VOICE_BUFFER_STATS                                     // Print buffer statistics
+//#define TIMING_START_TO_FIRST_FRAGMENT                         // Print lag time from voice session begin to receipt of first voice fragment
+//#define TIMING_LAST_FRAGMENT_TO_STOP                           // Print lag time from receipt of the last voice fragment to the voice session end
+
 typedef enum {
     CTRLM_VOICE_DEVICE_PTT,
     CTRLM_VOICE_DEVICE_FF,

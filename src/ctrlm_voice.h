@@ -21,7 +21,6 @@
 
 #include "ctrlm.h"
 #include "ctrlm_ipc_voice.h"
-#include "ctrlm_voice_iarm.h"
 #include <string>
 
 typedef enum {
@@ -48,12 +47,6 @@ typedef enum {
    CRTLM_VOICE_REMOTE_VOICE_END_TIMEOUT_INTERPACKET  =  9
 } ctrlm_voice_remote_voice_end_reason_t;
 
-typedef struct {
-   ctrlm_controller_id_t         controller_id;
-   ctrlm_voice_stats_session_t   session;
-   ctrlm_voice_stats_reboot_t    reboot;
-} ctrlm_main_queue_msg_voice_session_stats_t;
-
 typedef enum {
    VOICE_COMMAND_VOICE_SESSION_TERMINATE_SPECIAL_KEY_PRESS = 0,
    VOICE_COMMAND_VOICE_SESSION_TERMINATE_UNKNOWN = 5
@@ -71,8 +64,6 @@ extern "C"
 {
 #endif
 
-void ctrlm_voice_notify_stats_reboot(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_reset_type_t type, unsigned char voltage, unsigned char battery_percentage);
-void ctrlm_voice_notify_stats_session(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint16 total_packets, guint16 drop_retry, guint16 drop_buffer, guint16 mac_retries, guint16 network_retries, guint16 cca_sense);
 void ctrlm_voice_device_update_in_progress_set(bool in_progress);
 
 #ifdef __cplusplus

@@ -323,8 +323,28 @@ ctrlm_rf4ce_rib_attr_t::status ctrlm_rf4ce_voice_session_statistics_t::write_rib
                 LOG_INFO("%s: Total MAC Retries %u Network Retries %u CCA Sense Failures %u\n", __FUNCTION__, mac_retries, network_retries, cca_sense);
             }
 
-            // Send data to control manager
-            ctrlm_voice_notify_stats_session(this->network_id, this->controller_id, total_packets, drop_retry, drop_buffer, mac_retries, network_retries, cca_sense);
+            // Send data to voice object
+            ctrlm_voice_t *obj = ctrlm_get_voice_obj();
+            if(NULL != obj) {
+               ctrlm_voice_stats_session_t stats_session;
+
+               stats_session.available        = 1;
+               stats_session.packets_total    = total_packets;
+               stats_session.dropped_retry    = drop_retry;
+               stats_session.dropped_buffer   = drop_buffer;
+               stats_session.retry_mac        = mac_retries;
+               stats_session.retry_network    = network_retries;
+               stats_session.cca_sense        = cca_sense;
+
+               // The following are not set here and will be ignored
+               //stats_session.rf_channel       = 0;
+               //stats_session.buffer_watermark = 0;
+               //stats_session.packets_lost     = 0;
+               //stats_session.link_quality     = 0;
+
+               obj->voice_session_stats(stats_session);
+            }
+
             ret = ctrlm_rf4ce_rib_attr_t::status::SUCCESS;
 
         } else {
@@ -442,7 +462,11 @@ ctrlm_rf4ce_rib_attr_t::status ctrlm_rf4ce_voice_command_status_t::read_rib(ctrl
             }
             ret = ctrlm_rf4ce_rib_attr_t::status::SUCCESS;
             LOG_INFO("%s: %s read from RIB: %s\n", __FUNCTION__, this->get_name().c_str(), this->get_value().c_str());
-            if(this->vcs != ctrlm_rf4ce_voice_command_status_t::status::PENDING) {
+            if(this->vcs != ctrlm_rf4ce_voice_command_status_t::status::PENDING && accessor == ctrlm_rf4ce_rib_attr_t::CONTROLLER) {
+                ctrlm_voice_t *obj = ctrlm_get_voice_obj();
+                if(obj != NULL) {
+                    obj->voice_controller_command_status_read(this->controller->network_id_get(), this->controller->controller_id_get());
+                }
                 this->reset();
             }
         } else {

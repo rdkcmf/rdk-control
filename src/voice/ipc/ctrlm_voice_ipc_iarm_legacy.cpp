@@ -192,8 +192,8 @@ bool ctrlm_voice_ipc_iarm_legacy_t::session_statistics(const ctrlm_voice_ipc_eve
     event.network_type         = session_stats.common.network_type;
     event.controller_id        = session_stats.common.controller_id;
     event.session_id           = session_stats.common.session_id_ctrlm;
-    // event.session              = 0;
-    // event.reboot               = 0;
+    event.session              = session_stats.session;
+    event.reboot               = session_stats.reboot;
     return(broadcast_event(CTRLM_MAIN_IARM_BUS_NAME, CTRLM_VOICE_IARM_EVENT_SESSION_STATS, &event, sizeof(event)));
 }
 

@@ -52,6 +52,9 @@
 #define CTRLM_CONTROLLER_CMD_STATUS_READ_TIMEOUT (10000)
 #define CTRLM_VOICE_KEYWORD_BEEP_TIMEOUT         ( 1500)
 
+#define ADPCM_COMMAND_ID_MIN             (0x20)    ///< Minimum bound of command id as defined by XVP Spec.
+#define ADPCM_COMMAND_ID_MAX             (0x3F)    ///< Maximum bound of command id as defined by XVP Spec.
+
 static void ctrlm_voice_session_response_confirm(bool result, ctrlm_timestamp_t *timestamp, void *user_data);
 static void ctrlm_voice_data_post_processing_cb (ctrlm_hal_data_cb_params_t *param);
 
@@ -60,6 +63,10 @@ static void ctrlm_voice_system_audio_player_event_handler(system_audio_player_ev
 #endif
 
 static xrsr_power_mode_t voice_xrsr_power_map(ctrlm_power_state_t ctrlm_power_state);
+
+#ifdef VOICE_BUFFER_STATS
+static unsigned long voice_packet_interval_get(ctrlm_voice_format_t format, uint32_t opus_samples_per_packet);
+#endif
 
 // Application Interface Implementation
 ctrlm_voice_t::ctrlm_voice_t() {
@@ -76,6 +83,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->audio_sent_bytes                =  0;
     this->audio_sent_samples              =  0;
     this->timeout_packet_tag              =  0;
+    this->timeout_ctrl_session_stats_rxd  =  0;
     this->timeout_ctrl_cmd_status_read    =  0;
     this->timeout_keyword_beep            =  0;
     this->session_id                      =  0;
@@ -140,6 +148,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
     ERR_CHK(safec_rc);
     this->last_cmd_id               = 0;
+    this->next_cmd_id               = 0;
     this->packets_processed         = 0;
     this->packets_lost              = 0;
     this->confidence                = .0;
@@ -284,6 +293,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_FF,                   this->prefs.server_url_vrex_src_ff);
         conf.config_value_get(JSON_INT_NAME_VOICE_VREX_REQUEST_TIMEOUT,         this->prefs.timeout_vrex_connect,0);
         conf.config_value_get(JSON_INT_NAME_VOICE_VREX_RESPONSE_TIMEOUT,        this->prefs.timeout_vrex_session,0);
+        conf.config_value_get(JSON_INT_NAME_VOICE_TIMEOUT_STATS,                this->prefs.timeout_stats);
         conf.config_value_get(JSON_INT_NAME_VOICE_TIMEOUT_PACKET_INITIAL,       this->prefs.timeout_packet_initial);
         conf.config_value_get(JSON_INT_NAME_VOICE_TIMEOUT_PACKET_SUBSEQUENT,    this->prefs.timeout_packet_subsequent);
         conf.config_value_get(JSON_INT_NAME_VOICE_BITRATE_MINIMUM,              this->prefs.bitrate_minimum);
@@ -1017,6 +1027,17 @@ void ctrlm_voice_t::voice_controller_command_status_read(ctrlm_network_id_t netw
           this->state_src   = CTRLM_VOICE_STATE_SRC_READY;
           voice_session_stats_print();
           voice_session_stats_clear();
+
+         // Send session stats only if they haven't already been sent
+         if(stats_session_id != 0 && this->voice_ipc) {
+            ctrlm_voice_ipc_event_session_statistics_t stats;
+
+            stats.common  = this->ipc_common_data;
+            stats.session = this->stats_session;
+            stats.reboot  = this->stats_reboot;
+
+            this->voice_ipc->session_statistics(stats);
+         }
        }
    }
 }
@@ -1025,6 +1046,7 @@ void ctrlm_voice_t::voice_session_controller_command_status_read_timeout(void) {
    if(this->network_id == CTRLM_MAIN_NETWORK_ID_INVALID || this->controller_id == CTRLM_MAIN_CONTROLLER_ID_INVALID) {
       LOG_ERROR("%s: no active voice session\n", __FUNCTION__);
    } else if(this->timeout_ctrl_cmd_status_read > 0) {
+      this->session_active_controller    = false;
       this->timeout_ctrl_cmd_status_read = 0;
       LOG_INFO("%s: controller failed to read command status\n", __FUNCTION__);
       xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
@@ -1033,6 +1055,17 @@ void ctrlm_voice_t::voice_session_controller_command_status_read_timeout(void) {
          this->state_src   = CTRLM_VOICE_STATE_SRC_READY;
          voice_session_stats_print();
          voice_session_stats_clear();
+
+         // Send session stats only if they haven't already been sent
+         if(stats_session_id != 0 && this->voice_ipc) {
+            ctrlm_voice_ipc_event_session_statistics_t stats;
+
+            stats.common  = this->ipc_common_data;
+            stats.session = this->stats_session;
+            stats.reboot  = this->stats_reboot;
+
+            this->voice_ipc->session_statistics(stats);
+         }
       }
    }
 }
@@ -1142,8 +1175,6 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     this->controller_id             = controller_id;
     this->network_id                = network_id;
     this->network_type              = ctrlm_network_type_get(network_id);
-    this->audio_sent_bytes          = 0;
-    this->audio_sent_samples        = 0;
     this->last_cmd_id               = 0;
     this->session_active_server     = true;
     this->session_active_controller = true;
@@ -1154,6 +1185,8 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     this->controller_command_status = command_status;
     this->audio_sent_bytes          = 0;
     this->audio_sent_samples        = 0;
+    this->packets_processed         = 0;
+    this->packets_lost              = 0;
     if(stream_params == NULL) {
        this->has_stream_params  = false;
     } else {
@@ -1168,6 +1201,21 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     this->status.controller_id  = this->controller_id;
     this->voice_status_set();
     this->last_cmd_id           = 0;
+    this->next_cmd_id           = 0;
+    this->lqi_total             = 0;
+    this->stats_session_id      = voice_session_id_get() + 1;
+    memset(&this->stats_reboot, 0, sizeof(this->stats_reboot));
+    memset(&this->stats_session, 0, sizeof(this->stats_session));
+    this->stats_session.dropped_retry = ULONG_MAX; // Used to indicate whether controller provides stats or not
+
+    #ifdef VOICE_BUFFER_STATS
+    voice_buffer_warning_triggered = 0;
+    voice_buffer_high_watermark    = 0;
+    voice_packet_interval          = voice_packet_interval_get(this->format, this->opus_samples_per_packet);
+    #ifdef TIMING_START_TO_FIRST_FRAGMENT
+    ctrlm_timestamp_get(&voice_session_begin_timestamp);
+    #endif
+    #endif
 
     // Start packet timeout, but not if this is a voice session by text or standby microphone
     if (!this->is_session_by_text && !is_standby_microphone()) {
@@ -1240,6 +1288,34 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
         }
     }
 
+    #ifdef VOICE_BUFFER_STATS
+    ctrlm_timestamp_t before;
+    ctrlm_timestamp_get(&before);
+    #ifdef TIMING_LAST_FRAGMENT_TO_STOP
+    voice_session_last_fragment_timestamp = before;
+    #endif
+
+    if(this->audio_sent_bytes == 0) {
+        first_fragment = before; // timestamp for start of utterance voice data
+        #ifdef TIMING_START_TO_FIRST_FRAGMENT
+        LOG_INFO("Session Start to First Fragment: %8lld ms lag\n", ctrlm_timestamp_subtract_ms(voice_session_begin_timestamp, first_fragment));
+        #endif
+    }
+
+    unsigned long long session_time = this->voice_packet_interval + ctrlm_timestamp_subtract_us(first_fragment, before); // in microseconds
+
+    // The total packets (received + lost)
+    uint32_t packets_total = this->packets_processed + this->packets_lost;
+    unsigned long long session_delta = (session_time - ((packets_total - 1) * this->voice_packet_interval)); // in microseconds
+    unsigned long watermark = (session_delta / this->voice_packet_interval) + 1;
+    if(watermark > voice_buffer_high_watermark) {
+        voice_buffer_high_watermark = watermark;
+    }
+    if(session_delta > (VOICE_BUFFER_WARNING_THRESHOLD * this->voice_packet_interval)) {
+        voice_buffer_warning_triggered = 1;
+    }
+    #endif
+
     if(timestamp != NULL) {
         if(this->audio_sent_bytes == 0) {
             this->session_timing.ctrl_audio_rxd_first = *timestamp;
@@ -1282,7 +1358,15 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
        this->timeout_packet_tag = g_timeout_add(timeout, ctrlm_voice_packet_timeout, NULL);
        LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu> rate <%6.2f kbps> timeout <%lu ms>\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples, rx_rate, timeout);
     } else {
+       #ifdef VOICE_BUFFER_STATS
+       if(voice_buffer_warning_triggered) {
+          LOG_WARN("%s: Audio %s bytes <%lu> samples <%lu> pkt cnt <%3u> elapsed <%8llu ms> lag <%8llu ms> (%4.2f packets)\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples, packets_total, session_time / 1000, session_delta / 1000, (((float)session_delta) / this->voice_packet_interval));
+       } else {
+          LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu>\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples);
+       }
+       #else
        LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu>\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples);
+       #endif
     }
 }
 
@@ -1330,7 +1414,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
     return ret;
 }
 
-bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp) {
+bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp, uint8_t *lqi) {
     char              local_buf[length + 1];
     long unsigned int bytes_written = 0;
     if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
@@ -1347,16 +1431,30 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
         return(false);
     }
 
-    if(this->last_cmd_id == buffer[0] && this->network_type == CTRLM_NETWORK_TYPE_RF4CE) {
-        LOG_INFO("%s: RF4CE Duplicate Voice Packet\n", __FUNCTION__);
-        if(this->timeout_packet_tag > 0 && !controller_supports_qos()) {
-           g_source_remove(this->timeout_packet_tag);
-           this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_subsequent, ctrlm_voice_packet_timeout, NULL);
-        }
-        return(true);
-    }
+    uint8_t cmd_id = buffer[0];
 
-    this->last_cmd_id = buffer[0];
+    if(this->network_type == CTRLM_NETWORK_TYPE_RF4CE) {
+        if(this->last_cmd_id == cmd_id) {
+            LOG_INFO("%s: RF4CE Duplicate Voice Packet\n", __FUNCTION__);
+            if(this->timeout_packet_tag > 0 && !controller_supports_qos()) {
+               g_source_remove(this->timeout_packet_tag);
+               this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_subsequent, ctrlm_voice_packet_timeout, NULL);
+            }
+            return(true);
+        }
+
+        // Maintain a running packet received and lost count (which is overwritten by post session stats)
+        this->packets_processed++;
+        if(this->next_cmd_id != 0 && this->next_cmd_id != cmd_id) {
+            this->packets_lost += (cmd_id > this->next_cmd_id) ? (cmd_id - this->next_cmd_id) : (ADPCM_COMMAND_ID_MAX + 1 - this->next_cmd_id) + (cmd_id - ADPCM_COMMAND_ID_MIN);
+        }
+
+        this->last_cmd_id = cmd_id;
+        this->next_cmd_id = this->last_cmd_id + 1;
+        if(this->next_cmd_id > ADPCM_COMMAND_ID_MAX) {
+            this->next_cmd_id = ADPCM_COMMAND_ID_MIN;
+        }
+    }
 
     const char *action = "dumped";
     if(this->state_dst != CTRLM_VOICE_STATE_DST_READY) { // destination is accepting more data
@@ -1378,12 +1476,16 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
        }
     }
 
+    if(lqi != NULL) {
+        lqi_total += *lqi;
+    }
+
     voice_session_data_post_processing(length, action, timestamp);
 
     return(true);
 }
 
-void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp) {
+void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp, ctrlm_voice_session_end_stats_t *stats) {
     LOG_INFO("%s: voice session end < %s >\n", __FUNCTION__, ctrlm_voice_session_end_reason_str(reason));
     if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
         LOG_ERROR("%s: No voice session in progress\n", __FUNCTION__);
@@ -1422,14 +1524,29 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     end.reason              = reason;
     end.utterance_too_short = (this->audio_sent_bytes == 0 ? 1 : 0);
     // Don't need to fill out other info
+    if(stats != NULL) {
+        stats_session.rf_channel       = stats->rf_channel;
+        #ifdef VOICE_BUFFER_STATS
+        #ifdef TIMING_LAST_FRAGMENT_TO_STOP
+        ctrlm_timestamp_t after;
+        ctrlm_timestamp_get(&after);
+        unsigned long long lag_time = ctrlm_timestamp_subtract_ns(voice_session_last_fragment_timestamp, after);
+        LOG_INFO("Last Fragment to Session Stop: %8llu ms lag\n", lag_time / 1000000);
+        #endif
+        stats_session.buffer_watermark  = voice_buffer_high_watermark;
+        #else
+        stats_session.buffer_watermark  = ULONG_MAX;
+        #endif
+    }
     ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_end, &end, sizeof(end), NULL, this->network_id);
-
-    this->end_reason = reason;
 
     // clear session_active_controller for controllers that don't support voice command status
     if(!this->controller_command_status) {
        this->session_active_controller = false;
     }
+
+    // Set a timeout for receiving voice session stats from the controller
+    this->timeout_ctrl_session_stats_rxd = g_timeout_add(this->prefs.timeout_stats, ctrlm_voice_controller_session_stats_rxd_timeout, NULL);
 
     LOG_DEBUG("%s,%d: session_active_server = <%d>, session_active_controller = <%d>\n", __FUNCTION__, __LINE__, session_active_server, session_active_controller);
 
@@ -1451,42 +1568,57 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
     }
 }
 
-void ctrlm_voice_t::voice_session_stats(ctrlm_voice_stats_session_t session, ctrlm_voice_stats_reboot_t reboot) {
-   // TODO implement for voice object
-/*   m_stats_reboot  = reboot;
+void ctrlm_voice_t::voice_session_controller_stats_rxd_timeout() {
+   this->timeout_ctrl_session_stats_rxd = 0;
+   ctrlm_get_voice_obj()->voice_session_notify_stats();
+}
 
-   // Add or clear the statistics to the session stats
-   if(!session.available) {
-      // Clear out entries in case they contained values
-      m_stats_session.dropped_retry  = SESSION_STATS_INVALID_VALUE;
-      m_stats_session.dropped_buffer = SESSION_STATS_INVALID_VALUE;
-      m_stats_session.retry_mac      = SESSION_STATS_INVALID_VALUE;
-      m_stats_session.retry_network  = SESSION_STATS_INVALID_VALUE;
-      m_stats_session.cca_sense      = SESSION_STATS_INVALID_VALUE;
-   } else {
-      m_stats_session.packets_total  = session.packets_total;
-      m_stats_session.dropped_retry  = session.dropped_retry;
-      m_stats_session.dropped_buffer = session.dropped_buffer;
-      m_stats_session.retry_mac      = session.retry_mac;
-      m_stats_session.retry_network  = session.retry_network;
-      m_stats_session.cca_sense      = session.cca_sense;
-   }
+void ctrlm_voice_t::voice_session_stats(ctrlm_voice_stats_session_t session) {
+   stats_session.available      = session.available;
+   stats_session.packets_total  = session.packets_total;
+   stats_session.dropped_retry  = session.dropped_retry;
+   stats_session.dropped_buffer = session.dropped_buffer;
+   stats_session.retry_mac      = session.retry_mac;
+   stats_session.retry_network  = session.retry_network;
+   stats_session.cca_sense      = session.cca_sense;
 
-   if(reboot.available && reboot.voltage == 0xFF) { // Voltage was not reported (old remote firmware).  Use locally stored value.
-      m_stats_reboot.voltage            = m_remote_battery_value;
-      m_stats_reboot.battery_percentage = m_remote_battery_percentage;
-   }
+   voice_session_notify_stats();
+}
 
-   #ifdef PRINT_STATS_LAG_TIME
-   struct timespec session_stats_time;
-   clock_gettime(CLOCK_REALTIME, &session_stats_time);
-   unsigned long long delta_time;
-   delta_time = time_diff(&m_session_end_time, &session_stats_time);
-   LOG_INFO("%s: Stream end to stats lag time <%llu ms>\n", __FUNCTION__, delta_time / 1000000);
-   #endif
+void ctrlm_voice_t::voice_session_stats(ctrlm_voice_stats_reboot_t reboot) {
+   stats_reboot = reboot;
 
    // Send the notification
-   notify_stats();*/
+   voice_session_notify_stats();
+}
+
+void ctrlm_voice_t::voice_session_notify_stats() {
+   if(stats_session_id == 0) {
+      LOG_INFO("%s: already sent, ignoring.\n", __FUNCTION__);
+      return;
+   }
+   if(stats_session_id != this->ipc_common_data.session_id_ctrlm) {
+      LOG_INFO("%s: stale session, ignoring.\n", __FUNCTION__);
+      return;
+   }
+
+   // Stop session stats timeout
+   if(this->timeout_ctrl_session_stats_rxd > 0) {
+      g_source_remove(this->timeout_ctrl_session_stats_rxd);
+      this->timeout_ctrl_session_stats_rxd = 0;
+   }
+
+   // Send session stats only if the server voice session has ended
+   if(!this->session_active_server && this->voice_ipc) {
+      ctrlm_voice_ipc_event_session_statistics_t stats;
+
+      stats.common  = this->ipc_common_data;
+      stats.session = this->stats_session;
+      stats.reboot  = this->stats_reboot;
+
+      this->voice_ipc->session_statistics(stats);
+      stats_session_id = 0;
+   }
 }
 
 void ctrlm_voice_t::voice_session_timeout() {
@@ -2025,13 +2157,6 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_result, &msg, sizeof(msg), NULL, this->network_id);
     }
 
-    // Send Stats IARM Event
-    if(this->voice_ipc) {
-        ctrlm_voice_ipc_event_session_statistics_t stats;
-        stats.common = this->ipc_common_data;
-        this->voice_ipc->session_statistics(stats);
-    }
-
     if(this->voice_device == CTRLM_VOICE_DEVICE_FF && this->status.status == VOICE_COMMAND_STATUS_PENDING) {
         this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
     }
@@ -2045,6 +2170,16 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         voice_session_end(this->network_id, this->controller_id, CTRLM_VOICE_SESSION_END_REASON_OTHER_ERROR);
     } else if(!this->session_active_controller) {
         this->state_src = CTRLM_VOICE_STATE_SRC_READY;
+
+        // Send session stats only if the session stats have been received from the controller (or it has timed out)
+        if(stats_session_id != 0 && this->voice_ipc) {
+            ctrlm_voice_ipc_event_session_statistics_t stats;
+            stats.common  = this->ipc_common_data;
+            stats.session = this->stats_session;
+            stats.reboot  = this->stats_reboot;
+
+            this->voice_ipc->session_statistics(stats);
+        }
     }
 
     this->state_dst = CTRLM_VOICE_STATE_DST_READY;
@@ -2125,11 +2260,19 @@ void ctrlm_voice_t::voice_stream_end_callback(ctrlm_voice_stream_end_cb_t *strea
     xrsr_stream_stats_t *stats = &stream_end->stats;
     if(!stats->audio_stats.valid) {
         LOG_INFO("%s: end of stream <%s> audio stats not present\n", __FUNCTION__, (stats->result) ? "SUCCESS" : "FAILURE");
-        this->packets_processed = 0;
-        this->packets_lost      = 0;
+        this->packets_processed           = 0;
+        this->packets_lost                = 0;
+        this->stats_session.packets_total = 0;
+        this->stats_session.packets_lost  = 0;
+        this->stats_session.link_quality  = 0;
+
     } else {
-        this->packets_processed = stats->audio_stats.packets_processed;
-        this->packets_lost      = stats->audio_stats.packets_lost;
+        this->packets_processed           = stats->audio_stats.packets_processed;
+        this->packets_lost                = stats->audio_stats.packets_lost;
+        this->stats_session.available     = 1;
+        this->stats_session.packets_total = this->packets_lost + this->packets_processed;
+        this->stats_session.packets_lost  = this->packets_lost;
+        this->stats_session.link_quality  = (this->packets_processed > 0) ? (this->lqi_total / this->packets_processed) : 0;
 
         uint32_t samples_processed    = stats->audio_stats.samples_processed;
         uint32_t samples_lost         = stats->audio_stats.samples_lost;
@@ -2602,6 +2745,11 @@ int ctrlm_voice_t::ctrlm_voice_packet_timeout(void *data) {
     return(false);
 }
 
+int ctrlm_voice_t::ctrlm_voice_controller_session_stats_rxd_timeout(void *data) {
+    ctrlm_get_voice_obj()->voice_session_controller_stats_rxd_timeout();
+    return(false);
+}
+
 int ctrlm_voice_t::ctrlm_voice_controller_command_status_read_timeout(void *data) {
     ctrlm_get_voice_obj()->voice_session_controller_command_status_read_timeout();
     return(false);
@@ -2824,6 +2972,21 @@ bool ctrlm_voice_t::is_standby_microphone(void) {
    return ((this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
 
 }
+
+#ifdef VOICE_BUFFER_STATS
+unsigned long voice_packet_interval_get(ctrlm_voice_format_t format, uint32_t opus_samples_per_packet) {
+   if(format == CTRLM_VOICE_FORMAT_ADPCM) {
+      return(11375); // amount of time between voice packets in microseconds (91*2/16000)*1000000
+   } else if (format == CTRLM_VOICE_FORMAT_ADPCM_SKY) {
+      return(12000); // amount of time between voice packets in microseconds (96*2/16000)*1000000
+   } else if (format == CTRLM_VOICE_FORMAT_PCM) {
+      return(20000);
+   } else if (format == CTRLM_VOICE_FORMAT_OPUS_XVP || format == CTRLM_VOICE_FORMAT_OPUS) {
+      return(opus_samples_per_packet * 1000 / 16); // amount of time between voice packets in microseconds (samples per packet/16000)*1000000
+   }
+   return(0);
+}
+#endif
 
 xrsr_power_mode_t voice_xrsr_power_map(ctrlm_power_state_t ctrlm_power_state) {
 

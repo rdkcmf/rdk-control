@@ -3707,7 +3707,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
    ctrlm_hal_rf4ce_cfm_data_t        cb_confirm_rf4ce     = NULL;
    void *                            cb_confirm_param     = NULL;
    ctrlm_voice_session_rsp_confirm_t cb_confirm_voice_obj = NULL;
-   LOG_ERROR("%s: %s\n", __FUNCTION__, controller_name.c_str());
+
    session = ctrlm_get_voice_obj()->voice_session_req(network_id_get(),         dqm->controller_id,
                                                           device_type,              voice_format,
                                                           use_stream_params ? &stream_params : NULL,
@@ -3880,7 +3880,20 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_stop(void *data, int s
    g_assert(dqm);
    g_assert(size == sizeof(ctrlm_main_queue_msg_voice_session_stop_t));
 
-   ctrlm_get_voice_obj()->voice_session_end(network_id_get(), dqm->controller_id, dqm->session_end_reason, &dqm->timestamp);
+   // Check adjacent key press
+   if(CTRLM_VOICE_SESSION_END_REASON_OTHER_KEY_PRESSED == dqm->session_end_reason && true == is_key_adjacent(dqm->controller_id, dqm->key_code)) {
+      dqm->session_end_reason = CTRLM_VOICE_SESSION_END_REASON_ADJACENT_KEY_PRESSED;
+      LOG_INFO("%s: Adjacent key press.  Modifying end reason.\n", __FUNCTION__);
+   }
+
+   ctrlm_hal_network_property_network_stats_t network_stats = { 0 };
+
+   property_get(CTRLM_HAL_NETWORK_PROPERTY_NETWORK_STATS, (void **)&network_stats);
+
+   ctrlm_voice_session_end_stats_t stats;
+   stats.rf_channel = network_stats.rf_channel;
+
+   ctrlm_get_voice_obj()->voice_session_end(network_id_get(), dqm->controller_id, dqm->session_end_reason, &dqm->timestamp, &stats);
 }
 
 void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_end(void *data, int size) {
@@ -4597,3 +4610,22 @@ void ctrlm_obj_network_rf4ce_t::power_state_change(ctrlm_main_queue_power_state_
 gboolean ctrlm_obj_network_rf4ce_t::is_voice_session_in_progress() {
    return(voice_session_active_count_ > 0);
 }
+
+bool ctrlm_obj_network_rf4ce_t::is_key_adjacent(ctrlm_controller_id_t controller_id, unsigned long key_code) {
+   bool ret = false;
+   ctrlm_rf4ce_controller_type_t controller_type = controller_type_get(controller_id);
+   if(RF4CE_CONTROLLER_TYPE_INVALID != controller_type) {
+      LOG_INFO("%s: Remote Type <%s> key 0x%08lx\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type), key_code);
+      switch(controller_type) {
+         case RF4CE_CONTROLLER_TYPE_XR11:
+            if(key_code == CTRLM_KEY_CODE_RECORD || key_code == CTRLM_KEY_CODE_EXIT) {
+               ret = true;
+            }
+            break;
+         default:
+            break;
+      }
+   }
+   return ret;
+}
+

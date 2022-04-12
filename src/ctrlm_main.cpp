@@ -5599,24 +5599,6 @@ gboolean ctrlm_message_queue_delay(gpointer data) {
    return(FALSE);
 }
 
-bool ctrlm_is_key_adjacent(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long key_code) {
-   bool ret = false;
-   ctrlm_rcu_controller_type_t controller_type = CTRLM_RCU_CONTROLLER_TYPE_INVALID;
-   if(ctrlm_rcu_controller_type_get(network_id, controller_id, &controller_type)) {
-      LOG_INFO("%s: Remote Type <%d> key 0x%08lx\n", __FUNCTION__, controller_type, key_code);
-      switch(controller_type) {
-         case CTRLM_RCU_CONTROLLER_TYPE_XR11:
-            if(key_code == CTRLM_KEY_CODE_RECORD || key_code == CTRLM_KEY_CODE_EXIT) {
-               ret = true;
-            }
-            break;
-         default:
-            break;
-      }
-   }
-   return ret;
-}
-
 gboolean ctrlm_ntp_check(gpointer user_data) {
    ctrlm_main_queue_msg_header_t *msg = (ctrlm_main_queue_msg_header_t *)malloc(sizeof(ctrlm_main_queue_msg_header_t));
    if(msg) {

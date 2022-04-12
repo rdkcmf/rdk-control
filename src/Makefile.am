@@ -39,7 +39,6 @@ bin_PROGRAMS       = controlMgr
 controlMgr_SOURCES = ctrlm_main.cpp                           \
                      ctrlm_main_iarm.cpp                      \
                      ctrlm_voice.cpp                          \
-                     ctrlm_voice_iarm.cpp                     \
                      ctrlm_utils.cpp                          \
                      ctrlm_network.cpp                        \
                      ctrlm_network_iarm.cpp                   \
