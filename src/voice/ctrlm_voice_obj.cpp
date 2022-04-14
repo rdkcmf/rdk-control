@@ -123,6 +123,8 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->keyword_verified                = false;
     this->is_session_by_text              = false;
     this->transcription_in                = "";
+    this->packet_loss_threshold           = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD;
+    this->vsdk_config                     = NULL;
 
     #ifdef ENABLE_DEEP_SLEEP
     this->prefs.standby_params.connect_check_interval = JSON_INT_VALUE_VOICE_STANDBY_CONNECT_CHECK_INTERVAL;
@@ -181,19 +183,27 @@ ctrlm_voice_t::ctrlm_voice_t() {
     // Set audio mode to default
     ctrlm_voice_audio_settings_t settings = CTRLM_VOICE_AUDIO_SETTINGS_INITIALIZER;
     this->set_audio_mode(&settings);
+
+    // Setup RFC callbacks
+    ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+    if(rfc) {
+        rfc->add_changed_listener(ctrlm_rfc_t::attrs::VOICE, std::bind(&ctrlm_voice_t::voice_rfc_retrieved_handler, this, std::placeholders::_1));
+        rfc->add_changed_listener(ctrlm_rfc_t::attrs::VSDK, std::bind(&ctrlm_voice_t::vsdk_rfc_retrieved_handler, this, std::placeholders::_1));
+    }
 }
 
 ctrlm_voice_t::~ctrlm_voice_t() {
     LOG_INFO("%s: Destructor\n", __FUNCTION__);
 
-    if(this->xrsr_opened) {
-       xrsr_close();
-       this->xrsr_opened = false;
-    }
+    voice_sdk_close();
     if(this->voice_ipc) {
         this->voice_ipc->deregister_ipc();
         delete this->voice_ipc;
         this->voice_ipc = NULL;
+    }
+    if(this->vsdk_config) {
+        json_decref(this->vsdk_config);
+        this->vsdk_config = NULL;
     }
     if(audio_pipe[PIPE_READ] >= 0) {
         close(audio_pipe[PIPE_READ]);
@@ -278,6 +288,13 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    this->state_dst   = CTRLM_VOICE_STATE_DST_READY;
 }
 
+void ctrlm_voice_t::voice_sdk_close() {
+    if(this->xrsr_opened) {
+       xrsr_close();
+       this->xrsr_opened = false;
+    }
+}
+
 bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk, bool local_conf) {
     json_config                       conf;
     ctrlm_voice_iarm_call_settings_t *voice_settings     = NULL;
@@ -317,6 +334,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_STR_NAME_VOICE_OPUS_ENCODER_PARAMS,          this->prefs.opus_encoder_params_str);
         conf.config_value_get(JSON_INT_NAME_VOICE_PAR_VOICE_EOS_METHOD,         this->prefs.par_voice_eos_method);
         conf.config_value_get(JSON_INT_NAME_VOICE_PAR_VOICE_EOS_TIMEOUT,        this->prefs.par_voice_eos_timeout);
+        conf.config_value_get(JSON_INT_NAME_VOICE_PACKET_LOSS_THRESHOLD,        this->packet_loss_threshold, 0);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_MODE,                   audio_settings.mode);
         conf.config_value_get(JSON_INT_NAME_VOICE_AUDIO_TIMING,                 audio_settings.timing);
         conf.config_value_get(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, audio_settings.confidence_threshold, 0.0, 1.0);
@@ -398,8 +416,8 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
 
     // Disable muting/ducking to recover in case ctrlm restarts while muted/ducked.
     this->audio_state_set(false);
-
-    this->voice_sdk_open(json_obj_vsdk);
+    this->vsdk_config = json_incref(json_obj_vsdk);
+    this->voice_sdk_open(this->vsdk_config);
 
     // Update routes
     this->voice_sdk_update_routes();
@@ -2977,6 +2995,10 @@ bool ctrlm_voice_t::is_standby_microphone(void) {
 
 }
 
+int ctrlm_voice_t::packet_loss_threshold_get() const {
+    return(this->packet_loss_threshold);
+}
+
 #ifdef VOICE_BUFFER_STATS
 unsigned long voice_packet_interval_get(ctrlm_voice_format_t format, uint32_t opus_samples_per_packet) {
    if(format == CTRLM_VOICE_FORMAT_ADPCM) {
@@ -3013,4 +3035,83 @@ xrsr_power_mode_t voice_xrsr_power_map(ctrlm_power_state_t ctrlm_power_state) {
    }
 
    return xrsr_power_mode;
+}
+
+void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
+    bool enabled = true;
+
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_VREX_REQUEST_TIMEOUT,         this->prefs.timeout_vrex_connect,0);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_VREX_RESPONSE_TIMEOUT,        this->prefs.timeout_vrex_session,0);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_TIMEOUT_PACKET_INITIAL,       this->prefs.timeout_packet_initial);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_TIMEOUT_PACKET_SUBSEQUENT,    this->prefs.timeout_packet_subsequent);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_BITRATE_MINIMUM,              this->prefs.bitrate_minimum);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_TIME_THRESHOLD,               this->prefs.time_threshold);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_ENABLE_SAT,                  this->sat_token_required);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_SAVE_LAST_UTTERANCE,         this->prefs.utterance_save);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_QTY_MAX,       this->prefs.utterance_file_qty_max, 1);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_SIZE_MAX,      this->prefs.utterance_file_size_max, 4 * 1024);
+    attr.get_rfc_value(JSON_STR_NAME_VOICE_UTTERANCE_PATH,               this->prefs.utterance_path);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_MINIMUM_DURATION,             this->prefs.utterance_duration_min);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_FFV_LEADING_SAMPLES,          this->prefs.ffv_leading_samples, 0);
+    attr.get_rfc_value(JSON_STR_NAME_VOICE_APP_ID_HTTP,                  this->prefs.app_id_http);
+    attr.get_rfc_value(JSON_STR_NAME_VOICE_APP_ID_WS,                    this->prefs.app_id_ws);
+    attr.get_rfc_value(JSON_STR_NAME_VOICE_LANGUAGE,                     this->prefs.guide_language);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_KEYWORD_DETECT_SENSITIVITY,   this->prefs.keyword_sensitivity);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_VREX_TEST_FLAG,              this->prefs.vrex_test_flag);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_FORCE_TOGGLE_FALLBACK,       this->prefs.force_toggle_fallback);
+    attr.get_rfc_value(JSON_STR_NAME_VOICE_OPUS_ENCODER_PARAMS,          this->prefs.opus_encoder_params_str);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_PAR_VOICE_EOS_METHOD,         this->prefs.par_voice_eos_method);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_PAR_VOICE_EOS_TIMEOUT,        this->prefs.par_voice_eos_timeout);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_PACKET_LOSS_THRESHOLD,        this->packet_loss_threshold, 0);
+    if(attr.get_rfc_value(JSON_INT_NAME_VOICE_AUDIO_MODE, this->audio_mode) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_AUDIO_TIMING, this->audio_timing) |
+       attr.get_rfc_value(JSON_FLOAT_NAME_VOICE_AUDIO_CONFIDENCE_THRESHOLD, this->audio_confidence_threshold, 0.0, 1.0) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_AUDIO_DUCKING_TYPE, this->audio_ducking_type, CTRLM_VOICE_AUDIO_DUCKING_TYPE_ABSOLUTE, CTRLM_VOICE_AUDIO_DUCKING_TYPE_RELATIVE) |
+       attr.get_rfc_value(JSON_FLOAT_NAME_VOICE_AUDIO_DUCKING_LEVEL, this->audio_ducking_level, 0.0, 1.0) |
+       attr.get_rfc_value(JSON_BOOL_NAME_VOICE_AUDIO_DUCKING_BEEP, this->audio_ducking_beep_enabled)) {
+        ctrlm_voice_audio_settings_t audio_settings = {this->audio_mode, this->audio_timing, this->audio_confidence_threshold, this->audio_ducking_type, this->audio_ducking_level, this->audio_ducking_beep_enabled};
+        this->set_audio_mode(&audio_settings);
+    }
+
+    #ifdef ENABLE_DEEP_SLEEP
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.standby_params.connect_check_interval);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_CONNECT,        this->prefs.standby_params.timeout_connect);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.standby_params.timeout_inactivity);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_SESSION,        this->prefs.standby_params.timeout_session);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_STANDBY_IPV4_FALLBACK,         this->prefs.standby_params.ipv4_fallback);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_BACKOFF_DELAY,          this->prefs.standby_params.backoff_delay);
+    #endif
+
+    this->voice_params_opus_encoder_validate();
+
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_FORCE_VOICE_SETTINGS,        this->prefs.force_voice_settings);
+    if(attr.get_rfc_value(JSON_BOOL_NAME_VOICE_FORCE_VOICE_SETTINGS, this->prefs.force_voice_settings) && this->prefs.force_voice_settings) {
+        attr.get_rfc_value(JSON_BOOL_NAME_VOICE_ENABLE,                      enabled);
+        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_vrex_src_ptt);
+        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_FF,                   this->prefs.server_url_vrex_src_ff);
+        // Check if enabled
+        if(!enabled) {
+            sem_wait(&this->device_status_semaphore);
+            for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
+                this->voice_device_status_change((ctrlm_voice_device_t)i, CTRLM_VOICE_DEVICE_STATUS_DISABLED);
+            }
+            sem_post(&this->device_status_semaphore);
+        }
+        this->voice_sdk_update_routes();
+    }
+}
+
+void ctrlm_voice_t::vsdk_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
+    json_t *obj_voice = NULL;
+    if(attr.get_rfc_json_value(&obj_voice) && obj_voice) {
+        LOG_INFO("%s: VSDK values from XCONF, reopening xrsr..\n", __FUNCTION__);
+        if(this->vsdk_config) {
+            json_object_update_missing(obj_voice, this->vsdk_config);
+        }
+        // This is temporary until the VSDK supports receiving a config on the fly
+        this->voice_sdk_close();
+        this->voice_sdk_open(obj_voice);
+        this->voice_sdk_update_routes();
+        json_decref(obj_voice);
+    }
 }

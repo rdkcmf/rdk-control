@@ -22,17 +22,37 @@
 #include <iostream>
 #include "rfcapi.h"
 #include "ctrlm_log.h"
+#include "ctrlm_config_default.h"
 
 #define RFC_CALLER_ID "controlMgr"
 
 static ctrlm_rfc_t *_instance = NULL;
 
 ctrlm_rfc_t::ctrlm_rfc_t() {
+    // Create the RFC Attr objects
+    ctrlm_rfc_attr_t *vsdk           = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.vsdk", JSON_OBJ_NAME_VSDK);
+    ctrlm_rfc_attr_t *voice          = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.voice", JSON_OBJ_NAME_VOICE);
+    ctrlm_rfc_attr_t *rf4ce          = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.network_rf4ce", JSON_OBJ_NAME_NETWORK_RF4CE);
+    ctrlm_rfc_attr_t *ble            = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.network_ble", JSON_OBJ_NAME_NETWORK_BLE);
+    ctrlm_rfc_attr_t *ip             = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.network_ip", JSON_OBJ_NAME_NETWORK_IP);
+    ctrlm_rfc_attr_t *global         = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.global", JSON_OBJ_NAME_CTRLM_GLOBAL);
+    ctrlm_rfc_attr_t *device_update  = new ctrlm_rfc_attr_t("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.device_update", JSON_OBJ_NAME_DEVICE_UPDATE);
 
+    this->add_attribute(ctrlm_rfc_t::attrs::VSDK,          vsdk);
+    this->add_attribute(ctrlm_rfc_t::attrs::VOICE,         voice);
+    this->add_attribute(ctrlm_rfc_t::attrs::RF4CE,         rf4ce);
+    this->add_attribute(ctrlm_rfc_t::attrs::BLE,           ble);
+    this->add_attribute(ctrlm_rfc_t::attrs::IP,            ip);
+    this->add_attribute(ctrlm_rfc_t::attrs::GLOBAL,        global);
+    this->add_attribute(ctrlm_rfc_t::attrs::DEVICE_UPDATE, device_update);
 }
 
 ctrlm_rfc_t::~ctrlm_rfc_t() {
-
+    for(auto itr : this->attributes) {
+        if(itr.second) {
+            delete(itr.second);
+        }
+    }
 }
 
 ctrlm_rfc_t *ctrlm_rfc_t::get_instance() {
@@ -49,17 +69,34 @@ void ctrlm_rfc_t::destroy_instance() {
     }
 }
 
-void ctrlm_rfc_t::add_attribute(ctrlm_rfc_attr_t *attr) {
-    if(std::find(std::begin(this->attributes), std::end(this->attributes), attr) == std::end(this->attributes)) {
-        this->attributes.push_back(attr);
+void ctrlm_rfc_t::add_changed_listener(ctrlm_rfc_t::attrs type, ctrlm_rfc_attr_changed_t listener) {
+    if(this->attributes.count(type) > 0) {
+        this->attributes[type]->add_changed_listener(listener);
+    } else {
+        LOG_WARN("%s: RFC attribute doesn't exist to add listener\n", __FUNCTION__);
     }
 }
 
-void ctrlm_rfc_t::remove_attribute(ctrlm_rfc_attr_t *attr) {
-    auto itr = std::find(std::begin(this->attributes), std::end(this->attributes), attr);
-    if(itr != std::end(this->attributes)) {
-        this->attributes.erase(itr);
+void ctrlm_rfc_t::remove_changed_listener(ctrlm_rfc_t::attrs type, ctrlm_rfc_attr_changed_t listener) {
+    if(this->attributes.count(type) > 0) {
+        this->attributes[type]->remove_changed_listener(listener);
+    } else {
+        LOG_WARN("%s: RFC attribute doesn't exist to remove listener\n", __FUNCTION__);
     }
+}
+
+void ctrlm_rfc_t::add_attribute(ctrlm_rfc_t::attrs type, ctrlm_rfc_attr_t *attr) {
+    if(this->attributes.count(type) > 0) {
+        delete(this->attributes[type]);
+    }
+    this->attributes[type] = attr;
+}
+
+void ctrlm_rfc_t::remove_attribute(ctrlm_rfc_t::attrs type) {
+    if(this->attributes.count(type) > 0) {
+        delete(this->attributes[type]);
+    }
+    this->attributes.erase(type);
 }
 
 int ctrlm_rfc_t::fetch_attributes(void *data) {
@@ -68,16 +105,17 @@ int ctrlm_rfc_t::fetch_attributes(void *data) {
     if(rfc) {
         LOG_INFO("%s: fetching RFC attributes\n", __FUNCTION__);
         for(const auto &itr : rfc->attributes) {
-            if(itr->is_enabled()) {
-                LOG_INFO("%s: fetching <%s>\n", __FUNCTION__, itr->get_tr181_string().c_str());
-                std::string value = rfc->tr181_call(itr);
+            ctrlm_rfc_attr_t *attr = itr.second;
+            if(attr->is_enabled()) {
+                LOG_INFO("%s: fetching <%s>\n", __FUNCTION__, attr->get_tr181_string().c_str());
+                std::string value = rfc->tr181_call(attr);
                 if(!value.empty()) {
-                    itr->rfc_value(value);
+                    attr->set_rfc_value(value);
                 } else {
-                    LOG_DEBUG("%s: tr181 value for <%s> is empty\n", __FUNCTION__, itr->get_tr181_string().c_str());
+                    LOG_DEBUG("%s: tr181 value for <%s> is empty\n", __FUNCTION__, attr->get_tr181_string().c_str());
                 }
             } else {
-                LOG_DEBUG("%s: rfc is disabled for <%s>\n", __FUNCTION__, itr->get_tr181_string().c_str());
+                LOG_DEBUG("%s: rfc is disabled for <%s>\n", __FUNCTION__, attr->get_tr181_string().c_str());
             }
         }
     } else {

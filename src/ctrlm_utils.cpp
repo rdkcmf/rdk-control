@@ -2075,3 +2075,61 @@ bool ctrlm_utils_move_file_to_secure_nvm(const char *path) {
    }
    return true;
 }
+
+json_t *ctrlm_utils_json_from_path(json_t *root, std::string path, bool add_ref) {
+    json_t *ret  = root;
+    
+    if(ret != NULL) {
+        if(!path.empty()) {
+            do {
+                size_t delim_pos = path.find(JSON_PATH_SEPERATOR);
+                if(delim_pos != std::string::npos) {
+                    std::string key = path.substr(0, delim_pos);
+                    path = path.substr(delim_pos+1);
+                    ret  = json_object_get(ret, key.c_str());
+                } else {
+                    ret = json_object_get(ret, path.c_str());
+                    break;
+                }
+            } while(ret != NULL);
+        }
+
+        if(ret && add_ref) {
+            json_incref(ret);
+        }
+    }
+    return(ret);
+}
+
+std::string ctrlm_utils_json_string_from_path(json_t *root, std::string path) {
+    std::string ret = "";
+    json_t *obj     = root;
+    
+    if(obj != NULL) {
+        if(!path.empty()) {
+            do {
+                size_t delim_pos = path.find(JSON_PATH_SEPERATOR);
+                if(delim_pos != std::string::npos) {
+                    std::string key = path.substr(0, delim_pos);
+                    path = path.substr(delim_pos+1);
+                    obj  = json_object_get(obj, key.c_str());
+                } else {
+                    obj = json_object_get(obj, path.c_str());
+                    break;
+                }
+            } while(obj != NULL);
+        }
+
+        if(obj) {
+            char *obj_str = json_dumps(obj, JSON_ENCODE_ANY);
+            if(obj_str) {
+                ret = std::string(obj_str);
+                free(obj_str);
+                obj_str = NULL;
+            }
+        }
+    } else {
+        LOG_ERROR("%s: config json object is NULL\n", __FUNCTION__);
+    }
+    return(ret);
+}

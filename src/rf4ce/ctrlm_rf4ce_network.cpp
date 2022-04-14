@@ -44,6 +44,7 @@
 #include "../ctrlm_voice.h"
 #include "../ctrlm_recovery.h"
 #include "../json_config.h"
+#include "ctrlm_config.h"
 #include "../ctrlm_tr181.h"
 #include "../ctrlm_rcu.h"
 #ifdef ASB
@@ -261,12 +262,17 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
    reverse_cmd_end_event_timer_id_ = 0;
    chime_timeout_ = 0;
 
-   response_idle_time_ff_ = CTRLM_RF4CE_CONST_RESPONSE_IDLE_TIME_FF;
+   response_idle_time_ff_ = JSON_INT_VALUE_NETWORK_RF4CE_FF_RSP_IDLE_TIME;
    ir_rf_database_new_    = false;
 #if CTRLM_HAL_RF4CE_API_VERSION >= 15 && !defined(CTRLM_HOST_DECRYPTION_NOT_SUPPORTED)
    ctx_ = NULL;
 #endif
    instance = this;
+
+   ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+   if(rfc) {
+      rfc->add_changed_listener(ctrlm_rfc_t::attrs::RF4CE, std::bind(&ctrlm_obj_network_rf4ce_t::rfc_retrieved_handler, this, std::placeholders::_1));
+   }
 }
 
 #ifndef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
@@ -4629,3 +4635,167 @@ bool ctrlm_obj_network_rf4ce_t::is_key_adjacent(ctrlm_controller_id_t controller
    return ret;
 }
 
+void ctrlm_obj_network_rf4ce_t::rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
+   attr.get_rfc_value(JSON_STR_NAME_NETWORK_RF4CE_USER_STRING,user_string_);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_TIMEOUT_KEY_RELEASE, timeout_key_release_, 0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_SHORT_RF_RETRY_PERIOD,short_rf_retry_period_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_UTTERANCE_DURATION_MAX, utterance_duration_max_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_VOICE_DATA_RETRY_MAX,voice_data_retry_max_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_VOICE_CSMA_BACKOFF_MAX,voice_csma_backoff_max_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_VOICE_DATA_BACKOFF_EXP_MIN,voice_data_backoff_exp_min_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_VOICE_COMMAND_ENCRYPTION,voice_command_encryption_,VOICE_COMMAND_ENCRYPTION_DISABLED,VOICE_COMMAND_ENCRYPTION_DEFAULT);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_RIB_UPDATE_CHECK_INTERVAL,rib_update_check_interval_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_AUTO_CHECK_VALIDATION_PERIOD,auto_check_validation_period_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_LINK_LOST_WAIT_TIME,link_lost_wait_time_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_UPDATE_POLLING_PERIOD,update_polling_period_,0);
+   attr.get_rfc_value(JSON_BOOL_NAME_NETWORK_RF4CE_HOST_DECRYPTION,host_decryption_);
+   attr.get_rfc_value(JSON_BOOL_NAME_NETWORK_RF4CE_SINGLE_CHANNEL_RSP,single_channel_rsp_);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_FF_RSP_IDLE_TIME,response_idle_time_ff_,0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_DATA_REQUEST_WAIT_TIME,data_request_wait_time_, 0);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_AUDIO_PROFILES_TARGET,audio_profiles_targ_,0,7);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_CLASS_INC_LINE_OF_SIGHT,class_inc_line_of_sight_,0,15);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_CLASS_INC_RECENTLY_BOOTED,class_inc_recently_booted_,0,15);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_CLASS_INC_BINDING_BUTTON,class_inc_binding_button_,0,15);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_CLASS_INC_XR,class_inc_xr_,0,15);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_CLASS_INC_BIND_TABLE_EMPTY,class_inc_bind_table_empty_,0,15);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_BINDING_STATE_TIMEOUT, binding_in_progress_timeout_, 0);
+
+   // Discovery Config
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DISCOVERY_CONFIG JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_DISCOVERY_CONFIG_ENABLE,discovery_config_normal_.enabled);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DISCOVERY_CONFIG JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_DISCOVERY_CONFIG_REQUIRE_LINE_OF_SIGHT,discovery_config_normal_.require_line_of_sight);
+   // End Discovery Config
+
+   // Autobind Config
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_AUTOBIND_CONFIG JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_AUTOBIND_CONFIG_ENABLE,autobind_config_normal_.enabled);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_AUTOBIND_CONFIG JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS,autobind_config_normal_.threshold_pass,1,7);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_AUTOBIND_CONFIG JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_FAIL,autobind_config_normal_.threshold_fail,1,7);
+   autobind_config_normal_.octet = ((autobind_config_normal_.threshold_fail << 3) | autobind_config_normal_.threshold_pass);
+   // End Autobind Config
+
+   // Binding Menu Discovery Config
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_DISCOVERY_CONFIG JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_DISCOVERY_CONFIG_ENABLE,discovery_config_menu_.enabled);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_DISCOVERY_CONFIG JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_DISCOVERY_CONFIG_REQUIRE_LINE_OF_SIGHT,discovery_config_menu_.require_line_of_sight,0,1);
+   // End Binding Menu Discovery Config
+
+   // Binding Menu Autobind Config
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG_ENABLE,autobind_config_menu_.enabled);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG_QTY_PASS,autobind_config_menu_.threshold_pass,1,7);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_BINDING_MENU_MODE_AUTOBIND_CONFIG_QTY_FAIL,autobind_config_menu_.threshold_fail,1,7);
+   autobind_config_menu_.octet = ((autobind_config_menu_.threshold_fail << 3) | autobind_config_menu_.threshold_pass);
+   // End Binding Menu Autobind Config
+
+   // Pairing Blackout
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT_ENABLE,blackout_.is_blackout_enabled);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT_PAIRING_FAIL_THRESHOLD,blackout_.pairing_fail_threshold,1);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT_BLACKOUT_REBOOT_THRESHOLD,blackout_.blackout_reboot_threshold,1);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT_BLACKOUT_TIME,blackout_.blackout_time,1);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_PAIRING_BLACKOUT_FORCE_BLACKOUT_SETTINGS,blackout_.force_blackout_settings);
+   // End Pairing Blackout
+
+   // MFG Test
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_MFG_TEST_ENABLE, mfg_test_.enabled);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_MIC_DELAY, mfg_test_.mic_delay);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_MIC_DURATION, mfg_test_.mic_duration);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_SWEEP_DELAY, mfg_test_.sweep_delay);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_HAPTIC_DELAY, mfg_test_.haptic_delay);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_HAPTIC_DURATION, mfg_test_.haptic_duration);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_MFG_TEST JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_MFG_TEST_RESET_DELAY, mfg_test_.reset_delay);
+   // End MFG Test
+
+   // DPI
+#if (CTRLM_HAL_RF4CE_API_VERSION >= 11)
+      int dpi_pattern_list = 0;
+      if(attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_DPI_PATTERN, dpi_pattern_list, 0)) {
+         switch(dpi_pattern_list) {
+            case 1:  dpi_args_ = &dpi_args_new;   break;
+            case 2:  dpi_args_ = &dpi_args_test;  break;
+            default: dpi_args_ = &dpi_args_field; break;
+         }
+      }
+#endif
+   // End DPI
+
+   // Polling
+   #ifdef MAC_POLLING
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_TARGET JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_TARGET_METHODS, polling_methods_);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_TARGET JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_TARGET_FMR_CONTROLLERS_MAX, max_fmr_controllers_);
+   #endif
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_HB_GENERIC_CONFIG JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_HB_GENERIC_CONFIG_UPTIME_MULTIPLIER, controller_generic_polling_configuration_.uptime_multiplier);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_HB_GENERIC_CONFIG JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_HB_GENERIC_CONFIG_HB_TIME_TO_SAVE, controller_generic_polling_configuration_.hb_time_to_save);
+
+   // Default Polling
+   guint8 default_polling_methods = 0;
+   ctrlm_rf4ce_polling_configuration_t default_polling_config_hb = {0};
+   bool has_default_hb = false;
+   ctrlm_rf4ce_polling_configuration_t default_polling_config_mac;
+   default_polling_config_mac.trigger = POLLING_TRIGGER_FLAG_TIME;
+   bool has_default_mac = false;
+
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_METHODS, default_polling_methods);
+   if(attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT_TRIGGER,       default_polling_config_hb.trigger)     |
+      attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT_KP_COUNTER,    default_polling_config_hb.kp_counter)  |
+      attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT_TIME_INTERVAL, default_polling_config_hb.time_interval)) {
+      has_default_hb = true;
+   }
+   if(attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT JSON_PATH_SEPERATOR JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_MAC JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_MAC_TIME_INTERVAL, default_polling_config_mac.time_interval)) {
+      has_default_mac = true;
+   }
+   // End Default Polling
+
+   // Controller Specific Polling
+   for(int i = 0; i < RF4CE_CONTROLLER_TYPE_INVALID; i++) {
+      const char *controller_json_str  = ctrlm_rf4ce_controller_polling_configuration_str((ctrlm_rf4ce_controller_type_t)i);
+      if(has_default_hb) {
+         controller_polling_methods_[i]                 = default_polling_methods;
+         controller_polling_configuration_heartbeat_[i] = default_polling_config_hb;
+      }
+      if(has_default_mac) {
+         controller_polling_configuration_mac_[i]       = default_polling_config_mac;
+      }
+      if(controller_json_str) {
+         std::string temp = std::string(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING JSON_PATH_SEPERATOR) + std::string(controller_json_str) + std::string(JSON_PATH_SEPERATOR);
+         attr.get_rfc_value(temp + std::string(JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_METHODS), controller_polling_methods_[i]);
+         attr.get_rfc_value(temp + std::string(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT_TRIGGER),       controller_polling_configuration_heartbeat_[i].trigger);
+         attr.get_rfc_value(temp + std::string(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT_KP_COUNTER),    controller_polling_configuration_heartbeat_[i].kp_counter);
+         attr.get_rfc_value(temp + std::string(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_HEARTBEAT_TIME_INTERVAL), controller_polling_configuration_heartbeat_[i].time_interval);
+         attr.get_rfc_value(temp + std::string(JSON_OBJ_NAME_NETWORK_RF4CE_POLLING_DEFAULT_MAC JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_POLLING_DEFAULT_MAC_TIME_INTERVAL), controller_polling_configuration_mac_[i].time_interval);
+      }
+   }
+   // End Controller Specific Polling
+
+   // ASB
+#ifdef ASB
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_ASB JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_ASB_ENABLE, asb_enabled_);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_ASB JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_ASB_DERIVATION_METHODS, asb_key_derivation_methods_, 0x01, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_ASB JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_ASB_FALLBACK_THRESHOLD, asb_fallback_count_threshold_, 0x01, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_ASB JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_ASB_FORCE_SETTINGS, asb_force_settings_);
+#endif
+   // End ASB
+
+   // Voice
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_VOICE JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_VOICE_STREAM_BEGIN, stream_begin_, 0);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_VOICE JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_VOICE_STREAM_OFFSET, stream_offset_);
+   // End Voice
+
+   // Device Update
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DEVICE_UPDATE JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DEVICE_UPDATE_SESSION_TIMEOUT, device_update_session_timeout_, 0);
+   // End Device Update
+
+   // DSP
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_DSP_FORCE_SETTINGS, force_dsp_configuration_);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_FLAGS, dsp_configuration_.flags, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_VAD_THRESHOLD, dsp_configuration_.vad_threshold, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_NO_VAD_THRESHOLD, dsp_configuration_.no_vad_threshold, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_VAD_HANG_TIME, dsp_configuration_.vad_hang_time, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_INITIAL_EOS_TIMEOUT, dsp_configuration_.initial_eos_timeout, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_EOS_TIMEOUT, dsp_configuration_.eos_timeout, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_INITIAL_SPEECH_DELAY, dsp_configuration_.initial_speech_delay, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_PRIMARY_KEYWORD_SENSITIVITY, dsp_configuration_.primary_keyword_sensitivity, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_SECONDARY_KEYWORD_SENSITIVITY, dsp_configuration_.secondary_keyword_sensitivity, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_BEAMFORMER_TYPE, dsp_configuration_.beamformer_type, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_NOISE_REDUCTION_AGGRESSIVENESS, dsp_configuration_.noise_reduction_aggressiveness, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_DYNAMIC_GAIN_TARGET_LEVEL, dsp_configuration_.dynamic_gain_target_level);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_ATTEN_UPDATE, dsp_configuration_.ic_config_atten_update, 0x00, 0xFF);
+   attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_DETECT, dsp_configuration_.ic_config_detect, 0x00, 0xFF);
+   // End DSP
+}

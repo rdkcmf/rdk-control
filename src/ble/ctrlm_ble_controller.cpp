@@ -558,7 +558,8 @@ void ctrlm_obj_controller_ble_t::last_key_time_update() {
 
 // EGTODO: move to base controller class
 void ctrlm_obj_controller_ble_t::update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost) {
-   int32_t packet_loss_threshold = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD; //TODO Allow overrides from config file
+   ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+   int32_t packet_loss_threshold = (voice_obj ? voice_obj->packet_loss_threshold_get() : JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD); //TODO Allow overrides from config file
    ctrlm_voice_util_stats_t voice_util_metrics;
    handle_day_change();
    voice_packets_sent_today_       += voice_packets_sent;

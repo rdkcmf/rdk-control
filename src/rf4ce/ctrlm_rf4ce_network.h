@@ -35,6 +35,7 @@
 #include "ctrlm_device_update.h"
 #include "json_config.h"
 #include "ctrlm_rf4ce_ir_rf_db.h"
+#include "ctrlm_rfc.h"
 
 #define CTRLM_RF4CE_AUTOBIND_OCTET       ((JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_FAIL << 3) | JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS)
 #define CTRLM_RF4CE_AUTOBIND_OCTET_RESET (0x40 | (JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_FAIL << 3) | JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS)
@@ -163,12 +164,12 @@ typedef struct {
 } ctrlm_main_queue_msg_voice_session_response_confirm_t;
 
 typedef struct {
-   gboolean enabled;
-   gboolean require_line_of_sight;
+   bool enabled;
+   bool require_line_of_sight;
 } ctrlm_rf4ce_discovery_config_t;
 
 typedef struct {
-   gboolean enabled;
+   bool     enabled;
    guchar   threshold_pass;
    guchar   threshold_fail;
    guchar   octet;
@@ -203,7 +204,7 @@ typedef struct {
 typedef std::vector<ctrlm_bind_validation_timeout_t*> ctrlm_bind_validation_failed_timeout_t;
 
 typedef struct {
-   gboolean                           is_blackout_enabled;
+   bool                               is_blackout_enabled;
    guint                              pairing_fail_threshold;
    guint                              pairing_fail_count;
    guint                              blackout_reboot_threshold;
@@ -211,12 +212,12 @@ typedef struct {
    guint                              blackout_time;
    guint                              blackout_time_increment;
    guint                              blackout_tag;
-   gboolean                           is_blackout;
-   gboolean                           force_blackout_settings;
+   bool                               is_blackout;
+   bool                               force_blackout_settings;
 } ctrlm_rf4ce_pairing_blackout_t;
 
 typedef struct {
-   gboolean enabled;
+   bool     enabled;
    guint16  mic_delay;
    guint16  mic_duration;
    guint16  sweep_delay;
@@ -316,6 +317,8 @@ public:
    bool                                 analyze_assert_reason(const char *assert_info);
 
    void                                 power_state_change(ctrlm_main_queue_power_state_change_t *dqm);
+
+   void                                 rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
 
 //   void                                 req_process_voice_settings_update(ctrlm_main_queue_msg_voice_settings_update_t *dqm);
    void req_process_rib_set(void *data, int size);
@@ -478,7 +481,7 @@ private:
    bool                               single_channel_rsp_;
    #endif
    guint16                            audio_profiles_targ_;
-   gboolean                           is_import_;
+   bool                               is_import_;
    ctrlm_controller_id_t              controller_id_to_remove_;
    ctrlm_recovery_type_t              recovery_;
    guchar                            *nvm_backup_data_;
@@ -517,12 +520,12 @@ private:
 
 #ifdef ASB
    // ASB Variables
-   gboolean                                asb_enabled_;
+   bool                                    asb_enabled_;
    asb_key_derivation_bitmask_t            asb_key_derivation_methods_;
    gint                                    asb_fallback_count_;
    gint                                    asb_fallback_count_threshold_;
    discovery_deadlines_t                   asb_discovery_deadlines_;
-   gboolean                                asb_force_settings_;
+   bool                                    asb_force_settings_;
    // End ASB Variables
 #endif
 

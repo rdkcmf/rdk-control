@@ -32,6 +32,7 @@
 #include "rf4ce/ctrlm_rf4ce_network.h"
 #include "ctrlm_database.h"
 #include "ctrlm_device_update.h"
+#include "ctrlm_rfc.h"
 
 using namespace std;
 
@@ -218,6 +219,7 @@ static void     ctrlm_device_update_process_device_file(string file_path_archive
 static gboolean ctrlm_device_update_image_info_get(string filename, ctrlm_device_update_rf4ce_image_info_t *image_info);
 static gboolean ctrlm_device_update_rf4ce_is_software_version_not_equal(version_software_t current, version_software_t proposed);
 static void     ctrlm_device_update_device_get_from_session(ctrlm_device_update_rf4ce_session_t *session, ctrlm_device_update_device_t *device);
+static void     ctrlm_device_update_rfc_values_retrieved(const ctrlm_rfc_attr_t& attr);
 
 static void     ctrlm_device_update_tmp_dir_make();
 static void     ctrlm_device_update_tmp_dir_remove();
@@ -305,6 +307,12 @@ void ctrlm_device_update_init(json_t *json_obj_device_update) {
    g_ctrlm_device_update.running = true;
 
    ctrlm_device_update_init_iarm();
+
+   // set up rfc handler
+   ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+   if(rfc) {
+      rfc->add_changed_listener(ctrlm_rfc_t::attrs::DEVICE_UPDATE, &ctrlm_device_update_rfc_values_retrieved);
+   }
 
 }
 
@@ -614,6 +622,63 @@ gboolean ctrlm_device_update_load_config(json_t *json_obj_device_update) {
    }
 
    return true;
+}
+
+#define NONINTERACTIVE_DOWNLOAD_PATH JSON_OBJ_NAME_DEVICE_UPDATE_NON_INTERACTIVE JSON_PATH_SEPERATOR JSON_OBJ_NAME_DEVICE_UPDATE_NON_INTERACTIVE_DOWNLOAD JSON_PATH_SEPERATOR
+#define NONINTERACTIVE_LOAD_PATH JSON_OBJ_NAME_DEVICE_UPDATE_NON_INTERACTIVE JSON_PATH_SEPERATOR JSON_OBJ_NAME_DEVICE_UPDATE_NON_INTERACTIVE_LOAD JSON_PATH_SEPERATOR
+void ctrlm_device_update_rfc_values_retrieved(const ctrlm_rfc_attr_t& attr) {
+   if(attr.get_rfc_value(JSON_STR_NAME_DEVICE_UPDATE_DIR_ROOT, g_ctrlm_device_update.prefs.server_update_path) ||
+      attr.get_rfc_value(JSON_INT_NAME_DEVICE_UPDATE_CHECK_LOCATIONS, g_ctrlm_device_update.prefs.update_locations_valid)) {
+         if(g_ctrlm_device_update.prefs.update_locations_valid == DEVICE_UPDATE_CHECK_FILESYSTEM ||
+            g_ctrlm_device_update.prefs.update_locations_valid == DEVICE_UPDATE_CHECK_BOTH) {
+               // TODO check location
+         }
+   }
+   attr.get_rfc_value(JSON_STR_NAME_DEVICE_UPDATE_DIR_TEMP, g_ctrlm_device_update.prefs.temp_file_path);
+   if(attr.get_rfc_value(JSON_STR_NAME_DEVICE_UPDATE_XCONF_JSON_FILE_PATH, g_ctrlm_device_update.prefs.xconf_json_file_path)) {
+      // TODO export file again
+   }
+   attr.get_rfc_value(JSON_INT_NAME_DEVICE_UPDATE_CHECK_POLL_TIME_IMAGE, g_ctrlm_device_update.prefs.check_poll_time_image, 1, 24*60*60);
+   attr.get_rfc_value(JSON_INT_NAME_DEVICE_UPDATE_CHECK_POLL_TIME_DOWNLOAD, g_ctrlm_device_update.prefs.check_poll_time_download, 1, 30*60);
+   attr.get_rfc_value(JSON_INT_NAME_DEVICE_UPDATE_CHECK_POLL_TIME_LOAD, g_ctrlm_device_update.prefs.check_poll_time_load, 1, 30*60);
+   attr.get_rfc_value(JSON_BOOL_NAME_DEVICE_UPDATE_INTERACTIVE_DOWNLOAD, g_ctrlm_device_update.prefs.download.interactive);
+   attr.get_rfc_value(JSON_BOOL_NAME_DEVICE_UPDATE_INTERACTIVE_LOAD, g_ctrlm_device_update.prefs.load.interactive);
+   attr.get_rfc_value(JSON_INT_NAME_NETWORK_RF4CE_DATA_REQUEST_TIMEOUT, g_ctrlm_device_update.prefs.download.request_timeout, 0);
+
+
+   attr.get_rfc_value(NONINTERACTIVE_DOWNLOAD_PATH JSON_BOOL_NAME_DEVICE_UPDATE_NON_INTERACTIVE_DOWNLOAD_BACKGROUND_DOWNLOAD, g_ctrlm_device_update.prefs.download.background);
+   attr.get_rfc_value(NONINTERACTIVE_DOWNLOAD_PATH JSON_BOOL_NAME_DEVICE_UPDATE_NON_INTERACTIVE_DOWNLOAD_LOAD_IMMEDIATELY, g_ctrlm_device_update.prefs.download.load_immediately);
+   attr.get_rfc_value(NONINTERACTIVE_DOWNLOAD_PATH JSON_INT_NAME_DEVICE_UPDATE_NON_INTERACTIVE_DOWNLOAD_PERCENT_INCREMENT, g_ctrlm_device_update.prefs.download.percent_increment, 1, 50);
+   attr.get_rfc_value(NONINTERACTIVE_DOWNLOAD_PATH JSON_BOOL_NAME_DEVICE_UPDATE_NON_INTERACTIVE_DOWNLOAD_BACKGROUND_DOWNLOAD, g_ctrlm_device_update.prefs.download.background);
+
+   attr.get_rfc_value(NONINTERACTIVE_LOAD_PATH JSON_INT_NAME_DEVICE_UPDATE_NON_INTERACTIVE_LOAD_TIME_AFTER_INACTIVE, g_ctrlm_device_update.prefs.load.time_after_inactive, 0);
+   attr.get_rfc_value(NONINTERACTIVE_LOAD_PATH JSON_INT_NAME_DEVICE_UPDATE_NON_INTERACTIVE_LOAD_LOAD_BEFORE_HOUR, g_ctrlm_device_update.prefs.load.before_hour, 2, 23);
+
+   attr.get_rfc_value(JSON_ARRAY_NAME_DEVICE_UPDATE_DEVICE_UPDATE_DIRS, g_ctrlm_device_update.prefs.update_dirs);
+
+
+   //    json_obj = json_object_get(json_obj_device_update, JSON_ARRAY_NAME_DEVICE_UPDATE_DEVICE_UPDATE_DIRS);
+   //    text     = "Device Update Dirs";
+   //    if(json_obj == NULL || !json_is_array(json_obj)) {
+   //       LOG_ERROR("%s: %-28s - ABSENT!\n", __FUNCTION__, text);
+   //    } else {
+   //       size_t  index;
+   //       size_t array_size = json_array_size(json_obj);
+   //       if(array_size > 0) {
+   //          g_ctrlm_device_update.prefs.update_dirs.clear();
+   //       }
+
+   //       for(index = 0; index < array_size; index++) {
+   //          json_t *dir_name = json_array_get(json_obj, index);
+   //          if(dir_name == NULL || !json_is_string(dir_name)) {
+   //             LOG_WARN("%s: Ignoring invalid directory entry!\n", __FUNCTION__);
+   //          } else {
+   //             g_ctrlm_device_update.prefs.update_dirs.push_back(json_string_value(dir_name));
+   //             LOG_INFO("%s: %-28s - PRESENT <%s>\n", __FUNCTION__, text, json_string_value(dir_name));
+   //          }
+   //       }
+   //    }
+   // }
 }
 
 void ctrlm_device_update_process_dirs(void) {

@@ -18,7 +18,7 @@
 */
 #ifndef __CTRLM_RFC_H__
 #define __CTRLM_RFC_H__
-#include <vector>
+#include <map>
 #include "ctrlm_rfc_attr.h"
 
 /**
@@ -27,6 +27,16 @@
  * This class is a singleton that manages all RFC interactions
  */
 class ctrlm_rfc_t {
+public:
+    enum attrs {
+        VSDK,
+        VOICE,
+        RF4CE,
+        BLE,
+        IP,
+        GLOBAL,
+        DEVICE_UPDATE
+    };
 public:
     /**
      * This function is used to get the ControlMgr RFC instance, as it is a Singleton.
@@ -44,22 +54,37 @@ public:
 
 public:
     /**
-     * This function is used to add an Attribute to the RFC component
-     * @param attr The attribute to be added 
-     */
-    void add_attribute(ctrlm_rfc_attr_t *attr);
-    /**
-     * This function is used to remove an Attribute from the RFC component
-     * @param attr The attribute to be removed 
-     */
-    void remove_attribute(ctrlm_rfc_attr_t *attr);
-
-public:
-    /**
      * This static function is used by Glib to call this component on the gmain thread
      * @param data This is a pointer to the RFC object
      */
     static int fetch_attributes(void *data);
+
+public:
+    /**
+     * Adds the callback that is called when an RFC attribute value has changed
+     * @param type The RFC attribute type
+     * @param listener The callback
+     */
+    void add_changed_listener(ctrlm_rfc_t::attrs type, ctrlm_rfc_attr_changed_t listener);
+    /**
+     * Removes the callback that is called when an RFC attribute value has changed
+     * @param type The RFC attribute type
+     * @param listener The callback
+     * @param user_data Application data that the developer wants to pass to the callback
+     */
+    void remove_changed_listener(ctrlm_rfc_t::attrs type, ctrlm_rfc_attr_changed_t listener);
+
+protected:
+    /**
+     * This function is used to add an Attribute to the RFC component
+     * @param attr The attribute to be added 
+     */
+    void add_attribute(attrs type, ctrlm_rfc_attr_t *attr);
+    /**
+     * This function is used to remove an Attribute from the RFC component
+     * @param attr The attribute to be removed 
+     */
+    void remove_attribute(attrs type);
 
 private:
     /**
@@ -75,7 +100,7 @@ private:
     std::string tr181_call(ctrlm_rfc_attr_t *attr);
 
 private:
-    std::vector<ctrlm_rfc_attr_t *> attributes;
+    std::map<attrs, ctrlm_rfc_attr_t *> attributes;
 };
 
 #endif

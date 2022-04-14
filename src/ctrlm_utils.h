@@ -21,6 +21,8 @@
 
 #include <semaphore.h>
 #include <string>
+#include <ctrlm.h>
+#include <glib.h>
 #include <zlib.h>
 #include "ctrlm_ipc.h"
 #include "ctrlm_ipc_rcu.h"
@@ -31,6 +33,7 @@
 #include "ctrlm_hal_rf4ce.h"
 #include "libIBus.h"
 #include "libIBusDaemon.h"
+#include <jansson.h>
 #ifdef ENABLE_DEEP_SLEEP
 #include "deepSleepMgr.h"
 #endif
@@ -182,6 +185,9 @@ ctrlm_power_state_t ctrlm_iarm_power_state_map(IARM_Bus_PowerState_t iarm_power_
 
 bool ctrlm_utils_calc_crc32( const char *filename, uLong *crc_ret );
 bool ctrlm_utils_move_file_to_secure_nvm(const char *path);
+
+json_t *ctrlm_utils_json_from_path(json_t *root, std::string path, bool add_ref);
+std::string ctrlm_utils_json_string_from_path(json_t *root, std::string path);
 
 #ifdef __cplusplus
 }

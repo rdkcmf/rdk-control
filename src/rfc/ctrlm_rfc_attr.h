@@ -19,12 +19,16 @@
 #ifndef __CTRLM_RFC_ATTR_H__
 #define __CTRLM_RFC_ATTR_H__
 #include <string>
+#include <vector>
+#include <functional>
+#include <jansson.h>
+#include <climits>
 
 class ctrlm_rfc_attr_t;
 /**
  * This is the callback type that will be called when an RFC attribute value has changed
  */
-typedef void(*ctrlm_rfc_attr_changed_t)(ctrlm_rfc_attr_t *attr, void *data);
+typedef std::function<void(const ctrlm_rfc_attr_t&)> ctrlm_rfc_attr_changed_t;
 
 /**
  * @brief ControlMgr RFC Attribute
@@ -38,7 +42,7 @@ public:
      * @param tr181_string The TR181 string associated with the attribute
      * @param enabled An optional parameter to enable/disable RFC for this attribute (mostly for Development)
      */
-    ctrlm_rfc_attr_t(std::string tr181_string, bool enabled = true);
+    ctrlm_rfc_attr_t(std::string tr181_string, std::string config_key, bool enabled = true);
     /**
      * ControlMgr RFC Attribute Destructor
      */
@@ -61,19 +65,48 @@ public:
      */
     void        set_enabled(bool enabled);
     /**
-     * Set the callback that is called when the attributes value has changed
+     * Adds the callback that is called when the attributes value has changed
+     * @param listener The callback
+     */
+    void        add_changed_listener(ctrlm_rfc_attr_changed_t listener);
+    /**
+     * Removes the callback that is called when the attributes value has changed
      * @param listener The callback
      * @param user_data Application data that the developer wants to pass to the callback
      */
-    void        set_changed_listener(ctrlm_rfc_attr_changed_t listener, void *user_data);
+    void        remove_changed_listener(ctrlm_rfc_attr_changed_t listener);
 
 public:
     /**
-     * Interface function that the attribute will implement to convert the RFC
-     * string value to it's internal data structure
+     * Function that sets the value recieved from XCONF
      * @param value The string received from RFC
      */
-    virtual void rfc_value(std::string value) = 0;
+    void set_rfc_value(std::string value);
+    /**
+     * Function used to retrieve JSON object for the attribute
+     * 
+     * @param val The pointer which will be set to the JSON object. This adds a reference to the JSON object, must call json_decref after use.
+     * @return True if val is pointing to the JSON object, False otherwise.
+     */
+    bool get_rfc_json_value(json_t **val) const;
+    /**
+     * Function used to retrieve the decoded value for this atttribute
+     * @param path The path to the JSON object
+     * @return JSON object or NULL if value doesn't exist.
+     */
+    bool get_rfc_value(std::string path, bool &val) const;
+    bool get_rfc_value(std::string path, std::string &val) const;
+    bool get_rfc_value(std::string path, std::vector<std::string> &val) const;
+    bool get_rfc_value(std::string path, int &val, int min = INT_MIN, int max = INT_MAX) const;
+    template <typename T>
+    bool get_rfc_value(std::string path, T &val, int min = INT_MIN, int max = INT_MAX) const {
+         int value = 0;
+         if(get_rfc_value(path,value,min,max)) {
+            val = (T)value;
+            return true;
+         }
+         return false;
+    }
 
 protected:
     /**
@@ -81,12 +114,20 @@ protected:
      * has occured, which will trigger the user callback
      */
     void notify_changed();
+    /**
+     * This function checks whether a specific path is defined in the config file
+     * @param path The path of the config object
+     * @return True if the object is defined in the config file, else False.
+     */
+    bool check_config_file(std::string path) const;
 
 private:
     std::string tr181_string;
+    std::string config_key;
+    std::string value;
+    json_t *value_json;
     bool enabled;
-    ctrlm_rfc_attr_changed_t listener;
-    void *user_data;
+    std::vector<ctrlm_rfc_attr_changed_t> listeners;
 };
 
 #endif

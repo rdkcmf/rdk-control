@@ -23,8 +23,7 @@
 #include <errno.h>
 #include <string.h>
 #include "ctrlm_log.h"
-
-#define JSON_PATH_SEPERATOR "."
+#include "ctrlm_utils.h"
 
 static ctrlm_config_t *_instance = NULL;
 
@@ -79,64 +78,16 @@ bool ctrlm_config_t::load_config(std::string file_path) {
     return(ret);
 }
 
-json_t *ctrlm_config_t::json_from_path(std::string path, bool add_ref) {
-    json_t *ret  = this->root;
-    
-    if(ret != NULL) {
-        if(!path.empty()) {
-            do {
-                size_t delim_pos = path.find(JSON_PATH_SEPERATOR);
-                if(delim_pos != std::string::npos) {
-                    std::string key = path.substr(0, delim_pos);
-                    path = path.substr(delim_pos+1);
-                    ret  = json_object_get(ret, key.c_str());
-                } else {
-                    ret = json_object_get(ret, path.c_str());
-                    break;
-                }
-            } while(ret != NULL);
-        }
+bool ctrlm_config_t::path_exists(std::string path) {
+    return(ctrlm_utils_json_from_path(this->root, path, false) != NULL ? true : false);
+}
 
-        if(ret && add_ref) {
-            json_incref(ret);
-        }
-    } else {
-        LOG_ERROR("%s: config json object is NULL\n", __FUNCTION__);
-    }
-    return(ret);
+json_t *ctrlm_config_t::json_from_path(std::string path, bool add_ref) {
+    return(ctrlm_utils_json_from_path(this->root, path, add_ref));
 }
 
 std::string ctrlm_config_t::string_from_path(std::string path) {
-    std::string ret = "";
-    json_t *obj     = this->root;
-    
-    if(obj != NULL) {
-        if(!path.empty()) {
-            do {
-                size_t delim_pos = path.find(JSON_PATH_SEPERATOR);
-                if(delim_pos != std::string::npos) {
-                    std::string key = path.substr(0, delim_pos);
-                    path = path.substr(delim_pos+1);
-                    obj  = json_object_get(obj, key.c_str());
-                } else {
-                    obj = json_object_get(obj, path.c_str());
-                    break;
-                }
-            } while(obj != NULL);
-        }
-
-        if(obj) {
-            char *obj_str = json_dumps(obj, JSON_ENCODE_ANY);
-            if(obj_str) {
-                ret = std::string(obj_str);
-                free(obj_str);
-                obj_str = NULL;
-            }
-        }
-    } else {
-        LOG_ERROR("%s: config json object is NULL\n", __FUNCTION__);
-    }
-    return(ret);
+    return(ctrlm_utils_json_string_from_path(this->root, path));
 }
 
 std::string file_to_string(std::string file_path) {

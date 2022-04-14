@@ -611,7 +611,11 @@ ctrlm_db_attr_t(net, id)
     this->voice_packets_lost_yesterday                         = 0;
     this->utterances_exceeding_packet_loss_threshold_today     = 0;
     this->utterances_exceeding_packet_loss_threshold_yesterday = 0;
-    this->packet_loss_threshold                                = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD;//TODO
+    this->packet_loss_threshold                                = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD;
+    ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+    if(rfc) {
+        rfc->add_changed_listener(ctrlm_rfc_t::attrs::VOICE, std::bind(&ctrlm_rf4ce_voice_metrics_t::rfc_retrieved_handler, this, std::placeholders::_1));
+    }
 }
 
 ctrlm_rf4ce_voice_metrics_t::~ctrlm_rf4ce_voice_metrics_t() {
@@ -762,6 +766,10 @@ bool ctrlm_rf4ce_voice_metrics_t::read_config() {
         LOG_INFO("%s: Packet Loss Threshold default: %d%%\n", __FUNCTION__, this->packet_loss_threshold);
     }
     return(ret);
+}
+
+void ctrlm_rf4ce_voice_metrics_t::rfc_retrieved_handler(const ctrlm_rfc_attr_t &attr) {
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_PACKET_LOSS_THRESHOLD, this->packet_loss_threshold, 0);
 }
 
 bool ctrlm_rf4ce_voice_metrics_t::read_db(ctrlm_db_ctx_t ctx) {

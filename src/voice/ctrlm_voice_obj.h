@@ -32,6 +32,7 @@
 #include "xr_timestamp.h"
 #include "ctrlm_voice_types.h"
 #include "ctrlm_voice_ipc.h"
+#include "ctrlm_rfc.h"
 #include "xrsr.h"
 
 #ifdef BEEP_ON_KWD_ENABLED
@@ -412,10 +413,14 @@ class ctrlm_voice_t {
     void                                  voice_params_par_get(voice_params_par_t *params);
     virtual void                          process_xconf(json_t **json_obj_vsdk, bool local_conf);
     virtual void                          query_strings_updated();
+    int                          packet_loss_threshold_get() const;
 
     bool                                  voice_device_streaming(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
     void                                  voice_controller_command_status_read(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
     void                                  voice_status_set();
+
+    void                                  voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
+    void                                  vsdk_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
 
     // Helper semaphores for synchronization
     sem_t                    vsr_semaphore;
@@ -475,6 +480,7 @@ public:
 
     protected:
     virtual void          voice_sdk_open(json_t *json_obj_vsdk);
+    virtual void          voice_sdk_close();
     virtual void          voice_sdk_update_routes() = 0;
     virtual bool          voice_session_has_stb_data();
     unsigned long         voice_session_id_next();
@@ -583,6 +589,7 @@ public:
 
     bool                     is_session_by_text;
     std::string              transcription_in;
+    json_t                   *vsdk_config;
 
     ctrlm_voice_session_timing_t session_timing;
 
@@ -605,6 +612,7 @@ public:
     // End Timeout tags
 
     ctrlm_voice_session_end_reason_t end_reason;
+    int packet_loss_threshold;
 
    bool                 is_voice_assistant(ctrlm_voice_device_t device);
    bool                 controller_supports_qos(void);

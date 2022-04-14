@@ -237,8 +237,8 @@ typedef struct {
    guint                              one_touch_autobind_timeout_val;
    guint                              one_touch_autobind_timeout_tag;
    ctrlm_pairing_window               pairing_window;
-   gboolean                           mask_key_codes_json;
-   gboolean                           mask_key_codes_iarm;
+   bool                               mask_key_codes_json;
+   bool                               mask_key_codes_iarm;
    guint                              crash_recovery_threshold;
    gboolean                           successful_init;
    ctrlm_ir_remote_usage              ir_remote_usage_today;
@@ -342,6 +342,7 @@ static void     ctrlm_close_pairing_window_(ctrlm_network_id_t network_id, ctrlm
 static void     ctrlm_pairing_window_bind_status_set_(ctrlm_bind_status_t bind_status);
 static void     ctrlm_discovery_remote_type_set_(const char* remote_type_str);
 static void     ctrlm_controller_product_name_get(ctrlm_controller_id_t controller_id, char *source_name);
+static void     ctrlm_global_rfc_values_retrieved(const ctrlm_rfc_attr_t &attr);
 
 static gboolean ctrlm_timeout_line_of_sight(gpointer user_data);
 static gboolean ctrlm_timeout_autobind(gpointer user_data);
@@ -533,7 +534,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.pairing_window.bind_status     = CTRLM_BIND_STATUS_NO_DISCOVERY_REQUEST;
    g_ctrlm.pairing_window.restrict_by_remote = CTRLM_PAIRING_RESTRICT_NONE;
    g_ctrlm.mask_key_codes_json            = JSON_BOOL_VALUE_CTRLM_GLOBAL_MASK_KEY_CODES;
-   g_ctrlm.mask_key_codes_iarm            = FALSE;
+   g_ctrlm.mask_key_codes_iarm            = false;
    g_ctrlm.keycode_logging_poll_val       = JSON_INT_VALUE_CTRLM_GLOBAL_KEYCODE_LOGGING_POLL_PERIOD * 1000;
    g_ctrlm.keycode_logging_retries        = 0;
    g_ctrlm.keycode_logging_max_retries    = JSON_INT_VALUE_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES;
@@ -592,7 +593,11 @@ int main(int argc, char *argv[]) {
    // This tells the RFC component to go fetch all the enabled attributes once
    // we are fully initialized. This brings us to parity with the current RFC/TR181
    // implementation.
-   g_idle_add(&ctrlm_rfc_t::fetch_attributes, (void *)ctrlm_rfc_t::get_instance());
+   ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+   if(rfc) {
+      rfc->add_changed_listener(ctrlm_rfc_t::attrs::GLOBAL, &ctrlm_global_rfc_values_retrieved);
+      g_idle_add(&ctrlm_rfc_t::fetch_attributes, (void *)rfc);
+   }
    // TODO: We could possibly schedule this to run once every few hours or whatever
    //       the team decides is best.
 
@@ -1888,6 +1893,41 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
    g_ctrlm.local_conf = local_conf;
 
    return true;
+}
+
+void ctrlm_global_rfc_values_retrieved(const ctrlm_rfc_attr_t &attr) {
+   // DB Path / Authservice URL / Device ID updates not supported via RFC
+   // attr.get_rfc_value(JSON_STR_NAME_CTRLM_GLOBAL_DB_PATH, g_ctrlm.db_path);
+   // attr.get_rfc_value(JSON_STR_NAME_CTRLM_GLOBAL_URL_AUTH_SERVICE, g_ctrlm.server_url_authservice);
+   // attr.get_rfc_value(JSON_STR_NAME_CTRLM_GLOBAL_DEVICE_ID, g_ctrlm.device_id);
+   if(attr.get_rfc_value(JSON_STR_NAME_CTRLM_GLOBAL_MINIDUMP_PATH, g_ctrlm.minidump_path)) {
+      google_breakpad::MinidumpDescriptor descriptor(g_ctrlm.minidump_path.c_str());
+      google_breakpad::ExceptionHandler eh(descriptor, NULL, ctrlm_minidump_callback, NULL, true, -1);
+   }
+   if(attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_THREAD_MONITOR_PERIOD, g_ctrlm.thread_monitor_timeout_val, 1)) {
+      g_ctrlm.thread_monitor_timeout_val *= 1000;
+   }
+   attr.get_rfc_value(JSON_BOOL_NAME_CTRLM_GLOBAL_THREAD_MONITOR_MINIDUMP, g_ctrlm.thread_monitor_minidump);
+   if(attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_POLL_PERIOD, g_ctrlm.authservice_poll_val, 1)) {
+      g_ctrlm.authservice_poll_val *= 1000;
+   }
+   if(attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_POLL_PERIOD, g_ctrlm.keycode_logging_poll_val, 1)) {
+      g_ctrlm.keycode_logging_poll_val *= 1000;
+   }
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES, g_ctrlm.keycode_logging_max_retries, 1);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_TIMEOUT_RECENTLY_BOOTED, g_ctrlm.recently_booted_timeout_val, 1);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_TIMEOUT_LINE_OF_SIGHT, g_ctrlm.line_of_sight_timeout_val, 0);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_TIMEOUT_AUTOBIND, g_ctrlm.autobind_timeout_val, 0);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_TIMEOUT_BUTTON_BINDING, g_ctrlm.binding_button_timeout_val, 0);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_TIMEOUT_SCREEN_BIND, g_ctrlm.screen_bind_timeout_val, 0);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_TIMEOUT_ONE_TOUCH_AUTOBIND, g_ctrlm.one_touch_autobind_timeout_val, 0);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_CRASH_RECOVERY_THRESHOLD, g_ctrlm.crash_recovery_threshold, 0);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES, g_ctrlm.keycode_logging_max_retries, 1);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES, g_ctrlm.keycode_logging_max_retries, 1);
+   attr.get_rfc_value(JSON_BOOL_NAME_CTRLM_GLOBAL_MASK_KEY_CODES, g_ctrlm.mask_key_codes_json);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_POLL_PERIOD, g_ctrlm.authservice_poll_val);   
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_FAST_POLL_PERIOD, g_ctrlm.authservice_fast_poll_val);
+   attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_FAST_MAX_RETRIES, g_ctrlm.authservice_fast_retries_max);   
 }
 
 gboolean ctrlm_iarm_init(void) {

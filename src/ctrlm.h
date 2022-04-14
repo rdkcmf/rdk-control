@@ -38,6 +38,7 @@
 
 #define CTRLM_MAIN_QUEUE_MSG_TYPE_GLOBAL (0x100)
 #define CTRLM_THREAD_SYNC_DELAY          (10000)
+#define JSON_PATH_SEPERATOR "."
 
 class ctrlm_obj_network_t;
 class ctrlm_obj_network_rf4ce_t;

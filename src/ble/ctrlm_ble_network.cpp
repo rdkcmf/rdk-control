@@ -114,6 +114,11 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t(ctrlm_network_type_t type, ctrl
    // load_config(json_obj_net);
 
    hal_api_main_ = ctrlm_hal_ble_main;
+
+   ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+   if(rfc) {
+      rfc->add_changed_listener(ctrlm_rfc_t::attrs::BLE, std::bind(&ctrlm_obj_network_ble_t::rfc_retrieved_handler, this, std::placeholders::_1));
+   }
 }
 
 ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t() {
@@ -2031,4 +2036,8 @@ void ctrlm_obj_network_ble_t::power_state_change(ctrlm_main_queue_power_state_ch
          hal_api_handle_deepsleep_(params);
       }
    }
+}
+
+void ctrlm_obj_network_ble_t::rfc_retrieved_handler(const ctrlm_rfc_attr_t &attr) {
+   // TODO - No RFC parameters as of now
 }

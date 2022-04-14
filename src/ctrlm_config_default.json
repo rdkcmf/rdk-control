@@ -54,6 +54,7 @@
       "binding_state_timeout"            :        30,
       "host_decryption"                  :     false,
       "single_channel_rsp"               :      true,
+      "ff_rsp_idle_time"                 :        15,
       "discovery_config" : {
          "enable"                        :      true,
          "require_line_of_sight"         :     false
@@ -206,6 +207,8 @@
          "ic_detect"                     :       15,
          "force_settings"                :     false
       }
+   },
+   "network_ble" : {
    },
    "network_ip" : {
       "hal_target_url"                   : "/iptarget",

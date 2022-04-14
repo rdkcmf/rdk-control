@@ -23,6 +23,7 @@
 #include "ctrlm_config_attr.h"
 #include "rf4ce/rib/ctrlm_rf4ce_rib_attr.h"
 #include "ctrlm_version.h"
+#include "ctrlm_rfc.h"
 #include <vector>
 #include <functional>
 
@@ -468,6 +469,10 @@ public:
      * @see ctrlm_config_attr_t::read_config
      */
     virtual bool read_config();
+    /**
+     * Function to handle RFC parameter updates
+     */
+    void rfc_retrieved_handler(const ctrlm_rfc_attr_t &attr);
 
 public:
     /**

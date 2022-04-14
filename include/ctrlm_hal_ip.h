@@ -231,6 +231,17 @@ typedef struct {
    ctrlm_hal_ip_target_t             target;           ///< IP Target URL
    bool                              wss_logging;      ///< WSS Library logging
 } ctrlm_hal_ip_main_init_t;
+
+/// @brief Update Settings Structure
+/// @details The structure used to update the settings in the HAL.
+typedef struct {
+   bool wss_logging;
+   char target[CTRLM_HAL_IP_TARGET_LEN];
+   unsigned int port;
+   unsigned int blackout_threshold;
+   unsigned int blackout_time;
+} ctrlm_hal_ip_settings_t;
+
 /// @}
 
 /// @addtogroup HAL_IP_Functions Function Prototypes
@@ -243,6 +254,9 @@ void *ctrlm_hal_ip_main(ctrlm_hal_ip_main_init_t *main_init);
 /// @brief Network Init Confirmation Function
 /// @details This function is called after the HAL network initialization is complete.
 ctrlm_hal_result_t ctrlm_hal_ip_cfm_init(ctrlm_network_id_t network_id, ctrlm_hal_ip_cfm_init_params_t params);
+/// @brief Update Settings Function
+/// @details This function is used to update the settings for the IP HAL.
+ctrlm_hal_result_t ctrlm_hal_ip_update_settings(ctrlm_hal_ip_settings_t *settings);
 /// @brief SHA256 Function
 /// @details This function can be utilized by both Control Manager and the HAL Network to calculate SHA256 hash of a buffer
 bool ctrlm_ip_util_sha256(unsigned char *buf, size_t len, unsigned char *result);

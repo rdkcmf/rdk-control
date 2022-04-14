@@ -57,30 +57,7 @@ ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
 
 ctrlm_voice_generic_t::~ctrlm_voice_generic_t() {
     LOG_INFO("%s: Destructor\n", __FUNCTION__);
-
-    if(this->voice_state_src_get() != CTRLM_VOICE_STATE_SRC_READY) { // Need to terminate session before destroying endpoints
-        LOG_WARN("%s: Voice session in progress.. Terminating..\n", __FUNCTION__);
-        xrsr_session_terminate();
-    }
-
-    if(this->obj_ws != NULL) {
-        delete this->obj_ws;
-        this->obj_ws = NULL;
-    }
-    if(this->obj_http != NULL) {
-        delete this->obj_http;
-        this->obj_http = NULL;
-    }
-    if(this->obj_ws_nextgen != NULL) {
-        delete this->obj_ws_nextgen;
-        this->obj_ws_nextgen = NULL;
-    }
-    #ifdef SUPPORT_VOICE_DEST_ALSA
-    if(this->obj_sdt != NULL) {
-        delete this->obj_sdt;
-        this->obj_sdt = NULL;
-    }
-    #endif
+    this->voice_sdk_close();
 }
 
 void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
@@ -117,6 +94,34 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
     this->endpoints.push_back(this->obj_ws_nextgen);
     #ifdef SUPPORT_VOICE_DEST_ALSA
     this->endpoints.push_back(this->obj_sdt);
+    #endif
+}
+
+void ctrlm_voice_generic_t::voice_sdk_close() {
+    if(this->voice_state_src_get() != CTRLM_VOICE_STATE_SRC_READY) { // Need to terminate session before destroying endpoints
+        LOG_WARN("%s: Voice session in progress.. Terminating..\n", __FUNCTION__);
+        xrsr_session_terminate();
+    }
+
+    ctrlm_voice_t::voice_sdk_close();
+
+    if(this->obj_ws != NULL) {
+        delete this->obj_ws;
+        this->obj_ws = NULL;
+    }
+    if(this->obj_http != NULL) {
+        delete this->obj_http;
+        this->obj_http = NULL;
+    }
+    if(this->obj_ws_nextgen != NULL) {
+        delete this->obj_ws_nextgen;
+        this->obj_ws_nextgen = NULL;
+    }
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    if(this->obj_sdt != NULL) {
+        delete this->obj_sdt;
+        this->obj_sdt = NULL;
+    }
     #endif
 }
 

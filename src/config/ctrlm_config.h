@@ -20,6 +20,7 @@
 #define __CTRLM_CONFIG_H__
 #include <jansson.h>
 #include <string>
+#include "ctrlm.h"
 
 /**
  * @brief ControlMgr Configuration File Class
@@ -49,6 +50,12 @@ public:
      * @return True on success, otherwise False
      */
     bool load_config(std::string file_path);
+    /**
+     * Function to check if object exists from a path
+     * @param path A period seperated string used to navigate a JSON object i.e. "network_rf4ce.polling.enabled"
+     * @return True if the object exists, else False
+     */
+    bool path_exists(std::string path);
     /**
      * Function which is used to get a Jansson JSON object from a path.
      * @param path A period seperated string used to navigate a JSON object i.e. "network_rf4ce.polling.enabled"

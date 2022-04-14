@@ -34,6 +34,7 @@
 #include <string.h>
 #include <glib.h>
 #include <jansson.h>
+#include "ctrlm_rfc.h"
 
 // End Includes
 
@@ -109,6 +110,7 @@ public:
    virtual void                  hal_init_complete();
    virtual void                  hal_init_cfm(void *data, int size);
    virtual std::string           db_name_get() const;
+   void                          rfc_retrieved_handler(const ctrlm_rfc_attr_t &attr);
 
    void                          ind_process_rcu_status(void *data, int size);
    void                          ind_process_paired(void *data, int size);
