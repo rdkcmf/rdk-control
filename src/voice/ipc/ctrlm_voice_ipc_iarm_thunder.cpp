@@ -75,7 +75,7 @@
 
 static bool broadcast_event(const char *bus_name, int event, const char *str);
 static const char *voice_device_str(ctrlm_voice_device_t device);
-static const char *voice_device_status_str(ctrlm_voice_device_status_t status);
+static const char *voice_device_status_str(uint8_t status);
 
 ctrlm_voice_ipc_iarm_thunder_t::ctrlm_voice_ipc_iarm_thunder_t(ctrlm_voice_t *obj_voice): ctrlm_voice_ipc_t(obj_voice) {
 
@@ -635,15 +635,12 @@ const char *voice_device_str(ctrlm_voice_device_t device) {
     return("invalid");
 }
 
-const char *voice_device_status_str(ctrlm_voice_device_status_t status) {
-    switch(status) {
-        case CTRLM_VOICE_DEVICE_STATUS_READY:         return("ready");
-        case CTRLM_VOICE_DEVICE_STATUS_OPENED:        return("opened");
-        case CTRLM_VOICE_DEVICE_STATUS_DISABLED:      return("disabled");
-        case CTRLM_VOICE_DEVICE_STATUS_PRIVACY:       return("privacy");
-        case CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED: return("not supported");
-        default: break;
-    }
+const char *voice_device_status_str(uint8_t status) {
+    if(status == CTRLM_VOICE_DEVICE_STATUS_NONE)          { return("ready");         }
+    if(status & CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE) { return("opened");        }
+    if(status & CTRLM_VOICE_DEVICE_STATUS_DISABLED)       { return("disabled");      }
+    if(status & CTRLM_VOICE_DEVICE_STATUS_PRIVACY)        { return("privacy");       }
+    if(status & CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED)  { return("not supported"); }
     return("invalid");
 }
 

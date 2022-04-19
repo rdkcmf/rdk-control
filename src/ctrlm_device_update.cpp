@@ -1913,7 +1913,10 @@ gboolean ctrlm_device_update_rf4ce_begin(ctrlm_network_id_t network_id, ctrlm_co
       begin_info->background_download = true;
    } else {
       begin_info->background_download = false;
-      ctrlm_voice_device_update_in_progress_set(true);
+      ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+      if(voice_obj) {
+         voice_obj->voice_device_update_in_progress_set(true);
+      }
    }
 
    g_ctrlm_device_update.rf4ce_sessions[controller_id].download_in_progress = true;
@@ -1976,7 +1979,10 @@ void ctrlm_device_update_rf4ce_download_complete(ctrlm_device_update_rf4ce_sessi
          }
 
          if(!foreground_download_in_progress) {
-            ctrlm_voice_device_update_in_progress_set(false);
+            ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+            if(voice_obj) {
+               voice_obj->voice_device_update_in_progress_set(false);
+            }
          }
       }
    }

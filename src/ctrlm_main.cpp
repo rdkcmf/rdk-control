@@ -61,7 +61,6 @@
 #include "ctrlm_config.h"
 #include "ctrlm_tr181.h"
 #include "rf4ce/ctrlm_rf4ce_network.h"
-#include "ctrlm_voice.h"
 #include "ctrlm_device_update.h"
 #include "ctrlm_vendor_network_factory.h"
 #include "dsMgr.h"

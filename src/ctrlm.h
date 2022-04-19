@@ -338,6 +338,18 @@ typedef struct {
 } ctrlm_main_queue_msg_account_id_update_t;
 
 typedef enum {
+   VOICE_COMMAND_VOICE_SESSION_TERMINATE_SPECIAL_KEY_PRESS = 0,
+   VOICE_COMMAND_VOICE_SESSION_TERMINATE_UNKNOWN = 5
+} ctrlm_voice_session_termination_reason_t;
+
+
+typedef struct {
+   ctrlm_main_queue_msg_header_t            header;
+   ctrlm_controller_id_t                    controller_id;
+   ctrlm_voice_session_termination_reason_t reason;
+} ctrlm_main_queue_msg_terminate_voice_session_t;
+
+typedef enum {
    CTRLM_HANDLER_NETWORK,
    CTRLM_HANDLER_CONTROLLER,
    CTRLM_HANDLER_VOICE

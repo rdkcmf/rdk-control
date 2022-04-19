@@ -23,8 +23,19 @@
 #include "../ctrlm.h"
 #include "../ctrlm_rcu.h"
 #include "ctrlm_rf4ce_network.h"
-#include "../ctrlm_voice.h"
 #include "../ctrlm_voice_obj.h"
+
+typedef enum {
+   CRTLM_VOICE_REMOTE_VOICE_END_MIC_KEY_RELEASE      =  1,
+   CRTLM_VOICE_REMOTE_VOICE_END_EOS_DETECTION        =  2,
+   CRTLM_VOICE_REMOTE_VOICE_END_SECONDARY_KEY_PRESS  =  3,
+   CRTLM_VOICE_REMOTE_VOICE_END_TIMEOUT_MAXIMUM      =  4,
+   CRTLM_VOICE_REMOTE_VOICE_END_TIMEOUT_TARGET       =  5,
+   CRTLM_VOICE_REMOTE_VOICE_END_OTHER_ERROR          =  6,
+   CRTLM_VOICE_REMOTE_VOICE_END_MINIMUM_QOS          =  7,
+   CRTLM_VOICE_REMOTE_VOICE_END_TIMEOUT_FIRST_PACKET =  8,
+   CRTLM_VOICE_REMOTE_VOICE_END_TIMEOUT_INTERPACKET  =  9
+} ctrlm_voice_remote_voice_end_reason_t;
 
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_discovery_int(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_disc_params_t params, ctrlm_hal_rf4ce_rsp_disc_params_t *rsp_params, ctrlm_hal_rf4ce_rsp_discovery_t cb, void *cb_data, GCond *cond);
 static ctrlm_hal_result_t ctrlm_hal_rf4ce_ind_pair_int(ctrlm_network_id_t id, ctrlm_hal_rf4ce_ind_pair_params_t params, ctrlm_hal_rf4ce_rsp_pair_params_t *rsp_params, ctrlm_hal_rf4ce_rsp_pair_t cb, void *cb_data, GCond *cond);

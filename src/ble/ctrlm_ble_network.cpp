@@ -26,7 +26,6 @@
 #include "ctrlm_ble_iarm.h"
 #include "ctrlm_ipc.h"
 #include "ctrlm_ipc_key_codes.h"
-#include "../ctrlm_voice.h"
 #include "../ctrlm_voice_obj.h"
 #include "ctrlm_database.h"
 #include "../ctrlm_rcu.h"

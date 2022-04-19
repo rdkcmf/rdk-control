@@ -31,7 +31,6 @@
 #include "ctrlm_network.h"
 #include "ctrlm_rf4ce_controller.h"
 #include "ctrlm_rf4ce_utils.h"
-#include "ctrlm_voice.h"
 #include "ctrlm_device_update.h"
 #include "json_config.h"
 #include "ctrlm_rf4ce_ir_rf_db.h"

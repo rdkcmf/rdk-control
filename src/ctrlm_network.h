@@ -26,7 +26,6 @@
 #include "ctrlm.h"
 #include "ctrlm_rcu.h"
 #include "ctrlm_controller.h"
-#include "ctrlm_voice.h"
 #include "ctrlm_recovery.h"
 #include "ctrlm_validation.h"
 #include "ctrlm_irdb.h"

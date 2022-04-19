@@ -25,7 +25,6 @@
 #include "include/ctrlm_ipc.h"
 #include "include/ctrlm_ipc_voice.h"
 #include "ctrlm.h"
-#include "ctrlm_voice.h"
 #include "ctrlm_xraudio_hal.h"
 #include "ctrlm_config_default.h"
 #include "jansson.h"
@@ -98,6 +97,12 @@ typedef enum {
 } ctrlm_voice_command_status_t;
 
 typedef enum {
+   VOICE_SESSION_TYPE_STANDARD  = 0x00,
+   VOICE_SESSION_TYPE_SIGNALING = 0x01,
+   VOICE_SESSION_TYPE_FAR_FIELD = 0x02,
+} voice_session_type_t;
+
+typedef enum {
    VOICE_SESSION_RESPONSE_AVAILABLE                           = 0x00,
    VOICE_SESSION_RESPONSE_BUSY                                = 0x01,
    VOICE_SESSION_RESPONSE_SERVER_NOT_READY                    = 0x02,
@@ -107,6 +112,12 @@ typedef enum {
    VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE                 = 0x10,
    VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE = 0x11,
 } ctrlm_voice_session_response_status_t;
+
+typedef enum {
+   VOICE_SESSION_RESPONSE_STREAM_BUF_BEGIN     = 0x00,
+   VOICE_SESSION_RESPONSE_STREAM_KEYWORD_BEGIN = 0x01,
+   VOICE_SESSION_RESPONSE_STREAM_KEYWORD_END   = 0x02,
+} voice_session_response_stream_t;
 
 typedef enum {
     CTRLM_VOICE_STATE_SRC_READY     = 0x00,
@@ -123,14 +134,20 @@ typedef enum {
     CTRLM_VOICE_STATE_DST_INVALID    = 0x04
 } ctrlm_voice_state_dst_t;
 
-typedef enum {
-   CTRLM_VOICE_DEVICE_STATUS_READY,
-   CTRLM_VOICE_DEVICE_STATUS_OPENED,
-   CTRLM_VOICE_DEVICE_STATUS_DISABLED,
-   CTRLM_VOICE_DEVICE_STATUS_PRIVACY,
-   CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED,
-   CTRLM_VOICE_DEVICE_STATUS_INVALID,
-} ctrlm_voice_device_status_t;
+// The voice device status is a bitfield with bits for enable/disable, privacy on/off, session active/inactive, OTA active/inactive
+#define CTRLM_VOICE_DEVICE_STATUS_NONE           (0x00)
+#define CTRLM_VOICE_DEVICE_STATUS_LEGACY         (0x07) // Legacy values (only disable flag is maintained)
+#define CTRLM_VOICE_DEVICE_STATUS_DISABLED       (0x02)
+#define CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED  (0x08)
+#define CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE (0x10)
+#define CTRLM_VOICE_DEVICE_STATUS_DEVICE_UPDATE  (0x20)
+#define CTRLM_VOICE_DEVICE_STATUS_PRIVACY        (0x40)
+#define CTRLM_VOICE_DEVICE_STATUS_RESERVED       (0x80)
+
+// Mask for values that are stored in the DB (persistent across reboots and application restart)
+#define CTRLM_VOICE_DEVICE_STATUS_MASK_DB          (CTRLM_VOICE_DEVICE_STATUS_DISABLED)
+// Mask for values that shall prevent a voice session from being granted
+#define CTRLM_VOICE_DEVICE_STATUS_MASK_SESSION_REQ (CTRLM_VOICE_DEVICE_STATUS_DISABLED | CTRLM_VOICE_DEVICE_STATUS_DEVICE_UPDATE | CTRLM_VOICE_DEVICE_STATUS_PRIVACY | CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED)
 
 typedef enum {
    CTRLM_VOICE_REMOTE_VOICE_END_MIC_KEY_RELEASE     =  1,
@@ -350,7 +367,7 @@ typedef struct {
 typedef struct {
    std::string                       urlPtt;
    std::string                       urlHf;
-   ctrlm_voice_device_status_t       status[CTRLM_VOICE_DEVICE_INVALID];
+   uint8_t                           status[CTRLM_VOICE_DEVICE_INVALID];
    bool                              prv_enabled;
    bool                              wwFeedback;
    ctrlm_voice_status_capabilities_t capabilities;
@@ -418,6 +435,7 @@ class ctrlm_voice_t {
     bool                                  voice_device_streaming(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
     void                                  voice_controller_command_status_read(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
     void                                  voice_status_set();
+    void                                  voice_device_update_in_progress_set(bool in_progress);
 
     void                                  voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
     void                                  vsdk_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
@@ -491,8 +509,19 @@ public:
     void                  voice_params_opus_samples_per_packet_set(void);
     bool                  voice_params_hex_str_to_bytes(std::string hex_string, guchar *data, guint32 length);
 
-    // This function is called to change voice device statuses. Must acquire the device_status_semaphore before calling.
-    void                  voice_device_status_change(ctrlm_voice_device_t device, ctrlm_voice_device_status_t status, bool *update_routes = NULL);
+    bool                  voice_session_can_request(ctrlm_voice_device_t device);
+    void                  voice_session_set_active(ctrlm_voice_device_t device);
+    void                  voice_session_set_inactive(ctrlm_voice_device_t device);
+
+    bool                  voice_is_privacy_enabled(void);
+    void                  voice_privacy_enable(bool update_vsdk);
+    void                  voice_privacy_disable(bool update_vsdk);
+
+    void                  voice_device_update_set_active(void);
+    void                  voice_device_update_set_inactive(void);
+
+    void                  voice_device_enable(ctrlm_voice_device_t device, bool db_update, bool *update_routes);
+    void                  voice_device_disable(ctrlm_voice_device_t device, bool db_update, bool *update_routes);
 
     protected:
     // STB Data
@@ -530,7 +559,7 @@ public:
 
     protected:
     sem_t                                             device_status_semaphore;
-    ctrlm_voice_device_status_t                       device_status[CTRLM_VOICE_DEVICE_INVALID];
+    uint8_t                                           device_status[CTRLM_VOICE_DEVICE_INVALID];
     std::vector<ctrlm_voice_endpoint_t *>             endpoints;
     ctrlm_voice_endpoint_t *                          endpoint_current;
     std::vector<std::pair<std::string, std::string> > query_strs_ptt;
@@ -618,7 +647,7 @@ public:
    bool                 controller_supports_qos(void);
    void                 set_audio_mode(ctrlm_voice_audio_settings_t *settings);
    void                 audio_state_set(bool session);
-   bool                 privacy_mode(void);
+   bool                 vsdk_is_privacy_enabled(void);
    bool                 is_standby_microphone(void);
 
 };
@@ -628,7 +657,7 @@ const char *ctrlm_voice_format_str(ctrlm_voice_format_t format);
 const char *ctrlm_voice_state_src_str(ctrlm_voice_state_src_t state);
 const char *ctrlm_voice_state_dst_str(ctrlm_voice_state_dst_t state);
 const char *ctrlm_voice_device_str(ctrlm_voice_device_t device);
-const char *ctrlm_voice_device_status_str(ctrlm_voice_device_status_t status);
+std::string ctrlm_voice_device_status_str(uint8_t status);
 const char *ctrlm_voice_command_status_str(ctrlm_voice_command_status_t status);
 const char *ctrlm_voice_command_status_tv_avr_str(ctrlm_voice_tv_avr_cmd_t cmd);
 const char *ctrlm_voice_audio_mode_str(ctrlm_voice_audio_mode_t mode);

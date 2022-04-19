@@ -34,7 +34,6 @@
 #ifdef ASB
 #include "../cpc/asb/advanced_secure_binding.h"
 #endif
-#include "ctrlm_voice.h"
 #include "ctrlm_voice_obj.h"
 
 class ctrlm_obj_network_rf4ce_t;

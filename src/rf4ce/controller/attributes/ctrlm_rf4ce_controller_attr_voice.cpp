@@ -24,7 +24,6 @@
 #include <algorithm>
 #include <sstream>
 #include "ctrlm_database.h"
-#include "ctrlm_voice.h"
 #include "ctrlm_config_types.h"
 #include "ctrlm_voice_obj.h"
 

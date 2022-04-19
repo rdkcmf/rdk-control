@@ -31,7 +31,6 @@
 #include "../ctrlm_utils.h"
 #include "../ctrlm_validation.h"
 #include "../ctrlm_device_update.h"
-#include "../ctrlm_voice.h"
 #include "ctrlm_rf4ce_utils.h"
 
 using namespace std;
