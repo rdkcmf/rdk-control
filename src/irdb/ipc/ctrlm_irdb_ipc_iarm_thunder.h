@@ -42,6 +42,7 @@ protected:
     static IARM_Result_t get_ir_codes_by_auto_lookup(void *arg);
     static IARM_Result_t set_ir_codes_by_name(void *arg);
     static IARM_Result_t clear_ir_codes(void *arg);
+    static IARM_Result_t initialize_irdb(void *arg);
 };
 
 #endif

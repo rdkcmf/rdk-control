@@ -33,6 +33,7 @@ public:
     ctrlm_irdb_ir_entry_id_list_t        get_ir_codes_by_names(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, ctrlm_irdb_model_t model = "");
     bool                                 set_ir_codes_by_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t name);
     bool                                 clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
+    bool                                 initialize_irdb();
 
 protected:
     ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len);

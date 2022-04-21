@@ -108,8 +108,9 @@ static void _on_thunder_ready(void *data) {
 #endif
 
 ctrlm_irdb_t::ctrlm_irdb_t(ctrlm_irdb_mode_t mode) {
-    this->mode = mode;
-    this->ipc  = NULL;
+    this->mode        = mode;
+    this->ipc         = NULL;
+    this->initialized = 0;
 #if defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
     Thunder::Controller::ctrlm_thunder_controller_t *controller = Thunder::Controller::ctrlm_thunder_controller_t::getInstance();
     if(controller) {
@@ -238,6 +239,10 @@ ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_t::get_ir_codes_by_autolookup() {
 
 bool ctrlm_irdb_t::can_get_ir_codes_by_autolookup() { 
     return(false);
+}
+
+bool ctrlm_irdb_t::initialize_irdb() { 
+    return(this->initialized);
 }
 
 #if defined(CTRLM_THUNDER)

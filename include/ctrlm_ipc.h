@@ -96,7 +96,7 @@
 /// these names to allow the client code to function correctly if the values change.
 
 #define CTRLM_MAIN_IARM_BUS_NAME                                 "Ctrlm"                                ///< Control Manager's IARM Bus Name
-#define CTRLM_MAIN_IARM_BUS_API_REVISION                         (14)                                   ///< Revision of the Control Manager Main IARM API
+#define CTRLM_MAIN_IARM_BUS_API_REVISION                         (15)                                   ///< Revision of the Control Manager Main IARM API
 
 #define CTRLM_MAIN_IARM_CALL_STATUS_GET                          "Main_StatusGet"                       ///< Retrieves Control Manager's Status information
 #define CTRLM_MAIN_IARM_CALL_NETWORK_STATUS_GET                  "Main_NetworkStatusGet"                ///< Retrieves the network's Status information
@@ -127,6 +127,7 @@
 #define CTRLM_MAIN_IARM_CALL_IR_AUTO_LOOKUP                      "Main_IRAutoLookup"      ///< IARM Call to retrieve IR Codes based on EDID, Infoframe, and CEC
 #define CTRLM_MAIN_IARM_CALL_IR_SET_CODE                         "Main_IRSetCode"         ///< IARM Call to set an IR Code into a specified BLE remote
 #define CTRLM_MAIN_IARM_CALL_IR_CLEAR_CODE                       "Main_IRClear"           ///< IARM Call to clear all IR Codes from a specified BLE remote
+#define CTRLM_MAIN_IARM_CALL_IR_INITIALIZE                       "Main_IRInitialize"      ///< IARM Call to initialize the IR database
 
 // For Remote Plugin, only used for BLE currently, refactoring needed in other networks to use this interface
 #define CTRLM_MAIN_IARM_CALL_GET_RCU_STATUS                      "Main_GetRcuStatus"            ///< IARM Call get the RCU status info (same as what's provided by CTRLM_RCU_IARM_EVENT_RCU_STATUS)
@@ -811,6 +812,13 @@ typedef struct {
    char                     response[CTRLM_MAX_IRDB_RESPONSE_STR_LEN];  ///< OUT - result of the operation. Formatted in JSON
    ctrlm_iarm_call_result_t result;                                     ///< OUT - return code of the operation
 } ctrlm_iarm_call_IRClear_params_t;
+
+typedef struct {
+   unsigned char            api_revision;                               ///< Revision of this API
+   ctrlm_network_id_t       network_id;                                 ///< IN - Identifier of network
+   char                     response[CTRLM_MAX_IRDB_RESPONSE_STR_LEN];  ///< OUT - result of the operation. Formatted in JSON
+   ctrlm_iarm_call_result_t result;                                     ///< OUT - return code of the operation
+} ctrlm_iarm_call_initialize_irdb_params_t;
 
 typedef struct {
    unsigned char                 api_revision;

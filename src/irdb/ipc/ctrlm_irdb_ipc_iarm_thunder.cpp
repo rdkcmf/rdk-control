@@ -44,6 +44,7 @@ bool ctrlm_irdb_ipc_iarm_thunder_t::register_ipc() const {
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_AUTO_LOOKUP, get_ir_codes_by_auto_lookup)) ret = false;
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_SET_CODE, set_ir_codes_by_name)) ret = false;
     if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_CLEAR_CODE, clear_ir_codes)) ret = false;
+    if(!this->register_iarm_call(CTRLM_MAIN_IARM_CALL_IR_INITIALIZE, initialize_irdb)) ret = false;
 
     return(ret);
 }
@@ -285,6 +286,28 @@ IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::clear_ir_codes(void *arg) {
 
     if(irdb) {
         success = irdb->clear_ir_codes(params->network_id, params->controller_id);
+    }
+
+    // Assemble the return
+    json_object_set_new(ret, "success", json_boolean(success));
+    json_to_iarm_response(__FUNCTION__, &ret, params);
+    return(IARM_RESULT_SUCCESS);
+}
+
+IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::initialize_irdb(void *arg) {
+    IRDB_LOG_INFO("%s\n", __FUNCTION__);
+    ctrlm_iarm_call_initialize_irdb_params_t *params = (ctrlm_iarm_call_initialize_irdb_params_t *)arg;
+    json_t *ret        = json_object();
+    ctrlm_irdb_t *irdb = ctrlm_main_irdb_get();
+    bool success       = false;
+
+    if(params == NULL || params->api_revision != CTRLM_MAIN_IARM_BUS_API_REVISION) {
+        IRDB_LOG_ERROR("%s: Invalid parameters\n", __FUNCTION__);
+        return(IARM_RESULT_INVALID_PARAM);
+    }
+
+    if(irdb) {
+        success = irdb->initialize_irdb();
     }
 
     // Assemble the return

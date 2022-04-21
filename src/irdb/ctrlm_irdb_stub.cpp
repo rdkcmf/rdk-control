@@ -81,4 +81,9 @@ bool ctrlm_irdb_stub_t::clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_cont
     IRDB_LOG_ERROR("%s not implemented\n", __FUNCTION__);
     return(false);
 }
+    
+bool ctrlm_irdb_stub_t::initialize_irdb() {
+    IRDB_LOG_ERROR("%s not implemented\n", __FUNCTION__);
+    return(false);
+}
 

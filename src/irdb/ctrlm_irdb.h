@@ -104,6 +104,7 @@ public:
     virtual bool                                 set_ir_codes_by_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t name)       = 0;
     virtual bool                                 clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id)                                                                        = 0;
     virtual bool                                 can_get_ir_codes_by_autolookup();
+    virtual bool                                 initialize_irdb();
 
 #if defined(CTRLM_THUNDER)
 public:
@@ -123,6 +124,7 @@ protected:
 protected:
     ctrlm_irdb_mode_t mode;
     ctrlm_irdb_ipc_t *ipc;
+    volatile gint     initialized;
 
 private:
 #if   defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
