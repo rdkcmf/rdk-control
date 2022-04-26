@@ -95,6 +95,13 @@ using namespace std;
 #define VERSION_TXT_VERSION     "VERSION="
 #define VERSION_TXT_BUILD_TIME  "BUILD_TIME="
 
+#define CTRLM_THREAD_NAME_MAIN          "Ctrlm Main"
+#define CTRLM_THREAD_NAME_DATABASE      "Ctrlm Database"
+#define CTRLM_THREAD_NAME_DEVICE_UPDATE "Ctrlm Device Update"
+#define CTRLM_THREAD_NAME_VOICE_SDK     "Voice SDK"
+#define CTRLM_THREAD_NAME_RF4CE         "RF4CE"
+#define CTRLM_THREAD_NAME_BLE           "BLE"
+
 #define CTRLM_DEFAULT_DEVICE_MAC_INTERFACE "eth0"
 
 #define CTRLM_RESTART_DELAY_SHORT    "0"
@@ -833,28 +840,28 @@ void ctrlm_thread_monitor_init(void) {
 
    g_ctrlm.thread_monitor_timeout_tag = ctrlm_timeout_create(g_ctrlm.thread_monitor_timeout_val, ctrlm_thread_monitor, NULL);
 
-   thread_monitor.name        = "Ctrlm Main";
+   thread_monitor.name        = CTRLM_THREAD_NAME_MAIN;
    thread_monitor.queue_push  = ctrlm_main_queue_msg_push;
    thread_monitor.obj_network = NULL;
    thread_monitor.function    = NULL;
    thread_monitor.response    = CTRLM_THREAD_MONITOR_RESPONSE_ALIVE;
    g_ctrlm.monitor_threads.push_back(thread_monitor);
 
-   thread_monitor.name        = "Ctrlm Database";
+   thread_monitor.name        = CTRLM_THREAD_NAME_DATABASE;
    thread_monitor.queue_push  = ctrlm_db_queue_msg_push_front;
    thread_monitor.obj_network = NULL;
    thread_monitor.function    = NULL;
    thread_monitor.response    = CTRLM_THREAD_MONITOR_RESPONSE_ALIVE;
    g_ctrlm.monitor_threads.push_back(thread_monitor);
 
-   thread_monitor.name        = "Ctrlm Device Update";
+   thread_monitor.name        = CTRLM_THREAD_NAME_DEVICE_UPDATE;
    thread_monitor.queue_push  = ctrlm_device_update_queue_msg_push;
    thread_monitor.obj_network = NULL;
    thread_monitor.function    = NULL;
    thread_monitor.response    = CTRLM_THREAD_MONITOR_RESPONSE_ALIVE;
    g_ctrlm.monitor_threads.push_back(thread_monitor);
 
-   thread_monitor.name        = "Voice SDK";
+   thread_monitor.name        = CTRLM_THREAD_NAME_VOICE_SDK;
    thread_monitor.queue_push  = NULL;
    thread_monitor.obj_network = NULL;
    thread_monitor.function    = ctrlm_vsdk_thread_poll;
@@ -923,7 +930,26 @@ gboolean ctrlm_thread_monitor(gpointer user_data) {
          #ifdef BREAKPAD_SUPPORT
          if(g_ctrlm.thread_monitor_minidump) {
             LOG_FATAL("%s: Thread Monitor Minidump is enabled\n", __FUNCTION__);
-            ctrlm_crash();
+
+            if(       0 == strncmp(it->name, CTRLM_THREAD_NAME_MAIN,          sizeof(CTRLM_THREAD_NAME_MAIN))) {
+               ctrlm_crash_ctrlm_main();
+            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_VOICE_SDK,     sizeof(CTRLM_THREAD_NAME_VOICE_SDK))) {
+               ctrlm_crash_vsdk();
+            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_RF4CE,         sizeof(CTRLM_THREAD_NAME_RF4CE))) {
+               #ifdef RF4CE_HAL_QORVO
+               ctrlm_crash_rf4ce_qorvo();
+               #else
+               ctrlm_crash_rf4ce_ti();
+               #endif
+            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_BLE,           sizeof(CTRLM_THREAD_NAME_BLE))) {
+               ctrlm_crash_ble();
+            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_DATABASE,      sizeof(CTRLM_THREAD_NAME_DATABASE))) {
+               ctrlm_crash_ctrlm_database();
+            } else if(0 == strncmp(it->name, CTRLM_THREAD_NAME_DEVICE_UPDATE, sizeof(CTRLM_THREAD_NAME_DEVICE_UPDATE))) {
+               ctrlm_crash_ctrlm_device_update();
+            } else {
+               ctrlm_crash();
+            }
          }
          #endif
          ctrlm_quit_main_loop();

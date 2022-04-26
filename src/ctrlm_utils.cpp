@@ -50,6 +50,41 @@
 static char ctrlm_invalid_str[CTRLM_INVALID_STR_LEN];
 
 #ifdef BREAKPAD_SUPPORT
+
+void ctrlm_crash_ctrlm_device_update(void) {
+   LOG_FATAL("%s: crash\n", __FUNCTION__);
+   ctrlm_crash();
+}
+
+#ifdef RF4CE_HAL_QORVO
+void ctrlm_crash_rf4ce_qorvo(void) {
+#else
+void ctrlm_crash_rf4ce_ti(void) {
+#endif
+   LOG_FATAL("%s: crash\n", __FUNCTION__);
+   ctrlm_crash();
+}
+
+void ctrlm_crash_ble(void) {
+   LOG_FATAL("%s: crash\n", __FUNCTION__);
+   ctrlm_crash();
+}
+
+void ctrlm_crash_vsdk(void) {
+   LOG_FATAL("%s: crash\n", __FUNCTION__);
+   ctrlm_crash();
+}
+
+void ctrlm_crash_ctrlm_main(void) {
+   LOG_FATAL("%s: crash\n", __FUNCTION__);
+   ctrlm_crash();
+}
+
+void ctrlm_crash_ctrlm_database(void) {
+   LOG_FATAL("%s: crash\n", __FUNCTION__);
+   ctrlm_crash();
+}
+
 void ctrlm_crash(void)
 {
   volatile int* a = (int*)(NULL);

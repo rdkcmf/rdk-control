@@ -114,6 +114,11 @@ controlMgr_SOURCES  += rf4ce/ctrlm_rf4ce_battery.cpp                            
                        rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_irdb.cpp    \
                        rf4ce/rib/ctrlm_rf4ce_rib_attr.cpp                                  \
                        rf4ce/rib/ctrlm_rf4ce_rib.cpp
+
+if RF4CE_HAL_QORVO
+AM_CPPFLAGS += -DRF4CE_HAL_QORVO
+endif
+
 endif
 
 if BLE_ENABLED

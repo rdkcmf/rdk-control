@@ -171,6 +171,12 @@ AC_ARG_ENABLE([voice-keyword-beep],
 [voice_keyword_beep=false])
 AM_CONDITIONAL([VOICE_KEYWORD_BEEP], [test x$voice_keyword_beep = xtrue])
 
+AC_ARG_ENABLE([rf4ce-hal-qorvo],
+[  --enable-rf4ce-hal-qorvo    Enable for Qorvo RF4CE platforms],
+[rf4ce_hal_qorvo=true],
+[rf4ce_hal_qorvo=false])
+AM_CONDITIONAL([RF4CE_HAL_QORVO], [test x$rf4ce_hal_qorvo = xtrue])
+
 AC_ARG_ENABLE([irdb],
 [  --enable-irdb    Turn on IRDB support],
 [case "${enableval}" in
