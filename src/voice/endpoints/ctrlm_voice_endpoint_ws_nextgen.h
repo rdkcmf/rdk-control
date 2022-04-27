@@ -49,7 +49,7 @@ protected:
     void voice_message_send(void *data, int size);
 
 protected:
-    static void ctrlm_voice_handler_ws_nextgen_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, xrsv_ws_nextgen_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data);
+    static void ctrlm_voice_handler_ws_nextgen_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, xrsv_ws_nextgen_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_stream_begin(const uuid_t uuid, xrsr_src_t src, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_stream_kwd(const uuid_t uuid, rdkx_timestamp_t *timestamp, void *user_data);

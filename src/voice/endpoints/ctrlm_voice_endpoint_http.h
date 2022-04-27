@@ -44,7 +44,7 @@ protected:
     void voice_session_recv_msg_http(const char *transcription, long ret_code);
 
 protected:
-    static void ctrlm_voice_handler_http_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, rdkx_timestamp_t *timestamp, void *user_data);
+    static void ctrlm_voice_handler_http_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_http_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_http_stream_begin(const uuid_t uuid, xrsr_src_t src, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_http_stream_end(const uuid_t uuid, xrsr_stream_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data);
@@ -54,6 +54,7 @@ protected:
 
 protected:
     void       *xrsv_obj_http;
+    char        user_agent[XRSR_USER_AGENT_LEN_MAX];
 
 private:
     long        server_ret_code;

@@ -23,12 +23,13 @@
 
 // Structures
 typedef struct {
-    sem_t                        *semaphore;
-    uuid_t                       uuid;
-    xrsr_src_t                   src;
-    xrsr_session_configuration_t *configuration;
-    void                         *stream_params;
-    rdkx_timestamp_t             timestamp;
+    uuid_t                          uuid;
+    xrsr_src_t                      src;
+    xrsr_session_config_out_t       configuration;
+    xrsr_callback_session_config_t  callback;
+    bool                            has_stream_params;
+    xrsv_ws_nextgen_stream_params_t stream_params;
+    rdkx_timestamp_t                timestamp;
 } ctrlm_voice_session_begin_cb_ws_nextgen_t;
 
 // Timestamps and stats are not pointers to avoid corruption
@@ -239,31 +240,23 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
         LOG_ERROR("%s: NULL data\n", __FUNCTION__);
         return;
     }
-    xrsr_session_configuration_ws_t *ws = &dqm->configuration->ws;
     ctrlm_voice_session_info_t info;
     voice_params_par_t params;
-    std::string sat;
     bool keyword_verification = false;
+    xrsr_session_config_in_t config_in;
+    memset(&config_in, 0, sizeof(config_in));
 
     this->server_ret_code = 0;
     this->voice_message_available = false; // This is just for sanity
     this->voice_message_queue.clear();
 
     this->voice_obj->voice_session_info(&info);
-    sat = this->voice_obj->voice_stb_data_sat_get();
+    const char *sat = this->voice_obj->voice_stb_data_sat_get();
     this->voice_obj->voice_params_par_get(&params);
 
-    if(sat != "") {
+    if(sat[0] != '\0') {
         LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
-	/* LIMITATION :
-         * Following strncpy() can't modified to safec strncpy_s() api
-         * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
-         * And here, we have destination buffer size more than 4K i.e 5120.
-         */
-        strncpy(ws->sat_token, sat.c_str(), sizeof(ws->sat_token) -1);
-	ws->sat_token[sizeof(ws->sat_token) -1] = '\0';   //CID:158167 - Buffer size warning
-    } else {
-        ws->sat_token[0] = '\0';
+        config_in.ws.sat_token = sat;
     }
 
     if(xrsr_to_voice_device(dqm->src) == CTRLM_VOICE_DEVICE_MICROPHONE) {
@@ -274,9 +267,8 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
     }
 
     // Handle stream parameters
-    xrsv_ws_nextgen_stream_params_t *stream_params = (xrsv_ws_nextgen_stream_params_t *)dqm->stream_params;
-
-    if(stream_params != NULL) {
+    if(dqm->has_stream_params) {
+       xrsv_ws_nextgen_stream_params_t *stream_params = &dqm->stream_params;
        if(info.has_stream_params) {
           stream_params->keyword_sample_begin               = info.stream_params.pre_keyword_sample_qty; // in samples
           stream_params->keyword_sample_end                 = (info.stream_params.pre_keyword_sample_qty + info.stream_params.keyword_sample_qty); // in samples
@@ -321,9 +313,31 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
           }
        }
        stream_params->par_eos_timeout = params.par_voice_enabled ? params.par_voice_eos_timeout : 0;
-       ws->keyword_begin = stream_params->keyword_sample_begin;
-       ws->keyword_duration = stream_params->keyword_sample_end - stream_params->keyword_sample_begin;
+       config_in.ws.keyword_begin     = stream_params->keyword_sample_begin;
+       config_in.ws.keyword_duration  = stream_params->keyword_sample_end - stream_params->keyword_sample_begin;
+
+       xrsv_ws_nextgen_stream_params_t *stream_params_out = (xrsv_ws_nextgen_stream_params_t *)malloc(sizeof(xrsv_ws_nextgen_stream_params_t));
+
+       if(stream_params_out != NULL) {
+          *stream_params_out = *stream_params;
+       }
+       config_in.ws.app_config = stream_params_out;
+
        LOG_INFO("%s: session begin - ptt <%s> keyword begin <%u> end <%u> doa <%u> gain <%4.1f> db\n", __FUNCTION__, (stream_params->push_to_talk ? "TRUE" : "FALSE"), stream_params->keyword_sample_begin, stream_params->keyword_sample_end, stream_params->keyword_doa, stream_params->dynamic_gain);
+    } else if(xrsr_to_voice_device(dqm->src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+       xrsv_ws_nextgen_stream_params_t *stream_params = (xrsv_ws_nextgen_stream_params_t *)malloc(sizeof(xrsv_ws_nextgen_stream_params_t));
+
+       if(stream_params != NULL) {
+          errno_t safec_rc = memset_s(stream_params, sizeof(*stream_params), 0, sizeof(*stream_params));
+          ERR_CHK(safec_rc);
+
+          stream_params->push_to_talk = true;
+       }
+       config_in.ws.app_config = stream_params;
+
+       LOG_INFO("%s: session begin - ptt <TRUE>\n", __FUNCTION__);
+    } else {
+       LOG_ERROR("%s: session begin - invalid params\n", __FUNCTION__);
     }
     // End handle stream parameters
 
@@ -336,7 +350,10 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
     session_begin.keyword_verification = keyword_verification;
 
     this->voice_obj->voice_session_begin_callback(&session_begin);
-    sem_post(dqm->semaphore);
+
+    if(dqm->configuration.cb_session_config != NULL) {
+        (*dqm->configuration.cb_session_config)(dqm->uuid, &config_in);
+    }
 }
 
 void ctrlm_voice_endpoint_ws_nextgen_t::voice_stream_begin_callback_ws_nextgen(void *data, int size) {
@@ -431,11 +448,9 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_server_return_code_ws_next
     this->voice_obj->voice_server_return_code_callback(ret_code);
 }
 
-void ctrlm_voice_endpoint_ws_nextgen_t::ctrlm_voice_handler_ws_nextgen_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, xrsv_ws_nextgen_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
+void ctrlm_voice_endpoint_ws_nextgen_t::ctrlm_voice_handler_ws_nextgen_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, xrsv_ws_nextgen_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
     ctrlm_voice_endpoint_ws_nextgen_t *endpoint = (ctrlm_voice_endpoint_ws_nextgen_t *)user_data;
     ctrlm_voice_session_begin_cb_ws_nextgen_t msg = {0};
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
 
     if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
         // This is a controller, make sure session request / controller info is satisfied
@@ -444,14 +459,14 @@ void ctrlm_voice_endpoint_ws_nextgen_t::ctrlm_voice_handler_ws_nextgen_session_b
     }
 
     uuid_copy(msg.uuid, uuid);
-    msg.semaphore     = &semaphore;
     msg.src           = src;
-    msg.configuration = configuration;
-    msg.stream_params = (void *)stream_params;
+    msg.configuration = *configuration;
+    if(stream_params != NULL) {
+       msg.has_stream_params = true;
+       msg.stream_params     = *stream_params;
+    }
     msg.timestamp     = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
     ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen, &msg, sizeof(msg), (void *)endpoint);
-    sem_wait(&semaphore);
-    sem_destroy(&semaphore);
 }
 
 void ctrlm_voice_endpoint_ws_nextgen_t::ctrlm_voice_handler_ws_nextgen_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data) {

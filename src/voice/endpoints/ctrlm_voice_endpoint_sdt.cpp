@@ -20,12 +20,13 @@
 
 // Structures
 typedef struct {
-    sem_t                       *semaphore;
-    uuid_t                       uuid;
-    xrsr_src_t                   src;
-    xrsr_session_configuration_t *configuration;
-    void                         *stream_params;
-    rdkx_timestamp_t              timestamp;
+    uuid_t                          uuid;
+    xrsr_src_t                      src;
+    xrsr_session_config_out_t       configuration;
+    xrsr_callback_session_config_t  callback;
+    bool                            has_stream_params;
+    vmic_sdt_stream_params_t        stream_params;
+    rdkx_timestamp_t                timestamp;
 } ctrlm_voice_session_begin_cb_sdt_t;
 
 // Timestamps and stats are not pointers to avoid corruption
@@ -177,6 +178,8 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_begin_callback_sdt(void *data, in
     }
     ctrlm_voice_session_info_t info;
     bool keyword_verification = false;
+    xrsr_session_config_in_t config_in;
+    memset(&config_in, 0, sizeof(config_in));
 
     this->server_ret_code = 0;
     this->voice_message_available = false; // This is just for sanity
@@ -185,9 +188,8 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_begin_callback_sdt(void *data, in
     this->voice_obj->voice_session_info(&info);
 
     // Handle stream parameters
-    vmic_sdt_stream_params_t *stream_params = (vmic_sdt_stream_params_t *)dqm->stream_params;
-
-    if(stream_params != NULL) {
+    if(dqm->has_stream_params) {
+       vmic_sdt_stream_params_t *stream_params = &dqm->stream_params;
        if(info.has_stream_params) {
           stream_params->keyword_sample_begin               = info.stream_params.pre_keyword_sample_qty; // in samples
           stream_params->keyword_sample_end                 = (info.stream_params.pre_keyword_sample_qty + info.stream_params.keyword_sample_qty); // in samples
@@ -245,7 +247,10 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_begin_callback_sdt(void *data, in
     session_begin.keyword_verification = keyword_verification;
 
     this->voice_obj->voice_session_begin_callback(&session_begin);
-    sem_post(dqm->semaphore);
+
+    if(dqm->configuration.cb_session_config != NULL) {
+        (*dqm->configuration.cb_session_config)(dqm->uuid, &config_in);
+    }
 }
 
 void ctrlm_voice_endpoint_sdt_t::voice_stream_begin_callback_sdt(void *data, int size) {
@@ -319,13 +324,11 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_server_return_code_sdt(long ret_c
     this->voice_obj->voice_server_return_code_callback(ret_code);
 }
 
-void ctrlm_voice_endpoint_sdt_t::ctrlm_voice_handler_sdt_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, vmic_sdt_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
+void ctrlm_voice_endpoint_sdt_t::ctrlm_voice_handler_sdt_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, vmic_sdt_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
 
 ctrlm_voice_endpoint_sdt_t *endpoint = (ctrlm_voice_endpoint_sdt_t *)user_data;
     ctrlm_voice_session_begin_cb_sdt_t msg;
-    sem_t semaphore;
     memset(&msg, 0, sizeof(msg));
-    sem_init(&semaphore, 0, 0);
 
     if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
         // This is a controller, make sure session request / controller info is satisfied
@@ -333,16 +336,14 @@ ctrlm_voice_endpoint_sdt_t *endpoint = (ctrlm_voice_endpoint_sdt_t *)user_data;
         sem_wait(endpoint->voice_session_vsr_semaphore_get());
     }
     uuid_copy(msg.uuid, uuid);
-    msg.semaphore     = &semaphore;
     msg.src           = src;
-    msg.configuration = configuration;
-    msg.stream_params = (void *)stream_params;
+    msg.configuration = *configuration;
+    if(stream_params != NULL) {
+       msg.has_stream_params = true;
+       msg.stream_params     = *stream_params;
+    }
     msg.timestamp     = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
     ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_sdt_t::voice_session_begin_callback_sdt, &msg, sizeof(msg), (void *)endpoint);
-    sem_wait(&semaphore);
-    sem_destroy(&semaphore);
-    
-
 }
 
 void ctrlm_voice_endpoint_sdt_t::ctrlm_voice_handler_sdt_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data) {

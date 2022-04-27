@@ -47,7 +47,7 @@ protected:
     void voice_session_recv_msg_ws(const char *transcription);
 
 protected:
-    static void ctrlm_voice_handler_ws_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, xrsv_ws_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data);
+    static void ctrlm_voice_handler_ws_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, xrsv_ws_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_stream_begin(const uuid_t uuid, xrsr_src_t src, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_stream_kwd(const uuid_t uuid, rdkx_timestamp_t *timestamp, void *user_data);

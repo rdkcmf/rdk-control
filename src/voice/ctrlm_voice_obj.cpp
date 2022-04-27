@@ -161,7 +161,9 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->server_ret_code           = 0;
     this->has_stream_params         = false;
 
-    safec_rc =  memset_s(&this->session_timing, sizeof(this->session_timing), 0, sizeof(this->session_timing));
+    safec_rc = memset_s(this->sat_token, sizeof(this->sat_token), 0, sizeof(this->sat_token));
+    ERR_CHK(safec_rc);
+    safec_rc = memset_s(&this->session_timing, sizeof(this->session_timing), 0, sizeof(this->session_timing));
     ERR_CHK(safec_rc);
     safec_rc = memset_s(&this->stream_params, sizeof(this->stream_params), 0, sizeof(this->stream_params));
     ERR_CHK(safec_rc);
@@ -1879,10 +1881,12 @@ std::string ctrlm_voice_t::voice_stb_data_guide_language_get() const {
 
 void ctrlm_voice_t::voice_stb_data_sat_set(std::string &sat_token) {
     LOG_DEBUG("%s: SAT Token set to %s\n", __FUNCTION__, sat_token.c_str());
-    this->sat_token = sat_token;
+
+    errno_t safec_rc = strcpy_s(this->sat_token, sizeof(this->sat_token), sat_token.c_str());
+    ERR_CHK(safec_rc);
 }
 
-std::string ctrlm_voice_t::voice_stb_data_sat_get() const {
+const char *ctrlm_voice_t::voice_stb_data_sat_get() const {
     return(this->sat_token);
 }
 
@@ -1910,7 +1914,7 @@ bool ctrlm_voice_t::voice_session_has_stb_data() {
     }
 #endif
 #ifdef AUTH_SAT_TOKEN
-    if(this->sat_token_required && this->sat_token == "") {
+    if(this->sat_token_required && this->sat_token[0] == '\0') {
         LOG_INFO("%s: No SAT token\n", __FUNCTION__);
         return(false);
     }

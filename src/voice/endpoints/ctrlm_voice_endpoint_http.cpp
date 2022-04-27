@@ -23,12 +23,11 @@
 
 // Structures
 typedef struct {
-    sem_t                       *semaphore;
-    uuid_t                       uuid;
-    xrsr_src_t                   src;
-    xrsr_session_configuration_t *configuration;
-    void                         *stream_params;
-    rdkx_timestamp_t              timestamp;
+    uuid_t                          uuid;
+    xrsr_src_t                      src;
+    xrsr_session_config_out_t       configuration;
+    xrsr_callback_session_config_t  callback;
+    rdkx_timestamp_t                timestamp;
 } ctrlm_voice_session_begin_cb_http_t;
 
 // Timestamps and stats are not pointers to avoid corruption
@@ -165,37 +164,41 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
         return;
     }
     ctrlm_voice_session_info_t info;
-    std::string sat;
-    xrsr_session_configuration_http_t *http = &dqm->configuration->http;
     std::ostringstream user_agent;
-    errno_t safec_rc = -1;
+    xrsr_session_config_in_t config_in;
+    memset(&config_in, 0, sizeof(config_in));
+
     LOG_INFO("%s: session begin\n", __FUNCTION__);
 
-    if(NULL == http) {
-        LOG_ERROR("%s: http configuration null\n", __FUNCTION__);
-        return;
-    }
-
     this->voice_obj->voice_session_info(&info);
-    sat = this->voice_obj->voice_stb_data_sat_get();
+    const char *sat = this->voice_obj->voice_stb_data_sat_get();
     user_agent << "rmtType=" << info.controller_name.c_str() << "; rmtSVer=" << info.controller_version_sw.c_str() << "; rmtHVer=" << info.controller_version_hw.c_str() << "; stbName=" << info.stb_name.c_str() << "; rmtVolt=" << std::setprecision(3) << info.controller_voltage << "V";
 
     // User agent and SAT Token
-    if(sat != "") {
+    if(sat[0] != '\0') {
         LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
+        config_in.http.sat_token = sat;
     }
-    /* LIMITATION :
-     * Following strncpy() can't modified to safec strncpy_s() api
-     * Because, safec has the limitation of copying only 4k ( RSIZE_MAX ) to destination pointer
-     * And here, we have destination buffer size more than 4K i.e 5120.
-     */
-    strncpy(http->sat_token, sat.c_str(), sizeof(http->sat_token)-1);
-    http->sat_token[sizeof(http->sat_token)-1] = '\0';  //CID:157393 - Buffer size warning
-    safec_rc = strncpy_s(http->user_agent, sizeof(http->user_agent), user_agent.str().c_str(), sizeof(http->user_agent)-1);
+
+    errno_t safec_rc = strcpy_s(this->user_agent, sizeof(this->user_agent), user_agent.str().c_str());
     ERR_CHK(safec_rc);
-    http->user_agent[sizeof(http->user_agent)-1] = '\0';
+
+    config_in.http.user_agent = this->user_agent;
+
     if(dqm->src == XRSR_SRC_RCU_PTT && this->query_str_qty > 0) { // Add the application defined query string parameters
-       http->query_strs = this->query_strs;
+        uint32_t i = 0;
+        const char **query_strs = this->query_strs;
+
+        while(*query_strs != NULL) {
+            if(i >= XRSR_QUERY_STRING_QTY_MAX) {
+               XLOGD_WARN("maximum query string elements reached");
+               break;
+            }
+            config_in.http.query_strs[i++] = *query_strs;
+            query_strs++;
+        }
+
+        config_in.http.query_strs[i] = NULL;
     }
 
     this->server_ret_code = 0;
@@ -209,7 +212,10 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
     session_begin.keyword_verification = false; // Possibly could change in future, but meets current use cases.
 
     this->voice_obj->voice_session_begin_callback(&session_begin);
-    sem_post(dqm->semaphore);
+
+    if(dqm->configuration.cb_session_config != NULL) {
+        (*dqm->configuration.cb_session_config)(dqm->uuid, &config_in);
+    }
 }
 
 void ctrlm_voice_endpoint_http_t::voice_stream_begin_callback_http(void *data, int size) {
@@ -291,11 +297,9 @@ void ctrlm_voice_endpoint_http_t::voice_session_recv_msg_http(const char *transc
 // End Class Callbacks
 
 // Static Callbacks
-void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_configuration_t *configuration, rdkx_timestamp_t *timestamp, void *user_data) {
+void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, rdkx_timestamp_t *timestamp, void *user_data) {
     ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
     ctrlm_voice_session_begin_cb_http_t msg = {0};
-    sem_t semaphore;
-    sem_init(&semaphore, 0, 0);
 
     if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
         // This is a controller, make sure session request / controller info is satisfied
@@ -304,14 +308,10 @@ void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const u
     }
 
     uuid_copy(msg.uuid, uuid);
-    msg.semaphore     = &semaphore;
     msg.src           = src;
-    msg.configuration = configuration;
-    msg.stream_params = NULL;
+    msg.configuration = *configuration;
     msg.timestamp     = ctrlm_voice_endpoint_t::valid_timestamp_get(timestamp);
     ctrlm_main_queue_handler_push(CTRLM_HANDLER_VOICE, (ctrlm_msg_handler_voice_t)&ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http, &msg, sizeof(msg), (void *)endpoint);
-    sem_wait(&semaphore);
-    sem_destroy(&semaphore);
 }
 
 void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_end(const uuid_t uuid, xrsr_session_stats_t *stats, rdkx_timestamp_t *timestamp, void *user_data) {

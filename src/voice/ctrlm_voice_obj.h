@@ -223,7 +223,7 @@ typedef struct {
 typedef struct {
     ctrlm_voice_cb_header_t      header;
     xrsr_src_t                   src;
-    xrsr_session_configuration_t *configuration;
+    xrsr_session_config_out_t    configuration;
     ctrlm_voice_endpoint_t       *endpoint;
     bool                         keyword_verification;
 } ctrlm_voice_session_begin_cb_t;
@@ -397,7 +397,7 @@ class ctrlm_voice_t {
     virtual void                          voice_stb_data_guide_language_set(const char *language);
     std::string                           voice_stb_data_guide_language_get() const;
     virtual void                          voice_stb_data_sat_set(std::string &sat_token);
-    std::string                           voice_stb_data_sat_get() const;
+    const char *                          voice_stb_data_sat_get() const;
     bool                                  voice_stb_data_test_get() const;
 
     virtual bool                          voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk, bool local_conf);
@@ -497,7 +497,7 @@ public:
     std::string              receiver_id;
     std::string              partner_id;
     std::string              experience;
-    std::string              sat_token;
+    char                     sat_token[XRSR_SAT_TOKEN_LEN_MAX];
     bool                     sat_token_required;
     voice_session_prefss_t   prefs;
     // End STB Data
