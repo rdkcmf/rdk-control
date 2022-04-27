@@ -306,12 +306,15 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
             }
             controller_add(rcu_props.rcu_data);
          }
-         for(auto const &it : controllers_) {
-            if (BLE_CONTROLLER_TYPE_IR != it.second->getControllerType() && 
-               (hal_devices.end() == std::find(hal_devices.begin(), hal_devices.end(), it.second->getMacAddress()))) {
-               LOG_INFO("%s: Controller (ID = %u), MAC Address: <0x%llX> not paired according to HAL, so removing...\n", __FUNCTION__, it.first, it.second->getMacAddress());
+         for(auto it = controllers_.cbegin(); it != controllers_.cend(); ) {
+            if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType() &&
+               (hal_devices.end() == std::find(hal_devices.begin(), hal_devices.end(), it->second->getMacAddress()))) {
+               LOG_INFO("%s: Controller (ID = %u), MAC Address: <0x%llX> not paired according to HAL, so removing...\n", __FUNCTION__, it->first, it->second->getMacAddress());
                //remote stored in network database is not a paired remote as reported by the HAL, so remove it.
-               controller_remove(it.first);
+               controller_remove(it->first);
+               it = controllers_.erase(it);
+            } else {
+               ++it;
             }
          }
       }
@@ -1595,6 +1598,7 @@ void ctrlm_obj_network_ble_t::ind_process_unpaired(void *data, int size) {
    ctrlm_controller_id_t id;
    if (true == getControllerId(dqm->ieee_address, &id)) {
       controller_remove(id);
+      controllers_.erase(id);
       // report updated controller status to the plugin
       printStatus();
       iarm_event_rcu_status();
@@ -1885,7 +1889,6 @@ void ctrlm_obj_network_ble_t::controller_remove(ctrlm_controller_id_t controller
    }
    controllers_[controller_id]->db_destroy();
    delete controllers_[controller_id];
-   controllers_.erase(controller_id);
    LOG_INFO("%s: Removed controller %u\n", __FUNCTION__, controller_id);
 }
 
