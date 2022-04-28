@@ -153,9 +153,11 @@ endif
 controlMgr_SOURCES +=  thunder/ctrlm_thunder_plugin.cpp    \
                        thunder/ctrlm_thunder_controller.cpp \
                        thunder/helpers/ctrlm_thunder_helpers.cpp \
+                       thunder/plugins/ctrlm_thunder_plugin_system.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_display_settings.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_hdmi_input.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_cec_sink.cpp \
+                       thunder/plugins/ctrlm_thunder_plugin_cec_source.cpp \
                        thunder/plugins/ctrlm_thunder_plugin_cec.cpp
 endif
 

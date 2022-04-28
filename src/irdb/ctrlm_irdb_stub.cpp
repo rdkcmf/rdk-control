@@ -42,26 +42,26 @@ ctrlm_irdb_model_list_t ctrlm_irdb_stub_t::get_models(ctrlm_irdb_dev_type_t type
     return(ret);
 }
 
-ctrlm_irdb_ir_entry_id_ranked_list_t ctrlm_irdb_stub_t::get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len) {
-    ctrlm_irdb_ir_entry_id_ranked_list_t ret;
+ctrlm_irdb_autolookup_entry_ranked_list_t ctrlm_irdb_stub_t::get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len) {
+    ctrlm_irdb_autolookup_entry_ranked_list_t ret;
     IRDB_LOG_ERROR("%s not implemented\n", __FUNCTION__);
     return(ret);
 }
 
-ctrlm_irdb_ir_entry_id_ranked_list_t ctrlm_irdb_stub_t::get_ir_codes_by_edid(ctrlm_irdb_dev_type_t &type, unsigned char *edid, size_t edid_len) {
-    ctrlm_irdb_ir_entry_id_ranked_list_t ret;
+ctrlm_irdb_autolookup_entry_ranked_list_t ctrlm_irdb_stub_t::get_ir_codes_by_edid(ctrlm_irdb_dev_type_t &type, unsigned char *edid, size_t edid_len) {
+    ctrlm_irdb_autolookup_entry_ranked_list_t ret;
     IRDB_LOG_ERROR("%s not implemented\n", __FUNCTION__);
     return(ret);
 }
 
-ctrlm_irdb_ir_entry_id_ranked_list_t ctrlm_irdb_stub_t::get_ir_codes_by_cec(ctrlm_irdb_dev_type_t &type, std::string osd, unsigned int vendor_id, unsigned int logical_address) {
-    ctrlm_irdb_ir_entry_id_ranked_list_t ret;
+ctrlm_irdb_autolookup_entry_ranked_list_t ctrlm_irdb_stub_t::get_ir_codes_by_cec(ctrlm_irdb_dev_type_t &type, std::string osd, unsigned int vendor_id, unsigned int logical_address) {
+    ctrlm_irdb_autolookup_entry_ranked_list_t ret;
     IRDB_LOG_ERROR("%s not implemented\n", __FUNCTION__);
     return(ret);
 }
 
-ctrlm_irdb_ir_entry_id_by_type_t ctrlm_irdb_stub_t::get_ir_codes_by_autolookup() {
-    ctrlm_irdb_ir_entry_id_by_type_t ret;
+ctrlm_irdb_autolookup_entry_by_type_t ctrlm_irdb_stub_t::get_ir_codes_by_autolookup() {
+    ctrlm_irdb_autolookup_entry_by_type_t ret;
     IRDB_LOG_ERROR("%s not implemented\n", __FUNCTION__);
     return(ret);
 }

@@ -31,6 +31,7 @@
 #if   defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
 #include "ctrlm_thunder_plugin_display_settings.h"
 #include "ctrlm_thunder_plugin_cec.h"
+#include "ctrlm_thunder_plugin_cec_source.h"
 #elif defined (PLATFORM_TV) && defined(CTRLM_THUNDER)
 #include "ctrlm_thunder_plugin_hdmi_input.h"
 #include "ctrlm_thunder_plugin_cec_sink.h"
@@ -48,19 +49,30 @@ typedef enum {
     CTRLM_IRDB_DEV_TYPE_INVALID
 } ctrlm_irdb_dev_type_t;
 
-typedef std::map<ctrlm_key_code_t, std::vector<char> > ctrlm_irdb_ir_codes_t;
+typedef std::vector<char>                                             ctrlm_irdb_ir_code_t;
+typedef std::map<ctrlm_key_code_t, ctrlm_irdb_ir_code_t>              ctrlm_irdb_ir_codes_t;
 
-typedef std::string                                              ctrlm_irdb_manufacturer_t;
-typedef std::vector<ctrlm_irdb_manufacturer_t>                   ctrlm_irdb_manufacturer_list_t;
-typedef std::string                                              ctrlm_irdb_model_t;
-typedef std::vector<ctrlm_irdb_model_t>                          ctrlm_irdb_model_list_t;
-typedef std::string                                              ctrlm_irdb_ir_entry_id_t;
-typedef std::vector<ctrlm_irdb_ir_entry_id_t>                    ctrlm_irdb_ir_entry_id_list_t;
-typedef std::pair<ctrlm_irdb_ir_entry_id_t, int>                 ctrlm_irdb_ir_entry_id_ranked_t;
-typedef std::vector<ctrlm_irdb_ir_entry_id_ranked_t>             ctrlm_irdb_ir_entry_id_ranked_list_t;
-typedef std::map<ctrlm_irdb_dev_type_t,ctrlm_irdb_ir_entry_id_t> ctrlm_irdb_ir_entry_id_by_type_t;
+typedef std::string                                                   ctrlm_irdb_manufacturer_t;
+typedef std::vector<ctrlm_irdb_manufacturer_t>                        ctrlm_irdb_manufacturer_list_t;
+typedef std::string                                                   ctrlm_irdb_model_t;
+typedef std::vector<ctrlm_irdb_model_t>                               ctrlm_irdb_model_list_t;
+typedef std::string                                                   ctrlm_irdb_ir_entry_id_t;
+typedef std::vector<ctrlm_irdb_ir_entry_id_t>                         ctrlm_irdb_ir_entry_id_list_t;
 
-typedef std::vector<char> ctrlm_irdb_ir_code_t;
+// Autolookup
+class ctrlm_irdb_autolookup_entry_t {
+public:
+    ctrlm_irdb_manufacturer_t man;
+    ctrlm_irdb_ir_entry_id_t  id;
+    ctrlm_irdb_autolookup_entry_t() {
+        this->man = "Unknown";
+        this->id  = "";
+    }
+};
+typedef std::pair<ctrlm_irdb_autolookup_entry_t, int>                 ctrlm_irdb_autolookup_entry_ranked_t;
+typedef std::vector<ctrlm_irdb_autolookup_entry_ranked_t>             ctrlm_irdb_autolookup_entry_ranked_list_t;
+typedef std::map<ctrlm_irdb_dev_type_t,ctrlm_irdb_autolookup_entry_t> ctrlm_irdb_autolookup_entry_by_type_t;
+// End Autolookup
 
 class ctrlm_irdb_ir_code_set_t {
 public:
@@ -97,24 +109,24 @@ public:
     ctrlm_irdb_t(ctrlm_irdb_mode_t mode);
     virtual ~ctrlm_irdb_t();
 
-    virtual ctrlm_irdb_manufacturer_list_t       get_manufacturers(ctrlm_irdb_dev_type_t type, std::string prefix = "")                                                                                    = 0;
-    virtual ctrlm_irdb_model_list_t              get_models(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, std::string prefix = "")                                                   = 0;
-    virtual ctrlm_irdb_ir_entry_id_list_t        get_ir_codes_by_names(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, ctrlm_irdb_model_t model = "")                                  = 0;
-    virtual ctrlm_irdb_ir_entry_id_by_type_t     get_ir_codes_by_autolookup();
-    virtual bool                                 set_ir_codes_by_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t name)       = 0;
-    virtual bool                                 clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id)                                                                        = 0;
-    virtual bool                                 can_get_ir_codes_by_autolookup();
-    virtual bool                                 initialize_irdb();
+    virtual ctrlm_irdb_manufacturer_list_t        get_manufacturers(ctrlm_irdb_dev_type_t type, std::string prefix = "")                                                                                    = 0;
+    virtual ctrlm_irdb_model_list_t               get_models(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, std::string prefix = "")                                                   = 0;
+    virtual ctrlm_irdb_ir_entry_id_list_t         get_ir_codes_by_names(ctrlm_irdb_dev_type_t type, ctrlm_irdb_manufacturer_t manufacturer, ctrlm_irdb_model_t model = "")                                  = 0;
+    virtual ctrlm_irdb_autolookup_entry_by_type_t get_ir_codes_by_autolookup();
+    virtual bool                                  set_ir_codes_by_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_dev_type_t type, ctrlm_irdb_ir_entry_id_t name)       = 0;
+    virtual bool                                  clear_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id)                                                                        = 0;
+    virtual bool                                  can_get_ir_codes_by_autolookup();
+    virtual bool                                  initialize_irdb();
 
 #if defined(CTRLM_THUNDER)
 public:
-    virtual void                                 on_thunder_ready();
+    virtual void                                  on_thunder_ready();
 #endif
 
 protected:
-    virtual ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len)                                                    = 0;
-    virtual ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_edid(ctrlm_irdb_dev_type_t &type, unsigned char *edid, size_t edid_len)                                                                   = 0;
-    virtual ctrlm_irdb_ir_entry_id_ranked_list_t get_ir_codes_by_cec(ctrlm_irdb_dev_type_t &type, std::string osd, unsigned int vendor_id, unsigned int logical_address)                                   = 0;
+    virtual ctrlm_irdb_autolookup_entry_ranked_list_t get_ir_codes_by_infoframe(ctrlm_irdb_dev_type_t &type, unsigned char *infoframe, size_t infoframe_len)                                                    = 0;
+    virtual ctrlm_irdb_autolookup_entry_ranked_list_t get_ir_codes_by_edid(ctrlm_irdb_dev_type_t &type, unsigned char *edid, size_t edid_len)                                                                   = 0;
+    virtual ctrlm_irdb_autolookup_entry_ranked_list_t get_ir_codes_by_cec(ctrlm_irdb_dev_type_t &type, std::string osd, unsigned int vendor_id, unsigned int logical_address)                                   = 0;
 
 protected:
     bool                                         _set_ir_codes(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_irdb_ir_code_set_t &ir_codes);
@@ -128,11 +140,23 @@ protected:
 
 private:
 #if   defined(PLATFORM_STB) && defined(CTRLM_THUNDER)
+#if   defined(IRDB_HDMI_DISCOVERY)
     Thunder::DisplaySettings::ctrlm_thunder_plugin_display_settings_t display_settings;
+#endif
+#if   defined(IRDB_CEC_DISCOVERY)
+#if   defined(IRDB_CEC_FLEX2)
+    Thunder::CEC::ctrlm_thunder_plugin_cec_source_t                   cec;
+#else
     Thunder::CEC::ctrlm_thunder_plugin_cec_t                          cec;
+#endif
+#endif
 #elif defined(PLATFORM_TV) && defined(CTRLM_THUNDER)
+#if   defined(IRDB_HDMI_DISCOVERY)
     Thunder::HDMIInput::ctrlm_thunder_plugin_hdmi_input_t             hdmi_input;
+#endif
+#if   defined(IRDB_CEC_DISCOVERY)
     Thunder::CECSink::ctrlm_thunder_plugin_cec_sink_t                 cec_sink;
+#endif
 #endif
 
 };

@@ -169,8 +169,8 @@ IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::get_ir_codes_by_auto_lookup(void *a
     ctrlm_irdb_t *irdb = ctrlm_main_irdb_get();
 
     bool success                   = false;
-    json_t *tv_codes               = NULL;
-    json_t *avr_codes              = NULL;
+    json_t *tv_man, *tv_codes      = NULL;
+    json_t *avr_man, *avr_codes    = NULL;
 
     if(params == NULL || params->api_revision != CTRLM_MAIN_IARM_BUS_API_REVISION) {
         IRDB_LOG_ERROR("%s: Invalid parameters\n", __FUNCTION__);
@@ -181,13 +181,17 @@ IARM_Result_t ctrlm_irdb_ipc_iarm_thunder_t::get_ir_codes_by_auto_lookup(void *a
         if(irdb->can_get_ir_codes_by_autolookup()) {
             auto cd_map = irdb->get_ir_codes_by_autolookup();
             if(cd_map.count(CTRLM_IRDB_DEV_TYPE_TV) > 0) {
+                tv_man   = json_string(cd_map[CTRLM_IRDB_DEV_TYPE_TV].man.c_str());
                 tv_codes = json_array();
-                json_array_append_new(tv_codes, json_string(cd_map[CTRLM_IRDB_DEV_TYPE_TV].c_str()));
+                json_array_append_new(tv_codes, json_string(cd_map[CTRLM_IRDB_DEV_TYPE_TV].id.c_str()));
+                json_object_set_new(ret, "tvManufacturer", tv_man);
                 json_object_set_new(ret, "tvCodes", tv_codes);
             }
             if(cd_map.count(CTRLM_IRDB_DEV_TYPE_AVR) > 0) {
+                avr_man   = json_string(cd_map[CTRLM_IRDB_DEV_TYPE_AVR].man.c_str());
                 avr_codes = json_array();
-                json_array_append_new(avr_codes, json_string(cd_map[CTRLM_IRDB_DEV_TYPE_AVR].c_str()));
+                json_array_append_new(avr_codes, json_string(cd_map[CTRLM_IRDB_DEV_TYPE_AVR].id.c_str()));
+                json_object_set_new(ret, "avrManufacturer", avr_man);
                 json_object_set_new(ret, "avrCodes", avr_codes);
             }
             success = true;
