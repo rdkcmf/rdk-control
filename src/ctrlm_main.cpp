@@ -1264,7 +1264,7 @@ gboolean ctrlm_load_device_mac(void) {
 
 #ifdef AUTH_ENABLED
 void ctrlm_main_auth_start_poll() {
-   if(g_ctrlm.authservice_poll_tag == 0 && !ctrlm_load_authservice_data()) {
+   if(g_ctrlm.authservice_poll_tag == 0) {
       g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
                                                           ctrlm_authservice_poll,
                                                           NULL);
@@ -2578,6 +2578,7 @@ gpointer ctrlm_main_thread(gpointer param) {
                if(g_ctrlm.authservice_fast_retries == g_ctrlm.authservice_fast_retries_max) {
                   *dqm->ret = FALSE;
                   *dqm->switch_poll_interval = TRUE;
+                  g_ctrlm.authservice_fast_retries = 0;
                   LOG_INFO("%s: Switching to normal authservice poll interval\n", __FUNCTION__);
                }
             }
@@ -4580,7 +4581,7 @@ void ctrlm_main_invalidate_service_access_token(void) {
          if(g_ctrlm.service_access_token_expiration_tag != 0) {
             ctrlm_timeout_destroy(&g_ctrlm.service_access_token_expiration_tag);
          }
-         if(g_ctrlm.authservice_poll_tag == 0 && !ctrlm_load_authservice_data()) {
+         if(g_ctrlm.authservice_poll_tag == 0) {
             g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted ? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
                                                                 ctrlm_authservice_poll,
                                                                 NULL);
