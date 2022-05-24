@@ -41,10 +41,10 @@
 //////////////////////////////////////////
 
 typedef enum {
-   BLE_CONTROLLER_TYPE_IR,
    BLE_CONTROLLER_TYPE_PR1,
    BLE_CONTROLLER_TYPE_LC103,
    BLE_CONTROLLER_TYPE_EC302,
+   BLE_CONTROLLER_TYPE_IR,    // add new remote types before this
    BLE_CONTROLLER_TYPE_UNKNOWN,
    BLE_CONTROLLER_TYPE_INVALID
 } ctrlm_ble_controller_type_t;
@@ -113,6 +113,8 @@ public:
 
    bool                          swUpgradeRequired(ctrlm_version_t newVersion, bool force);
 
+   void                          setUpgradeInProgress(bool upgrading);
+   bool                          getUpgradeInProgress(void);
    void                          setUpgradeAttempted(bool upgrade_attempted);
    bool                          getUpgradeAttempted(void);
 
@@ -136,6 +138,9 @@ public:
    std::vector<uint16_t>         getWakeupCustomList();
    std::string                   wakeupCustomListToString();
 
+   void                          setUpgradePaused(bool paused);
+   bool                          getUpgradePaused();
+
    void                          update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost);
    void                          property_write_voice_metrics(void);
    guchar                        property_parse_voice_metrics(guchar *data, guchar length);
@@ -157,7 +162,9 @@ private:
    ctrlm_version_t                  hw_revision_;
    ctrlm_version_t                  sw_revision_;
 
+   bool                             upgrade_in_progress_;
    bool                             upgrade_attempted_;
+   bool                             upgrade_paused_;
 
    int                              ir_code_;
 

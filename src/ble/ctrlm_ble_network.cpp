@@ -47,10 +47,23 @@
 
 using namespace std;
 
+// timer requires the value to be in milliseconds
+#define MINUTE_IN_MILLISECONDS                (60 * 1000)
+#define CTRLM_BLE_STALE_REMOTE_TIMEOUT        (MINUTE_IN_MILLISECONDS * 60)   // 60 minutes
+#define CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT    (MINUTE_IN_MILLISECONDS * 5)    // 5 minutes
+#define CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT       (MINUTE_IN_MILLISECONDS * 2)    // 2 minutes
 
-#define CTRLM_BLE_STALE_REMOTE_TIMEOUT    60 * 60 * 1000    // in ms
+typedef struct {
+   guint stale_remote_timer_tag;
+   guint upgrade_continue_timer_tag;
+   guint upgrade_pause_timer_tag;
+} ctrlm_ble_network_t;
+
+static ctrlm_ble_network_t g_ctrlm_ble_network;
+
 
 static gboolean ctrlm_ble_network_continue_upgrade(gpointer user_data);
+static gboolean ctrlm_ble_network_resume_upgrade(gpointer user_data);
 static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrade_image_info_t &image_info);
 static gboolean ctrlm_ble_check_for_stale_remote(gpointer user_data);
 
@@ -98,19 +111,18 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t(ctrlm_network_type_t type, ctrl
    ir_state_                    = CTRLM_IR_STATE_IDLE;
    upgrade_in_progress_         = false;
    unpair_on_remote_request_    = true;
-   upgrade_timer_tag_           = 0;
-   stale_remote_timer_tag_      = 0;
 
    hal_thread_                  = NULL;
    hal_api_main_                = NULL;
    hal_api_term_                = NULL;
 
+   g_ctrlm_ble_network.stale_remote_timer_tag = 0;
+   g_ctrlm_ble_network.upgrade_continue_timer_tag = 0;
+   g_ctrlm_ble_network.upgrade_pause_timer_tag = 0;
+
    // Initialize condition and mutex
    g_mutex_init(&mutex_);
    g_cond_init(&condition_);
-
-   // EGTODO: should BLE have a similar config file?
-   // load_config(json_obj_net);
 
    hal_api_main_ = ctrlm_hal_ble_main;
 
@@ -127,8 +139,9 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t() {
 ctrlm_obj_network_ble_t::~ctrlm_obj_network_ble_t() {
    LOG_INFO("ctrlm_obj_network_ble_t destructor - Type (%u) Id (%u) Name (%s)\n", type_, id_, name_.c_str());
 
-   ctrlm_timeout_destroy(&upgrade_timer_tag_);
-   ctrlm_timeout_destroy(&stale_remote_timer_tag_);
+   ctrlm_timeout_destroy(&g_ctrlm_ble_network.stale_remote_timer_tag);
+   ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
+   ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
 
    ctrlm_ble_iarm_terminate();
    
@@ -260,6 +273,7 @@ void ctrlm_obj_network_ble_t::hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t p
    hal_api_get_daemon_log_levels_      = params.get_daemon_log_levels;
    hal_api_set_daemon_log_levels_      = params.set_daemon_log_levels;
    hal_api_fw_upgrade_                 = params.fw_upgrade;
+   hal_api_fw_upgrade_cancel_          = params.fw_upgrade_cancel;
    hal_api_get_rcu_unpair_reason_      = params.get_rcu_unpair_reason;
    hal_api_get_rcu_reboot_reason_      = params.get_rcu_reboot_reason;
    hal_api_get_rcu_last_wakeup_key_    = params.get_rcu_last_wakeup_key;
@@ -335,7 +349,7 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
       LOG_INFO("%s: -----------------------\n", __FUNCTION__);
    }
 
-   stale_remote_timer_tag_ = ctrlm_timeout_create(CTRLM_BLE_STALE_REMOTE_TIMEOUT, ctrlm_ble_check_for_stale_remote, &id_);
+   g_ctrlm_ble_network.stale_remote_timer_tag = ctrlm_timeout_create(CTRLM_BLE_STALE_REMOTE_TIMEOUT, ctrlm_ble_check_for_stale_remote, &id_);
 
    if (hal_api_start_threads_) {
       hal_api_start_threads_();
@@ -1163,48 +1177,94 @@ void ctrlm_obj_network_ble_t::addUpgradeImage(ctrlm_ble_upgrade_image_info_t ima
 static gboolean ctrlm_ble_network_continue_upgrade(gpointer user_data) {
    ctrlm_network_id_t* net_id =  (ctrlm_network_id_t*) user_data;
    if (net_id != NULL) {
-      // LOG_DEBUG("%s: Enter...\n", __FUNCTION__);
-      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, NULL, 0, NULL, *net_id);
+      // Allocate a message and send it to Control Manager's queue
+      ctrlm_main_queue_msg_continue_upgrade_t msg;
+      errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+      ERR_CHK(safec_rc);
+      msg.retry_all = false;
+
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, &msg, sizeof(msg), NULL, *net_id);
    }
+   g_ctrlm_ble_network.upgrade_continue_timer_tag = 0;
+   return false;
+}
+
+static gboolean ctrlm_ble_network_resume_upgrade(gpointer user_data) {
+   ctrlm_network_id_t* net_id =  (ctrlm_network_id_t*) user_data;
+   if (net_id != NULL) {
+      // Allocate a message and send it to Control Manager's queue
+      ctrlm_main_queue_msg_continue_upgrade_t msg;
+      errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+      ERR_CHK(safec_rc);
+      msg.retry_all = true;   //clear upgrade_attempted flag for all controllers to retry upgrade for all
+
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, &msg, sizeof(msg), NULL, *net_id);
+   }
+   g_ctrlm_ble_network.upgrade_pause_timer_tag = 0;
    return false;
 }
 
 void ctrlm_obj_network_ble_t::req_process_network_continue_upgrade(void *data, int size) {
+   ctrlm_main_queue_msg_continue_upgrade_t *dqm = (ctrlm_main_queue_msg_continue_upgrade_t *)data;
+
+   g_assert(dqm);
+   g_assert(size == sizeof(ctrlm_main_queue_msg_continue_upgrade_t));
+
    if (upgrade_images_.empty()) {
       LOG_WARN("%s: No upgrade images in the queue.\n", __PRETTY_FUNCTION__);
       return;
    }
-   bool additional_upgrades_required = false;
+
+   if (dqm->retry_all) {
+      LOG_INFO("%s: Checking all controllers for upgrades from a clean state.\n", __PRETTY_FUNCTION__);
+      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
+      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
+      for (auto &controller : controllers_) {
+         controller.second->setUpgradeAttempted(false);
+         controller.second->setUpgradePaused(false);
+      }
+   }
+
    if (!upgrade_in_progress_) {
       for (auto const &upgrade_image : upgrade_images_) {
          for (auto &controller : controllers_) {
             if (controller.second->getControllerType() == upgrade_image.first) {
                if (controller.second->swUpgradeRequired(upgrade_image.second.version_software, upgrade_image.second.force_update)) {
-                  additional_upgrades_required = true;
+                  ctrlm_version_t new_version = upgrade_image.second.version_software;
+                  LOG_INFO("%s: Attempting to upgrade controller %s from <%s> to <%s>\n", __PRETTY_FUNCTION__,
+                        ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str(),
+                        controller.second->getSwRevision().toString().c_str(),
+                        new_version.toString().c_str());
+
+                  // Attempt an upgrade once per request.  In the event of a failure, we don't want a remote
+                  // continuously trying an upgrade.
+                  controller.second->setUpgradeAttempted(true);
+
                   ctrlm_hal_ble_FwUpgrade_params_t params;
                   params.file_path = upgrade_image.second.path + "/" + upgrade_image.second.image_filename;
                   params.ieee_address = controller.second->getMacAddress();
-                  controller.second->setUpgradeAttempted(true);
                   if (hal_api_fw_upgrade_) {
                      hal_api_fw_upgrade_(params);
                   } else {
                      LOG_FATAL("%s: hal_api_fw_upgrade_ is NULL!\n", __PRETTY_FUNCTION__);
                   }
+
+                  LOG_DEBUG("%s: Upgrading one remote at a time, setting timer for %d minutes to check if other remotes need upgrades.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT / MINUTE_IN_MILLISECONDS);
+                  ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
+                  g_ctrlm_ble_network.upgrade_continue_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_network_continue_upgrade, &id_);
+                  return;
                } else {
-                  LOG_DEBUG("%s: Software for controller <0x%llX> already up to date\n", __PRETTY_FUNCTION__, controller.second->getMacAddress());
+                  LOG_INFO("%s: Software for controller %s already up to date.\n", __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str());
                }
             }
          }
       }
-   } else {
-      additional_upgrades_required = true;
-   }
-   if (additional_upgrades_required) {
-      LOG_INFO("%s: Setting timer to check for more upgrades in 5 minutes.\n", __PRETTY_FUNCTION__);
-      upgrade_timer_tag_ = ctrlm_timeout_create(5 * (1000 * 60), ctrlm_ble_network_continue_upgrade, &id_);
-   } else {
       // We looped through all the upgrade images and all the controllers and didn't trigger any upgrades, so stop upgrade process.
-      LOG_INFO("%s: Software for all controllers already up to date, exiting upgrade procedure.\n", __PRETTY_FUNCTION__);
+      LOG_INFO("%s: Software for all controllers up to date.  Exiting upgrade procedure.\n", __PRETTY_FUNCTION__);
+   } else {
+      LOG_INFO("%s: Upgrade currently in progress, setting timer for %d minutes to check if other remotes need upgrades.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT / MINUTE_IN_MILLISECONDS);
+      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
+      g_ctrlm_ble_network.upgrade_continue_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_network_continue_upgrade, &id_);
    }
 }
 
@@ -1245,11 +1305,13 @@ void ctrlm_obj_network_ble_t::req_process_network_managed_upgrade(void *data, in
          }
       }
 
-      for (auto &controller : controllers_) {
-         controller.second->setUpgradeAttempted(false);
-      }
+      // Allocate a message and send it to Control Manager's queue
+      ctrlm_main_queue_msg_continue_upgrade_t msg;
+      errno_t safec_rc = memset_s(&msg, sizeof(msg), 0, sizeof(msg));
+      ERR_CHK(safec_rc);
+      msg.retry_all = true;
 
-      ctrlm_ble_network_continue_upgrade((gpointer) &id_);
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, &msg, sizeof(msg), NULL, id_);
    }
 }
 
@@ -1381,11 +1443,19 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                case CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING:
                   LOG_INFO("%s: Controller (0x%llX) firmware upgrading = %s\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.is_upgrading ? "TRUE" : "FALSE");
                   upgrade_in_progress_ = dqm->rcu_data.is_upgrading;
+                  if (!dqm->rcu_data.is_upgrading) {
+                     // If we get FALSE here, make sure the controller upgrade progress flag is cleared.  But we don't want to set the controller progress
+                     // flag to TRUE based on this property.  Controller upgrade progress flag should only be set to true if packets are actively being sent
+                     controller->setUpgradeInProgress(false);
+                  }
                   report_status = false;
                   print_status = false;
                   break;
                case CTRLM_HAL_BLE_PROPERTY_UPGRADE_PROGRESS:
                   LOG_INFO("%s: Controller (0x%llX) firmware upgrade %d%% complete...\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.upgrade_progress);
+                  // From a controller perspective, we cannot use the CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING flag above to determine if its actively upgrading.
+                  // Instead, its more accurate to use the progress percentage to determine if the remote is actively receiving firmware packets.
+                  controller->setUpgradeInProgress(dqm->rcu_data.upgrade_progress > 0 && dqm->rcu_data.upgrade_progress < 100);
                   report_status = false;
                   print_status = false;
                   break;
@@ -1640,6 +1710,28 @@ void ctrlm_obj_network_ble_t::ind_process_keypress(void *data, int size) {
    if (true == getControllerId(dqm->ieee_address, &controller_id)) {
       LOG_INFO("%s: %s - MAC Address <%s>, code = <0x%X>, status = <%s>\n", __FUNCTION__, ctrlm_ble_controller_type_str(controllers_[controller_id]->getControllerType()), 
          ctrlm_convert_mac_long_to_string(dqm->ieee_address).c_str(), mask_key_codes_get() ? 0xFF : dqm->event.code, ctrlm_key_status_str(key_status));
+
+      ctrlm_obj_controller_ble_t *controller = controllers_[controller_id];
+
+      ctrlm_hal_ble_FwUpgradeCancel_params_t params;
+      params.ieee_address = dqm->ieee_address;
+      if (key_status == CTRLM_KEY_STATUS_DOWN) {
+         if (controller->getUpgradeInProgress()) {
+            if (hal_api_fw_upgrade_cancel_) {
+               if (CTRLM_HAL_RESULT_SUCCESS == hal_api_fw_upgrade_cancel_(params)) {
+                  controller->setUpgradePaused(true);
+               }
+            } else {
+               LOG_FATAL("%s: hal_api_fw_upgrade_cancel_ is NULL!\n", __PRETTY_FUNCTION__);
+            }
+         }
+         if (controller->getUpgradePaused()) {
+            LOG_INFO("%s: Upgrade cancelled since remote is being used.  Setting timer to resume upgrade in %d minutes.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT / MINUTE_IN_MILLISECONDS);
+            //delete existing timer and start again
+            ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
+            g_ctrlm_ble_network.upgrade_pause_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT, ctrlm_ble_network_resume_upgrade, &id_);
+         }
+      }
 
       controllers_[controller_id]->process_event_key(key_status, dqm->event.code);
    } else {

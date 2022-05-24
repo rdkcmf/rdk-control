@@ -32,8 +32,8 @@
 
 #define CTRLM_HAL_BLE_DEFAULT_DISCOVERY_TIMEOUT_MS (30 * 1000)
 
-// EGTODO: Sky remote sends 100 byte ADPCM, or 384 byte PCM.  Do I keep this hardcoded?
-#define CTRLM_HAL_BLE_MAX_VOICE_PACKET_BYTES   (96*2*2)   //(100)
+// Sky remote sends 100 byte ADPCM, or 384 byte PCM.
+#define CTRLM_HAL_BLE_MAX_VOICE_PACKET_BYTES   (96*2*2)
 
 
 
@@ -211,6 +211,10 @@ typedef struct {
 } ctrlm_hal_ble_FwUpgrade_params_t;
 
 typedef struct {
+   unsigned long long   ieee_address;
+} ctrlm_hal_ble_FwUpgradeCancel_params_t;
+
+typedef struct {
    unsigned long long            ieee_address;
    ctrlm_ble_RcuUnpairReason_t   reason;
 } ctrlm_hal_ble_GetRcuUnpairReason_params_t;
@@ -333,6 +337,11 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_SetDaemonLogLevels_t)(daemon_logg
 /// @param[in] file_path - path to the firmware binary
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_FwUpgrade_t)(ctrlm_hal_ble_FwUpgrade_params_t params);
 
+/// @brief Pause/resume RCU firmware upgrade procedure
+/// @param[in] ieee_address - MAC address of the controller
+/// @param[in] pause - if true: pause upgrade, if false: resume upgrade
+typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_FwUpgradeCancel_t)(ctrlm_hal_ble_FwUpgradeCancel_params_t params);
+
 
 /// @brief Read the reason for the last unpairing from the RCU
 /// @param[in] ieee_address - MAC address of the controller
@@ -387,6 +396,7 @@ typedef struct {
    ctrlm_hal_ble_req_GetDaemonLogLevels_t       get_daemon_log_levels;
    ctrlm_hal_ble_req_SetDaemonLogLevels_t       set_daemon_log_levels;
    ctrlm_hal_ble_req_FwUpgrade_t                fw_upgrade;
+   ctrlm_hal_ble_req_FwUpgradeCancel_t          fw_upgrade_cancel;
    ctrlm_hal_ble_req_GetRcuUnpairReason_t       get_rcu_unpair_reason;
    ctrlm_hal_ble_req_GetRcuRebootReason_t       get_rcu_reboot_reason;
    ctrlm_hal_ble_req_GetRcuLastWakeupKey_t      get_rcu_last_wakeup_key;

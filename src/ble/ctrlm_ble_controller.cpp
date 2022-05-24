@@ -65,6 +65,8 @@ bool ctrlm_obj_controller_ble_t::controllerTypeToXconfString(ctrlm_ble_controlle
       case BLE_CONTROLLER_TYPE_EC302:
          xconfString = XCONF_PRODUCT_NAME_EC302;
          break;
+      case BLE_CONTROLLER_TYPE_IR:
+         return false;
       default:
          LOG_ERROR("%s: controller of type %s not mapped to XCONF string\n", __FUNCTION__, ctrlm_ble_controller_type_str(type));
          return false;
@@ -72,7 +74,6 @@ bool ctrlm_obj_controller_ble_t::controllerTypeToXconfString(ctrlm_ble_controlle
    return true;
 }
 
-//EGTODO:  handle the fact that LC203 has same fw as LC103
 bool ctrlm_obj_controller_ble_t::xconfStringToControllerType(string xconfString, ctrlm_ble_controller_type_t &controller_type) {
    if (xconfString == XCONF_PRODUCT_NAME_PR1) {
       controller_type = BLE_CONTROLLER_TYPE_PR1;
@@ -98,6 +99,9 @@ ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t(ctrlm_controller_id_t con
    device_id_(0),
    manufacturer_(),
    model_(),
+   upgrade_in_progress_(false),
+   upgrade_attempted_(false),
+   upgrade_paused_(false),
    stored_in_db_(false),
    connected_(false),
    validation_result_(validation_result),
@@ -439,9 +443,13 @@ guchar ctrlm_obj_controller_ble_t::property_read_irdb_entry_id_name_avr(guchar *
 bool ctrlm_obj_controller_ble_t::swUpgradeRequired(ctrlm_version_t newVersion, bool force) {
    LOG_DEBUG("%s: Controller %u: current rev = <%s>, new rev = <%s>, force = <%s>\n", __FUNCTION__, 
          controller_id_get(), sw_revision_.toString().c_str(),newVersion.toString().c_str(), force ? "TRUE" : "FALSE");
-   int rev_compare = sw_revision_.compare(newVersion);
-   // Need a sw upgrade if the current version is older than the new version, or force flag is true and versions aren't equal
-   return ((rev_compare < 0) && !upgrade_attempted_) || (force && (rev_compare != 0));
+   if ((unsigned)controller_type_ >= BLE_CONTROLLER_TYPE_IR) {
+      return false;
+   } else {
+      int rev_compare = sw_revision_.compare(newVersion);
+      // Need a sw upgrade if the current version is older than the new version, or force flag is true and versions aren't equal
+      return ((rev_compare < 0) && !upgrade_attempted_) || (force && (rev_compare != 0));
+   }
 }
 
 void ctrlm_obj_controller_ble_t::setUpgradeAttempted(bool upgrade_attempted) {
@@ -451,6 +459,23 @@ void ctrlm_obj_controller_ble_t::setUpgradeAttempted(bool upgrade_attempted) {
 
 bool ctrlm_obj_controller_ble_t::getUpgradeAttempted(void) {
    return upgrade_attempted_;
+}
+
+void ctrlm_obj_controller_ble_t::setUpgradeInProgress(bool upgrading) {
+   LOG_DEBUG("%s: Controller %u set Upgrade in Progress to %d\n", __FUNCTION__, controller_id_get(), upgrading);
+   upgrade_in_progress_ = upgrading;
+}
+
+bool ctrlm_obj_controller_ble_t::getUpgradeInProgress(void) {
+   return upgrade_in_progress_;
+}
+
+void ctrlm_obj_controller_ble_t::setUpgradePaused(bool paused) {
+   upgrade_paused_ = paused;
+}
+
+bool ctrlm_obj_controller_ble_t::getUpgradePaused() {
+   return upgrade_paused_;
 }
 
 void ctrlm_obj_controller_ble_t::setIrCode(int ircode) {
@@ -529,7 +554,7 @@ void ctrlm_obj_controller_ble_t::setWakeupCustomList(int *list, int size) {
 vector<uint16_t> ctrlm_obj_controller_ble_t::getWakeupCustomList() {
    return wakeup_custom_list_;
 }
-//EGTODO: move to utils
+
 std::string ctrlm_obj_controller_ble_t::wakeupCustomListToString() {
   std::ostringstream oss;
   if (!wakeup_custom_list_.empty()) {

@@ -75,6 +75,11 @@ typedef struct {
 } ctrlm_main_queue_msg_write_advertising_config_t;
 
 typedef struct {
+   ctrlm_main_queue_msg_header_t                  header;
+   bool                                           retry_all;
+} ctrlm_main_queue_msg_continue_upgrade_t;
+
+typedef struct {
    ctrlm_ble_controller_type_t   controller_type;
    std::string                   path;
    std::string                   image_filename;
@@ -183,6 +188,7 @@ private:
    ctrlm_hal_ble_req_GetDaemonLogLevels_t       hal_api_get_daemon_log_levels_;
    ctrlm_hal_ble_req_SetDaemonLogLevels_t       hal_api_set_daemon_log_levels_;
    ctrlm_hal_ble_req_FwUpgrade_t                hal_api_fw_upgrade_;
+   ctrlm_hal_ble_req_FwUpgradeCancel_t          hal_api_fw_upgrade_cancel_;
    ctrlm_hal_ble_req_GetRcuUnpairReason_t       hal_api_get_rcu_unpair_reason_;
    ctrlm_hal_ble_req_GetRcuRebootReason_t       hal_api_get_rcu_reboot_reason_;
    ctrlm_hal_ble_req_GetRcuLastWakeupKey_t      hal_api_get_rcu_last_wakeup_key_;
@@ -195,8 +201,6 @@ private:
    int                                    pairing_code_;
 
    bool                                   upgrade_in_progress_;
-   guint                                  upgrade_timer_tag_;
-   guint                                  stale_remote_timer_tag_;
 
    bool                                   unpair_on_remote_request_;
 

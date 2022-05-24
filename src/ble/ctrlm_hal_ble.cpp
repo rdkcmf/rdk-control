@@ -126,6 +126,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_SetDaemonLogLevel(daemon_logging_t l
 
 static void ctrlm_hal_ble_FwUpgrade_ResultCB(GDBusProxy *proxy, GAsyncResult *res, gpointer user_data);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_params_t params);
+static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgradeCancel(ctrlm_hal_ble_FwUpgradeCancel_params_t params);
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_GetRcuUnpairReason_params_t *params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_GetRcuRebootReason_params_t *params);
@@ -472,6 +473,7 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
         params.get_daemon_log_levels = ctrlm_hal_ble_req_GetDaemonLogLevel;
         params.set_daemon_log_levels = ctrlm_hal_ble_req_SetDaemonLogLevel;
         params.fw_upgrade = ctrlm_hal_ble_req_FwUpgrade;
+        params.fw_upgrade_cancel = ctrlm_hal_ble_req_FwUpgradeCancel;
         params.get_rcu_unpair_reason = ctrlm_hal_ble_req_GetRcuUnpairReason;
         params.get_rcu_reboot_reason = ctrlm_hal_ble_req_GetRcuRebootReason;
         params.get_rcu_last_wakeup_key = ctrlm_hal_ble_req_GetRcuLastWakeupKey;
@@ -1131,6 +1133,20 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_pa
     return ret;
 }
 
+static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgradeCancel(ctrlm_hal_ble_FwUpgradeCancel_params_t params)
+{
+    ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
+
+    GVariant  *reply = NULL;
+    ret = ctrlm_hal_ble_dbusSendMethodCall (g_ctrlm_hal_ble->getDbusUpgradeIfceProxy(params.ieee_address),
+                                            "CancelUpgrade",
+                                            NULL,
+                                            &reply,
+                                            CTRLM_BLE_G_DBUS_CALL_TIMEOUT_LONG);
+    if (CTRLM_HAL_RESULT_SUCCESS == ret) { LOG_INFO("%s, RCU FW upgrade cancel sent SUCCESSFULLY.\n", __FUNCTION__); }
+    if (NULL != reply) { g_variant_unref(reply); }
+    return ret;
+}
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_GetRcuUnpairReason_params_t *params)
 {
@@ -1626,11 +1642,11 @@ static ctrlm_hal_result_t ctrlm_hal_ble_dbusSendMethodCall (GDBusProxy         *
         *reply = g_dbus_proxy_call_with_unix_fd_list_sync (gdbus_proxy, apcMethod, params, G_DBUS_CALL_FLAGS_NONE, dbus_call_timeout, in_fds, out_fds, NULL, &error);
         if (NULL == *reply) {
             // g_dbus_proxy_call_sync will return NULL if there's an error reported
-            if (NULL != error) {
-                LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-            }
+            LOG_ERROR ("%s, %d: DBUS interface <%s> call <%s> failed with error = <%s>\n", __FUNCTION__, __LINE__, g_dbus_proxy_get_interface_name(gdbus_proxy), apcMethod, (error == NULL) ? "" : error->message);
             g_clear_error (&error);
             return CTRLM_HAL_RESULT_ERROR;
+        } else {
+            LOG_DEBUG ("%s, %d: DBUS interface <%s> call <%s> succeeded.\n", __FUNCTION__, __LINE__, g_dbus_proxy_get_interface_name(gdbus_proxy), apcMethod);
         }
     }
     return CTRLM_HAL_RESULT_SUCCESS;
