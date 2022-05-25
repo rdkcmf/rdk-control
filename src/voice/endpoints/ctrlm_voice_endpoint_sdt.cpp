@@ -77,6 +77,7 @@ bool ctrlm_voice_endpoint_sdt_t::open() {
   
     vmic_sdt_params_t      params_sdt = {
       .test_flag        = this->voice_obj->voice_stb_data_test_get(),
+      .mask_pii         = ctrlm_is_pii_mask_enabled(),
       .user_data        = (void *)this
    };
 
@@ -147,6 +148,12 @@ bool ctrlm_voice_endpoint_sdt_t::voice_message(const char *msg) const {
     sem_destroy(&semaphore);
 
     return(ret);
+}
+
+void ctrlm_voice_endpoint_sdt_t::voice_stb_data_pii_mask_set(bool enable) {
+    if(this->vmic_obj_sdt) {
+        vmic_sdt_update_mask_pii(this->vmic_obj_sdt, enable);
+    }
 }
 
 void ctrlm_voice_endpoint_sdt_t::voice_message_send(void *data, int size) {

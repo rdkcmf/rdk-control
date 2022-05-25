@@ -84,6 +84,7 @@ bool ctrlm_voice_endpoint_http_t::open() {
        .app_id           = app_id.c_str(),
        .language         = language.c_str(),
        .test_flag        = this->voice_obj->voice_stb_data_test_get(),
+       .mask_pii         = ctrlm_is_pii_mask_enabled(),
        .user_data        = (void *)this
    };
 
@@ -153,6 +154,12 @@ void ctrlm_voice_endpoint_http_t::voice_stb_data_experience_set(std::string &exp
 void ctrlm_voice_endpoint_http_t::voice_stb_data_guide_language_set(const char *language) {
    if(this->xrsv_obj_http) {
        xrsv_http_update_language(this->xrsv_obj_http, language);
+   }
+}
+
+void ctrlm_voice_endpoint_http_t::voice_stb_data_pii_mask_set(bool enable) {
+   if(this->xrsv_obj_http) {
+       xrsv_http_update_mask_pii(this->xrsv_obj_http, enable);
    }
 }
 

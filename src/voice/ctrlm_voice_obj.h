@@ -417,6 +417,8 @@ class ctrlm_voice_t {
     virtual void                          voice_stb_data_sat_set(std::string &sat_token);
     const char *                          voice_stb_data_sat_get() const;
     bool                                  voice_stb_data_test_get() const;
+    virtual void                          voice_stb_data_pii_mask_set(bool mask_pii);
+    bool                                  voice_stb_data_pii_mask_get() const;
 
     virtual bool                          voice_configure_config_file_json(json_t *obj_voice, json_t *json_obj_vsdk, bool local_conf);
     virtual bool                          voice_configure(ctrlm_voice_iarm_call_settings_t *settings, bool db_write);
@@ -500,6 +502,7 @@ public:
     virtual void          voice_sdk_open(json_t *json_obj_vsdk);
     virtual void          voice_sdk_close();
     virtual void          voice_sdk_update_routes() = 0;
+    virtual void          mask_pii_updated(bool enable) = 0;
     virtual bool          voice_session_has_stb_data();
     unsigned long         voice_session_id_next();
     void                  voice_session_notify_abort(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long session_id, ctrlm_voice_session_abort_reason_t reason);
@@ -534,6 +537,7 @@ public:
     std::string              experience;
     char                     sat_token[XRSR_SAT_TOKEN_LEN_MAX];
     bool                     sat_token_required;
+    bool                     mask_pii;
     voice_session_prefss_t   prefs;
     // End STB Data
 

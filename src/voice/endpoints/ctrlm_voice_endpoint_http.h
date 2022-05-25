@@ -35,6 +35,7 @@ public:
     void voice_stb_data_partner_id_set(std::string &partner_id);
     void voice_stb_data_experience_set(std::string &experience);
     void voice_stb_data_guide_language_set(const char *language);
+    void voice_stb_data_pii_mask_set(bool enable);
 
 protected:
     void voice_session_begin_callback_http(void *data, int size);

@@ -313,3 +313,21 @@ void ctrlm_voice_generic_t::query_strings_updated() {
         }
     }
 }
+
+void ctrlm_voice_generic_t::mask_pii_updated(bool enable) {
+    if(this->obj_http) {
+        this->obj_http->voice_stb_data_mask_pii_set(enable);
+    }
+    if(this->obj_ws) {
+        this->obj_ws->voice_stb_data_mask_pii_set(enable);
+    }
+    if(this->obj_ws_nextgen) {
+        this->obj_ws_nextgen->voice_stb_data_mask_pii_set(enable);
+    }
+    #ifdef SUPPORT_VOICE_DEST_ALSA
+    if(this->obj_sdt != NULL) {
+        this->obj_sdt->voice_stb_data_mask_pii_set(enable);
+    }
+    #endif
+}
+

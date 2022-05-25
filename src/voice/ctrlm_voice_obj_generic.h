@@ -37,6 +37,7 @@ class ctrlm_voice_generic_t : public ctrlm_voice_t {
     void                  voice_sdk_close();
     void                  voice_sdk_update_routes();
     void                  query_strings_updated();
+    void                  mask_pii_updated(bool enable);
 
     private:
     ctrlm_voice_endpoint_t * obj_http;

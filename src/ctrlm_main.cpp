@@ -238,6 +238,7 @@ typedef struct {
    ctrlm_pairing_window               pairing_window;
    bool                               mask_key_codes_json;
    bool                               mask_key_codes_iarm;
+   bool                               mask_pii;
    guint                              crash_recovery_threshold;
    gboolean                           successful_init;
    ctrlm_ir_remote_usage              ir_remote_usage_today;
@@ -534,6 +535,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.pairing_window.restrict_by_remote = CTRLM_PAIRING_RESTRICT_NONE;
    g_ctrlm.mask_key_codes_json            = JSON_BOOL_VALUE_CTRLM_GLOBAL_MASK_KEY_CODES;
    g_ctrlm.mask_key_codes_iarm            = false;
+   g_ctrlm.mask_pii                       = true;
    g_ctrlm.keycode_logging_poll_val       = JSON_INT_VALUE_CTRLM_GLOBAL_KEYCODE_LOGGING_POLL_PERIOD * 1000;
    g_ctrlm.keycode_logging_retries        = 0;
    g_ctrlm.keycode_logging_max_retries    = JSON_INT_VALUE_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES;
@@ -575,6 +577,8 @@ int main(int argc, char *argv[]) {
       LOG_FATAL("ctrlm_main: failed to load version\n");
       return(-1);
    }
+
+   g_ctrlm.mask_pii = ctrlm_is_production_build() ? JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_0 : JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_1;
 
    LOG_INFO("ctrlm_main: load device mac\n");
    if(!ctrlm_load_device_mac()) {
@@ -651,6 +655,7 @@ int main(int argc, char *argv[]) {
 #endif // AUTH_ENABLED
 
    g_ctrlm.voice_session->voice_stb_data_stb_name_set(g_ctrlm.stb_name);
+   g_ctrlm.voice_session->voice_stb_data_pii_mask_set(g_ctrlm.mask_pii);
 
 #if defined(BREAKPAD_SUPPORT) && !defined(BREAKPAD_MINIDUMP_PATH_OVERRIDE)
    if(g_ctrlm.minidump_path != JSON_STR_VALUE_CTRLM_GLOBAL_MINIDUMP_PATH) {
@@ -1255,7 +1260,7 @@ gboolean ctrlm_load_device_mac(void) {
       std::transform(mac.begin(), mac.end(), mac.begin(), ::toupper);
       g_ctrlm.device_mac = mac;
       ret = true;
-      LOG_INFO("%s: Device Mac set to <%s>\n", __FUNCTION__, mac.c_str());
+      LOG_INFO("%s: Device Mac set to <%s>\n", __FUNCTION__, ctrlm_is_pii_mask_enabled() ? "***" : mac.c_str());
    } else {
       LOG_ERROR("%s: Failed to get MAC address for device mac\n", __FUNCTION__);
       g_ctrlm.device_mac = "UNKNOWN";
@@ -1496,7 +1501,7 @@ gboolean ctrlm_load_authservice_data(void) {
          LOG_WARN("%s: failed to load receiver id\n", __FUNCTION__);
          ret = FALSE;
       } else {
-         LOG_INFO("%s: load receiver id successfully <%s>\n", __FUNCTION__, g_ctrlm.receiver_id.c_str());
+         LOG_INFO("%s: load receiver id successfully <%s>\n", __FUNCTION__, ctrlm_is_pii_mask_enabled() ? "***" : g_ctrlm.receiver_id.c_str());
       }
    }
 #endif
@@ -1508,7 +1513,7 @@ gboolean ctrlm_load_authservice_data(void) {
          LOG_WARN("%s: failed to load device id\n", __FUNCTION__);
          ret = FALSE;
       } else {
-         LOG_INFO("%s: load device id successfully <%s>\n", __FUNCTION__, g_ctrlm.device_id.c_str());
+         LOG_INFO("%s: load device id successfully <%s>\n", __FUNCTION__, ctrlm_is_pii_mask_enabled() ? "***" : g_ctrlm.device_id.c_str());
       }
    }
 #endif
@@ -1520,7 +1525,7 @@ gboolean ctrlm_load_authservice_data(void) {
          LOG_WARN("%s: failed to load account id\n", __FUNCTION__);
          ret = FALSE;
       } else {
-         LOG_INFO("%s: load account id successfully <%s>\n", __FUNCTION__, g_ctrlm.service_account_id.c_str());
+         LOG_INFO("%s: load account id successfully <%s>\n", __FUNCTION__, ctrlm_is_pii_mask_enabled() ? "***" : g_ctrlm.service_account_id.c_str());
       }
    }
 #endif
@@ -1532,7 +1537,7 @@ gboolean ctrlm_load_authservice_data(void) {
          LOG_WARN("%s: failed to load partner id\n", __FUNCTION__);
          ret = FALSE;
       } else {
-         LOG_INFO("%s: load partner id successfully <%s>\n", __FUNCTION__, g_ctrlm.partner_id.c_str());
+         LOG_INFO("%s: load partner id successfully <%s>\n", __FUNCTION__, ctrlm_is_pii_mask_enabled() ? "***" : g_ctrlm.partner_id.c_str());
       }
    }
 #endif
@@ -1544,7 +1549,7 @@ gboolean ctrlm_load_authservice_data(void) {
          LOG_WARN("%s: failed to load experience\n", __FUNCTION__);
          ret = FALSE;
       } else {
-         LOG_INFO("%s: load experience successfully <%s>\n", __FUNCTION__, g_ctrlm.experience.c_str());
+         LOG_INFO("%s: load experience successfully <%s>\n", __FUNCTION__, ctrlm_is_pii_mask_enabled() ? "***" : g_ctrlm.experience.c_str());
       }
    }
 #endif
@@ -1635,6 +1640,10 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
    if(json_obj_ctrlm == NULL || !json_is_object(json_obj_ctrlm)) {
       LOG_WARN("%s: control manger object not found\n", __FUNCTION__);
    } else {
+      json_config conf_global;
+      if(conf_global.config_object_set(json_obj_ctrlm)) {
+         LOG_ERROR("%s: unable to set config object\n", __FUNCTION__);
+      }
 
       // Extract the validation configuration object
       *json_obj_validation = json_object_get(json_obj_ctrlm, JSON_OBJ_NAME_CTRLM_GLOBAL_VALIDATION_CONFIG);
@@ -1847,6 +1856,13 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
       } else {
          LOG_INFO("%s: %-28s - ABSENT\n", __FUNCTION__, text);
       }
+
+      text     = "Mask PII";
+      if(conf_global.config_value_get(JSON_ARRAY_NAME_CTRLM_GLOBAL_MASK_PII, g_ctrlm.mask_pii, ctrlm_is_production_build() ? CTRLM_JSON_ARRAY_INDEX_PRD : CTRLM_JSON_ARRAY_INDEX_DEV)) {
+         LOG_INFO("%s: %-28s - PRESENT <%s>\n", __FUNCTION__, text, g_ctrlm.mask_pii ? "true" : "false");
+      } else {
+         LOG_INFO("%s: %-28s - ABSENT\n", __FUNCTION__, text);
+      }
       json_obj = json_object_get(json_obj_ctrlm, JSON_INT_NAME_CTRLM_GLOBAL_CRASH_RECOVERY_THRESHOLD);
       text     = "Crash Recovery Threshold";
       if(json_obj != NULL && json_is_integer(json_obj)) {
@@ -1886,6 +1902,7 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
    LOG_INFO("%s: Timeout Screen Bind          %u ms\n", __FUNCTION__, g_ctrlm.screen_bind_timeout_val);
    LOG_INFO("%s: Timeout One Touch Autobind   %u ms\n", __FUNCTION__, g_ctrlm.one_touch_autobind_timeout_val);
    LOG_INFO("%s: Mask Key Codes               <%s>\n",  __FUNCTION__, g_ctrlm.mask_key_codes_json ? "YES" : "NO");
+   LOG_INFO("%s: Mask PII                     <%s>\n",  __FUNCTION__, g_ctrlm.mask_pii ? "YES" : "NO");
    LOG_INFO("%s: Crash Recovery Threshold     <%u>\n",  __FUNCTION__, g_ctrlm.crash_recovery_threshold);
    LOG_INFO("%s: Auth Service URL             <%s>\n",  __FUNCTION__, g_ctrlm.server_url_authservice.c_str());
 
@@ -1924,6 +1941,9 @@ void ctrlm_global_rfc_values_retrieved(const ctrlm_rfc_attr_t &attr) {
    attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES, g_ctrlm.keycode_logging_max_retries, 1);
    attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_KEYCODE_LOGGING_MAX_RETRIES, g_ctrlm.keycode_logging_max_retries, 1);
    attr.get_rfc_value(JSON_BOOL_NAME_CTRLM_GLOBAL_MASK_KEY_CODES, g_ctrlm.mask_key_codes_json);
+   if(attr.get_rfc_value(JSON_ARRAY_NAME_CTRLM_GLOBAL_MASK_PII, g_ctrlm.mask_pii, ctrlm_is_production_build() ? CTRLM_JSON_ARRAY_INDEX_PRD : CTRLM_JSON_ARRAY_INDEX_DEV)) {
+      g_ctrlm.voice_session->voice_stb_data_pii_mask_set(g_ctrlm.mask_pii);
+   }
    attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_POLL_PERIOD, g_ctrlm.authservice_poll_val);   
    attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_FAST_POLL_PERIOD, g_ctrlm.authservice_fast_poll_val);
    attr.get_rfc_value(JSON_INT_NAME_CTRLM_GLOBAL_AUTHSERVICE_FAST_MAX_RETRIES, g_ctrlm.authservice_fast_retries_max);   
@@ -2969,6 +2989,10 @@ gboolean ctrlm_is_binding_table_full(void) {
 
 gboolean ctrlm_is_key_code_mask_enabled(void) {
    return(g_ctrlm.mask_key_codes_json || g_ctrlm.mask_key_codes_iarm);
+}
+
+bool ctrlm_is_pii_mask_enabled(void) {
+   return(g_ctrlm.mask_pii);
 }
 
 gboolean ctrlm_timeout_recently_booted(gpointer user_data) {

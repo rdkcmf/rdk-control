@@ -88,6 +88,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->timeout_keyword_beep            =  0;
     this->session_id                      =  0;
     this->software_version                = "N/A";
+    this->mask_pii                        = ctrlm_is_production_build() ? JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_0 : JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_1;
     this->prefs.server_url_vrex_src_ptt   = JSON_STR_VALUE_VOICE_URL_SRC_PTT;
     this->prefs.server_url_vrex_src_ff    = JSON_STR_VALUE_VOICE_URL_SRC_FF;
     this->prefs.sat_enabled               = JSON_BOOL_VALUE_VOICE_ENABLE_SAT;
@@ -278,7 +279,7 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    ctrlm_power_state_t ctrlm_power_state = ctrlm_main_get_power_state();
    xrsr_power_mode_t   xrsr_power_mode   = voice_xrsr_power_map(ctrlm_power_state);
 
-   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, xrsr_power_mode, privacy, json_obj_vsdk)) {
+   if(!xrsr_open(host_name, routes, &kw_config, &capture_config, xrsr_power_mode, privacy, this->mask_pii, json_obj_vsdk)) {
       LOG_ERROR("%s: Failed to open speech router\n", __FUNCTION__);
       g_assert(0);
    }
@@ -1926,6 +1927,20 @@ bool ctrlm_voice_t::voice_stb_data_test_get() const {
     return(this->prefs.vrex_test_flag);
 }
 
+void ctrlm_voice_t::voice_stb_data_pii_mask_set(bool mask_pii) {
+   if(this->mask_pii != mask_pii) {
+      this->mask_pii = mask_pii;
+      if(this->xrsr_opened) {
+         xrsr_mask_pii_set(mask_pii);
+      }
+      this->mask_pii_updated(mask_pii);
+   }
+}
+
+bool ctrlm_voice_t::voice_stb_data_pii_mask_get() const {
+   return(this->mask_pii);
+}
+
 bool ctrlm_voice_t::voice_session_has_stb_data() {
 #if defined(AUTH_RECEIVER_ID) || defined(AUTH_DEVICE_ID)
     if(this->receiver_id == "" && this->device_id == "") {
@@ -2470,7 +2485,7 @@ void ctrlm_voice_t::voice_session_transcription_callback(const char *transcripti
     } else {
         this->transcription = "";
     }
-    LOG_INFO("%s: Voice Session Transcription: \"%s\"\n", __FUNCTION__, this->transcription.c_str());
+    LOG_INFO("%s: Voice Session Transcription: \"%s\"\n", __FUNCTION__, this->mask_pii ? "***" : this->transcription.c_str());
 }
 
 void ctrlm_voice_t::voice_server_return_code_callback(long ret_code) {

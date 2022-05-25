@@ -31,6 +31,7 @@ public:
 
     bool voice_init_set(const char *blob) const;
     bool voice_message(const char *msg) const;
+    void voice_stb_data_pii_mask_set(bool enable);
 
 protected:
     void voice_session_begin_callback_sdt(void *data, int size);

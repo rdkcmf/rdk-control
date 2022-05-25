@@ -52,6 +52,7 @@ public:
     virtual void voice_stb_data_partner_id_set(std::string &partner_id);
     virtual void voice_stb_data_experience_set(std::string &experience);
     virtual void voice_stb_data_guide_language_set(const char *language);
+    virtual void voice_stb_data_mask_pii_set(bool enable);
     // End Data Setters
 
 protected:

@@ -98,6 +98,7 @@ bool ctrlm_voice_endpoint_ws_t::open() {
        .pstn             = "",
        .language         = language.c_str(),
        .test_flag        = this->voice_obj->voice_stb_data_test_get(),
+       .mask_pii         = ctrlm_is_pii_mask_enabled(),
        .user_data        = (void *)this
    };
 
@@ -200,6 +201,12 @@ void ctrlm_voice_endpoint_ws_t::voice_stb_data_experience_set(std::string &exper
 void ctrlm_voice_endpoint_ws_t::voice_stb_data_guide_language_set(const char *language) {
    if(this->xrsv_obj_ws) {
        xrsv_ws_update_language(this->xrsv_obj_ws, language);
+   }
+}
+
+void ctrlm_voice_endpoint_ws_t::voice_stb_data_mask_pii_set(bool enable) {
+   if(this->xrsv_obj_ws) {
+       xrsv_ws_update_mask_pii(this->xrsv_obj_ws, enable);
    }
 }
 

@@ -103,6 +103,7 @@ bool ctrlm_voice_endpoint_ws_nextgen_t::open() {
        .language         = language.c_str(),
        .device_mac       = (device_mac.empty() == false ? device_mac.c_str() : NULL),
        .test_flag        = this->voice_obj->voice_stb_data_test_get(),
+       .mask_pii         = ctrlm_is_pii_mask_enabled(),
        .user_data        = (void *)this
    };
 
@@ -231,6 +232,12 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_stb_data_experience_set(std::strin
 void ctrlm_voice_endpoint_ws_nextgen_t::voice_stb_data_guide_language_set(const char *language) {
    if(this->xrsv_obj_ws_nextgen) {
        xrsv_ws_nextgen_update_language(this->xrsv_obj_ws_nextgen, language);
+   }
+}
+
+void ctrlm_voice_endpoint_ws_nextgen_t::voice_stb_data_mask_pii_set(bool enable) {
+   if(this->xrsv_obj_ws_nextgen) {
+       xrsv_ws_nextgen_update_mask_pii(this->xrsv_obj_ws_nextgen, enable);
    }
 }
 
