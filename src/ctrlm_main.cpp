@@ -89,12 +89,6 @@ using namespace std;
 #define CTRLM_VERSION "1.0"
 #endif
 
-#define VERSION_TXT_PATH        "/version.txt"
-#define VERSION_TXT_IMAGENAME   "imagename:"
-#define VERSION_TXT_BRANCH      "BRANCH="
-#define VERSION_TXT_VERSION     "VERSION="
-#define VERSION_TXT_BUILD_TIME  "BUILD_TIME="
-
 #define CTRLM_THREAD_NAME_MAIN          "Ctrlm Main"
 #define CTRLM_THREAD_NAME_DATABASE      "Ctrlm Database"
 #define CTRLM_THREAD_NAME_DEVICE_UPDATE "Ctrlm Device Update"
@@ -504,7 +498,7 @@ int main(int argc, char *argv[]) {
    g_ctrlm.main_loop                      = g_main_loop_new(NULL, true);
    g_ctrlm.main_thread                    = NULL;
    g_ctrlm.queue                          = NULL;
-   g_ctrlm.production_build               = false;
+   g_ctrlm.production_build               = true;
    g_ctrlm.has_service_access_token       = false;
    g_ctrlm.sat_enabled                    = true;
    g_ctrlm.service_access_token_expiration_tag = 0;
@@ -1221,14 +1215,18 @@ gboolean ctrlm_load_version(void) {
    rdk_version_info_t info;
    int ret_val = rdk_version_parse_version(&info);
 
-   g_ctrlm.image_name = info.image_name;
-   g_ctrlm.stb_name = info.stb_name;
-   g_ctrlm.image_branch = info.branch_name;
-   g_ctrlm.image_version = info.version_name;
-   g_ctrlm.image_build_time = info.image_build_time;
-   g_ctrlm.production_build = info.production_build;
+   if(ret_val != 0) {
+      LOG_ERROR("%s: parse error <%s>\n", __FUNCTION__, info.parse_error == NULL ? "" : info.parse_error);
+   } else {
+      g_ctrlm.image_name       = info.image_name;
+      g_ctrlm.stb_name         = info.stb_name;
+      g_ctrlm.image_branch     = info.branch_name;
+      g_ctrlm.image_version    = info.version_name;
+      g_ctrlm.image_build_time = info.image_build_time;
+      g_ctrlm.production_build = info.production_build;
 
-   LOG_INFO("%s: STB Name <%s> Image Type <%s> Version <%s> Branch <%s> Build Time <%s>\n", __FUNCTION__, g_ctrlm.stb_name.c_str(), g_ctrlm.production_build ? "PROD" : "DEV", g_ctrlm.image_version.c_str(), g_ctrlm.image_branch.c_str(), g_ctrlm.image_build_time.c_str());
+      LOG_INFO("%s: STB Name <%s> Image Type <%s> Version <%s> Branch <%s> Build Time <%s>\n", __FUNCTION__, g_ctrlm.stb_name.c_str(), g_ctrlm.production_build ? "PROD" : "DEV", g_ctrlm.image_version.c_str(), g_ctrlm.image_branch.c_str(), g_ctrlm.image_build_time.c_str());
+   }
 
    rdk_version_object_free(&info);
 
