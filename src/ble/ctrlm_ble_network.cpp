@@ -1092,13 +1092,7 @@ static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrad
    }
 
    ctrlm_ble_controller_type_t controller_type;
-   if (product_name == XCONF_PRODUCT_NAME_PR1) {
-      controller_type = BLE_CONTROLLER_TYPE_PR1;
-   } else if (product_name == XCONF_PRODUCT_NAME_LC103) {
-      controller_type = BLE_CONTROLLER_TYPE_LC103;
-   } else if (product_name == XCONF_PRODUCT_NAME_EC302) {
-      controller_type = BLE_CONTROLLER_TYPE_EC302;
-   }  else {
+   if (false == ctrlm_obj_controller_ble_t::xconfStringToControllerType(product_name, controller_type)) {
       LOG_ERROR("%s: Unsupported product <%s>\n", __FUNCTION__, product_name.c_str());
       return false;
    }
@@ -1997,36 +1991,20 @@ json_t *ctrlm_obj_network_ble_t::xconf_export_controllers() {
       }
    }
    json_t *ret = json_array();
-   errno_t safec_rc = -1;
 
    for (auto const ctrlType : minVersions) {
-      char product_name[CTRLM_MAX_PARAM_STR_LEN];
-
-      // XCONF expects a different name than product name, so need to map here
-      switch(ctrlType.first) {
-         case BLE_CONTROLLER_TYPE_PR1:
-            safec_rc = strcpy_s(product_name, sizeof(product_name), XCONF_PRODUCT_NAME_PR1);
-            ERR_CHK(safec_rc);
-            break;
-         case BLE_CONTROLLER_TYPE_LC103:
-            safec_rc = strcpy_s(product_name, sizeof(product_name), XCONF_PRODUCT_NAME_LC103);
-            ERR_CHK(safec_rc);
-            break;
-         case BLE_CONTROLLER_TYPE_EC302:
-            safec_rc = strcpy_s(product_name, sizeof(product_name), XCONF_PRODUCT_NAME_EC302);
-            ERR_CHK(safec_rc);
-            break;
-         default:
-            LOG_WARN("%s: controller of type %s ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(ctrlType.first));
-            continue;
+      string product_name;
+      if (false == ctrlm_obj_controller_ble_t::controllerTypeToXconfString(ctrlType.first, product_name)) {
+         LOG_WARN("%s: controller of type %s ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(ctrlType.first));
+         continue;
       }
 
       ctrlm_version_t revSw = get<0>(ctrlType.second);
       ctrlm_version_t revHw = get<1>(ctrlType.second);
 
       json_t *temp = json_object();
-      LOG_INFO("%s: adding to json - Product = <%s>, FwVer = <%s>, HwVer = <%s>\n", __FUNCTION__, product_name, revSw.toString().c_str(), revHw.toString().c_str());
-      json_object_set(temp, "Product", json_string(product_name));
+      LOG_INFO("%s: adding to json - Product = <%s>, FwVer = <%s>, HwVer = <%s>\n", __FUNCTION__, product_name.c_str(), revSw.toString().c_str(), revHw.toString().c_str());
+      json_object_set(temp, "Product", json_string(product_name.c_str()));
       json_object_set(temp, "FwVer", json_string(revSw.toString().c_str()));
       json_object_set(temp, "HwVer", json_string(revHw.toString().c_str()));
 

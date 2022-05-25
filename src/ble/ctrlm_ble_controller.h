@@ -36,13 +36,6 @@
 
 #define BROADCAST_PRODUCT_NAME_IR_DEVICE                 ("IR Device")
 
-#define XCONF_PRODUCT_NAME_PR1                           ("PR1-10")
-#define BROADCAST_PRODUCT_NAME_PR1                       ("Platco PR1")
-#define XCONF_PRODUCT_NAME_LC103                         ("LC103-10")
-#define BROADCAST_PRODUCT_NAME_LC103                     ("SkyQ LC103")
-#define XCONF_PRODUCT_NAME_EC302                         ("EC302-10")
-#define BROADCAST_PRODUCT_NAME_EC302                     ("SkyQ EC302")
-
 //////////////////////////////////////////
 // Enumerations
 //////////////////////////////////////////
@@ -74,7 +67,10 @@ class ctrlm_obj_controller_ble_t : public ctrlm_obj_controller_t {
 public:
    ctrlm_obj_controller_ble_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_ble_t &network, ctrlm_ble_result_validation_t validation_result);
    ctrlm_obj_controller_ble_t();
-   
+
+   static bool controllerTypeToXconfString(ctrlm_ble_controller_type_t type, std::string &xconfString);
+   static bool xconfStringToControllerType(std::string xconfString, ctrlm_ble_controller_type_t &controller_type);
+
    void db_create();
    void db_destroy();
    void db_load();

@@ -42,6 +42,51 @@ using namespace std;
 
 // End Includes
 
+#define BROADCAST_PRODUCT_NAME_PR1                       ("Platco PR1")
+#define XCONF_PRODUCT_NAME_PR1                           ("PR1-10")
+
+#define BROADCAST_PRODUCT_NAME_LC103                     ("SkyQ LC103")
+#define BROADCAST_PRODUCT_NAME_LC203                     ("SkyQ LC203")
+#define XCONF_PRODUCT_NAME_LC103                         ("LC103-10")
+
+#define BROADCAST_PRODUCT_NAME_EC302                     ("SkyQ EC302")
+#define XCONF_PRODUCT_NAME_EC302                         ("EC302-10")
+
+// Static class functions
+
+bool ctrlm_obj_controller_ble_t::controllerTypeToXconfString(ctrlm_ble_controller_type_t type, string &xconfString) {
+   switch(type) {
+      case BLE_CONTROLLER_TYPE_PR1:
+         xconfString = XCONF_PRODUCT_NAME_PR1;
+         break;
+      case BLE_CONTROLLER_TYPE_LC103:
+         xconfString = XCONF_PRODUCT_NAME_LC103;
+         break;
+      case BLE_CONTROLLER_TYPE_EC302:
+         xconfString = XCONF_PRODUCT_NAME_EC302;
+         break;
+      default:
+         LOG_ERROR("%s: controller of type %s not mapped to XCONF string\n", __FUNCTION__, ctrlm_ble_controller_type_str(type));
+         return false;
+   }
+   return true;
+}
+
+//EGTODO:  handle the fact that LC203 has same fw as LC103
+bool ctrlm_obj_controller_ble_t::xconfStringToControllerType(string xconfString, ctrlm_ble_controller_type_t &controller_type) {
+   if (xconfString == XCONF_PRODUCT_NAME_PR1) {
+      controller_type = BLE_CONTROLLER_TYPE_PR1;
+   } else if (xconfString == XCONF_PRODUCT_NAME_LC103) {
+      controller_type = BLE_CONTROLLER_TYPE_LC103;
+   } else if (xconfString == XCONF_PRODUCT_NAME_EC302) {
+      controller_type = BLE_CONTROLLER_TYPE_EC302;
+   } else {
+      LOG_ERROR("%s: Unsupported XCONF product <%s>\n", __FUNCTION__, xconfString.c_str());
+      return false;
+   }
+   return true;
+}
+
 // Function Implementations
 
 ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_ble_t &network, ctrlm_ble_result_validation_t validation_result) : 
@@ -190,6 +235,9 @@ void ctrlm_obj_controller_ble_t::setControllerType(std::string productName) {
    } else if (productName.find(BROADCAST_PRODUCT_NAME_EC302) != std::string::npos) {
       controller_type_ = BLE_CONTROLLER_TYPE_EC302;
    } else if (productName.find(BROADCAST_PRODUCT_NAME_LC103) != std::string::npos) {
+      controller_type_ = BLE_CONTROLLER_TYPE_LC103;
+   } else if (productName.find(BROADCAST_PRODUCT_NAME_LC203) != std::string::npos) {
+      // LC203 for all controlMgr purposes is the same as LC103, it even loads the same f/w
       controller_type_ = BLE_CONTROLLER_TYPE_LC103;
    } else {
       controller_type_ = BLE_CONTROLLER_TYPE_UNKNOWN;
