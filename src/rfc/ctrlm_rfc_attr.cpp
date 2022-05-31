@@ -119,13 +119,26 @@ bool ctrlm_rfc_attr_t::get_rfc_json_value(json_t **val) const {
     return(ret);
 }
 
-bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, bool &val) const {
+bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, bool &val, int index) const {
     bool ret = false;
     if(!this->check_config_file(path)) {
         if(this->value_json) {
             json_t *temp = ctrlm_utils_json_from_path(this->value_json, path, false);
             if(temp) {
-                if(json_is_boolean(temp)) {
+                if(index >= 0) { // Handle array index
+                    if(!json_is_array(temp)) {
+                        LOG_ERROR("%s: %s - not an array\n", __FUNCTION__, path.c_str());
+                        temp = 0;
+                    } else {
+                        json_t *json_element = json_array_get(temp, index);
+                        if(json_element == 0) {
+                            LOG_ERROR("%s: %s - array index not found.  index <%u> size <%u>\n", __FUNCTION__, path.c_str(), index, json_array_size(temp));
+                        }
+                        temp = json_element;
+                    }
+                }
+
+                if(temp && json_is_boolean(temp)) {
                     val = json_is_true(temp);
                     ret = true;
                     LOG_INFO("%s: RFC - <%s, %s>\n", __FUNCTION__, path.c_str(), (val ? "TRUE" : "FALSE"));
@@ -140,13 +153,26 @@ bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, bool &val) const {
     return(ret);
 }
 
-bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, int &val, int min, int max) const {
+bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, int &val, int min, int max, int index) const {
     bool ret = false;
     if(!this->check_config_file(path)) {
         if(this->value_json) {
             json_t *temp = ctrlm_utils_json_from_path(this->value_json, path, false);
             if(temp) {
-                if(json_is_integer(temp)) {
+                if(index >= 0) { // Handle array index
+                    if(!json_is_array(temp)) {
+                        LOG_ERROR("%s: %s - not an array\n", __FUNCTION__, path.c_str());
+                        temp = 0;
+                    } else {
+                        json_t *json_element = json_array_get(temp, index);
+                        if(json_element == 0) {
+                            LOG_ERROR("%s: %s - array index not found.  index <%u> size <%u>\n", __FUNCTION__, path.c_str(), index, json_array_size(temp));
+                        }
+                        temp = json_element;
+                    }
+                }
+
+                if(temp && json_is_integer(temp)) {
                     int temp_int = json_integer_value(temp);
                     if(temp_int > max || temp_int < min) {
                         LOG_ERROR("%s: integer out of range (%d)\n", __FUNCTION__, temp_int);

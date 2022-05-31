@@ -236,7 +236,7 @@
       "app_id_ws"                        : "",
       "aspect_ratio"                     : "",
       "language"                         : "eng-USA",
-      "save_last_utterance"              :      true,
+      "save_last_utterance"              : [false, true],
       "utterance_file_qty_max"           :         2,
       "utterance_file_size_max"          :    160044,
       "utterance_path"                   : "/opt/logs/rf4ce_adpcm_header_vrex.raw",

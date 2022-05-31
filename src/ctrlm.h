@@ -40,6 +40,9 @@
 #define CTRLM_THREAD_SYNC_DELAY          (10000)
 #define JSON_PATH_SEPERATOR "."
 
+#define CTRLM_JSON_ARRAY_INDEX_PRD (0)
+#define CTRLM_JSON_ARRAY_INDEX_DEV (1)
+
 class ctrlm_obj_network_t;
 class ctrlm_obj_network_rf4ce_t;
 class ctrlm_obj_controller_t;

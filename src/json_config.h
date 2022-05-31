@@ -33,13 +33,13 @@ class json_config {
       bool open_for_read(const char* json_file_name, const char* json_section_name);
       bool config_object_set(json_t *json_obj);
 
-      bool config_value_get(const char* key, bool& val) const;
-      bool config_value_get(const char* key, int& val, int min_val=INT_MIN, int max_val=INT_MAX) const;
-      bool config_value_get(const char* key, double& val, double min_val=0.0, double max_val=1.0) const;
+      bool config_value_get(const char* key, bool& val, int index=-1) const;
+      bool config_value_get(const char* key, int& val, int min_val=INT_MIN, int max_val=INT_MAX, int index=-1) const;
+      bool config_value_get(const char* key, double& val, double min_val=0.0, double max_val=1.0, int index=-1) const;
       template <typename T>
-      bool config_value_get(const char* key, T& val, int min_val=INT_MIN, int max_val=INT_MAX) const {
+      bool config_value_get(const char* key, T& val, int min_val=INT_MIN, int max_val=INT_MAX, int index=-1) const {
          int value = 0;
-         if (config_value_get(key,value,min_val,max_val)){
+         if (config_value_get(key,value,min_val,max_val,index)){
             val = (T)value;
             return true;
          }

@@ -94,14 +94,14 @@ public:
      * @param path The path to the JSON object
      * @return JSON object or NULL if value doesn't exist.
      */
-    bool get_rfc_value(std::string path, bool &val) const;
+    bool get_rfc_value(std::string path, bool &val, int index = -1) const;
     bool get_rfc_value(std::string path, std::string &val) const;
     bool get_rfc_value(std::string path, std::vector<std::string> &val) const;
-    bool get_rfc_value(std::string path, int &val, int min = INT_MIN, int max = INT_MAX) const;
+    bool get_rfc_value(std::string path, int &val, int min = INT_MIN, int max = INT_MAX, int index = -1) const;
     template <typename T>
-    bool get_rfc_value(std::string path, T &val, int min = INT_MIN, int max = INT_MAX) const {
+    bool get_rfc_value(std::string path, T &val, int min = INT_MIN, int max = INT_MAX, int index = -1) const {
          int value = 0;
-         if(get_rfc_value(path,value,min,max)) {
+         if(get_rfc_value(path,value,min,max,index)) {
             val = (T)value;
             return true;
          }

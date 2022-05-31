@@ -102,7 +102,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->prefs.timeout_packet_subsequent = JSON_INT_VALUE_VOICE_TIMEOUT_PACKET_SUBSEQUENT;
     this->prefs.bitrate_minimum           = JSON_INT_VALUE_VOICE_BITRATE_MINIMUM;
     this->prefs.time_threshold            = JSON_INT_VALUE_VOICE_TIME_THRESHOLD;
-    this->prefs.utterance_save            = JSON_BOOL_VALUE_VOICE_SAVE_LAST_UTTERANCE;
+    this->prefs.utterance_save            = ctrlm_is_production_build() ? JSON_ARRAY_VAL_BOOL_VOICE_SAVE_LAST_UTTERANCE_0 : JSON_ARRAY_VAL_BOOL_VOICE_SAVE_LAST_UTTERANCE_1;
     this->prefs.utterance_file_qty_max    = JSON_INT_VALUE_VOICE_UTTERANCE_FILE_QTY_MAX;
     this->prefs.utterance_file_size_max   = JSON_INT_VALUE_VOICE_UTTERANCE_FILE_SIZE_MAX;
     this->prefs.utterance_path            = JSON_STR_VALUE_VOICE_UTTERANCE_PATH;
@@ -245,7 +245,7 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    xrsr_route_t          routes[1];
    xrsr_keyword_config_t kw_config;
    xrsr_capture_config_t capture_config = {
-         .delete_files  = false,
+         .delete_files  = !this->prefs.utterance_save,
          .enable        = this->prefs.utterance_save,
          .file_qty_max  = (uint32_t)this->prefs.utterance_file_qty_max,
          .file_size_max = (uint32_t)this->prefs.utterance_file_size_max,
@@ -318,8 +318,8 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_INT_NAME_VOICE_BITRATE_MINIMUM,              this->prefs.bitrate_minimum);
         conf.config_value_get(JSON_INT_NAME_VOICE_TIME_THRESHOLD,               this->prefs.time_threshold);
         conf.config_value_get(JSON_BOOL_NAME_VOICE_ENABLE_SAT,                  this->sat_token_required);
-        conf.config_value_get(JSON_BOOL_NAME_VOICE_SAVE_LAST_UTTERANCE,         this->prefs.utterance_save);
-        conf.config_value_get(JSON_INT_NAME_VOICE_UTTERANCE_FILE_QTY_MAX,       this->prefs.utterance_file_qty_max, 1);
+        conf.config_value_get(JSON_ARRAY_NAME_VOICE_SAVE_LAST_UTTERANCE,        this->prefs.utterance_save, ctrlm_is_production_build() ? CTRLM_JSON_ARRAY_INDEX_PRD : CTRLM_JSON_ARRAY_INDEX_DEV);
+        conf.config_value_get(JSON_INT_NAME_VOICE_UTTERANCE_FILE_QTY_MAX,       this->prefs.utterance_file_qty_max, 1, 100000);
         conf.config_value_get(JSON_INT_NAME_VOICE_UTTERANCE_FILE_SIZE_MAX,      this->prefs.utterance_file_size_max, 4 * 1024);
         conf.config_value_get(JSON_STR_NAME_VOICE_UTTERANCE_PATH,               this->prefs.utterance_path);
         conf.config_value_get(JSON_INT_NAME_VOICE_MINIMUM_DURATION,             this->prefs.utterance_duration_min);
@@ -3136,8 +3136,8 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
     attr.get_rfc_value(JSON_INT_NAME_VOICE_BITRATE_MINIMUM,              this->prefs.bitrate_minimum);
     attr.get_rfc_value(JSON_INT_NAME_VOICE_TIME_THRESHOLD,               this->prefs.time_threshold);
     attr.get_rfc_value(JSON_BOOL_NAME_VOICE_ENABLE_SAT,                  this->sat_token_required);
-    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_SAVE_LAST_UTTERANCE,         this->prefs.utterance_save);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_QTY_MAX,       this->prefs.utterance_file_qty_max, 1);
+    attr.get_rfc_value(JSON_ARRAY_NAME_VOICE_SAVE_LAST_UTTERANCE,        this->prefs.utterance_save, ctrlm_is_production_build() ? CTRLM_JSON_ARRAY_INDEX_PRD : CTRLM_JSON_ARRAY_INDEX_DEV);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_QTY_MAX,       this->prefs.utterance_file_qty_max, 1, 100000);
     attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_SIZE_MAX,      this->prefs.utterance_file_size_max, 4 * 1024);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_UTTERANCE_PATH,               this->prefs.utterance_path);
     attr.get_rfc_value(JSON_INT_NAME_VOICE_MINIMUM_DURATION,             this->prefs.utterance_duration_min);

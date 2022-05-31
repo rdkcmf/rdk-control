@@ -53,9 +53,22 @@ bool json_config::config_object_set(json_t *json_obj){
    return true;
 }
 
-bool json_config::config_value_get(const char* key, bool& val) const {
+bool json_config::config_value_get(const char* key, bool& val, int index) const {
 
    json_t *json_obj = json_object_get(json_section_obj, key);
+   if(json_obj != 0 && index >= 0) { // Handle array index
+      if(!json_is_array(json_obj)) {
+         LOG_ERROR("%s: %-25s - not an array\n", __FUNCTION__, key);
+         json_obj = 0;
+      } else {
+         json_t *json_element = json_array_get(json_obj, index);
+         if(json_element == 0) {
+            LOG_ERROR("%s: %-25s - array index not found.  index <%u> size <%u>\n", __FUNCTION__, key, index, json_array_size(json_obj));
+         }
+         json_obj = json_element;
+      }
+   }
+
    if(json_obj == 0 || !json_is_boolean(json_obj)) {
       LOG_INFO("%s: %-25s - ABSENT\n", __FUNCTION__, key);
       return false;
@@ -65,9 +78,22 @@ bool json_config::config_value_get(const char* key, bool& val) const {
    return true;
 }
 
-bool json_config::config_value_get(const char* key, int& val, int min_val, int max_val) const {
+bool json_config::config_value_get(const char* key, int& val, int min_val, int max_val, int index) const {
 
    json_t *json_obj = json_object_get(json_section_obj, key);
+   if(json_obj != 0 && index >= 0) { // Handle array index
+      if(!json_is_array(json_obj)) {
+         LOG_ERROR("%s: %-25s - not an array\n", __FUNCTION__, key);
+         json_obj = 0;
+      } else {
+         json_t *json_element = json_array_get(json_obj, index);
+         if(json_element == 0) {
+            LOG_ERROR("%s: %-25s - array index not found.  index <%u> size <%u>\n", __FUNCTION__, key, index, json_array_size(json_obj));
+         }
+         json_obj = json_element;
+      }
+   }
+
    if(json_obj == 0 || (!json_is_integer(json_obj) && !json_is_boolean(json_obj)) ) {
       LOG_INFO("%s: %-25s - ABSENT\n", __FUNCTION__, key);
       return false;
@@ -91,9 +117,22 @@ bool json_config::config_value_get(const char* key, int& val, int min_val, int m
    return true;
 }
 
-bool json_config::config_value_get(const char* key, double& val, double min_val, double max_val) const {
+bool json_config::config_value_get(const char* key, double& val, double min_val, double max_val, int index) const {
 
    json_t *json_obj = json_object_get(json_section_obj, key);
+   if(json_obj != 0 && index >= 0) { // Handle array index
+      if(!json_is_array(json_obj)) {
+         LOG_ERROR("%s: %-25s - not an array\n", __FUNCTION__, key);
+         json_obj = 0;
+      } else {
+         json_t *json_element = json_array_get(json_obj, index);
+         if(json_element == 0) {
+            LOG_ERROR("%s: %-25s - array index not found.  index <%u> size <%u>\n", __FUNCTION__, key, index, json_array_size(json_obj));
+         }
+         json_obj = json_element;
+      }
+   }
+
    if(json_obj == 0 || !json_is_real(json_obj) ) {
       LOG_INFO("%s: %-25s - ABSENT\n", __FUNCTION__, key);
       return false;
