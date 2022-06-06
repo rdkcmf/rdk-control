@@ -1524,6 +1524,8 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
         return; 
     }
 
+    this->end_reason = reason;
+
     if(timestamp != NULL) {
        this->session_timing.ctrl_stop = *timestamp;
     } else {

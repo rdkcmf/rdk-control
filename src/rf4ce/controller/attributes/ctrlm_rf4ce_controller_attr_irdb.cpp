@@ -370,7 +370,7 @@ ctrlm_rf4ce_rib_attr_t::status ctrlm_rf4ce_controller_ir_rf_database_status_t::r
                 LOG_INFO("%s: %s read from RIB: %s\n", __FUNCTION__, this->get_name().c_str(), this->get_value().c_str());
             }
         } else {
-            LOG_ERROR("%s: data is invalid size <%d>\n", __FUNCTION__, len);
+            LOG_ERROR("%s: data is invalid size <%d>\n", __FUNCTION__, *len);
             ret = ctrlm_rf4ce_rib_attr_t::status::WRONG_SIZE;
         }
     } else {
