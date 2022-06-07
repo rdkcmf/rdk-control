@@ -477,9 +477,9 @@ void ctrlm_rf4ce_battery_milestones_t::battery_status_updated(const ctrlm_rf4ce_
             LOG_WARN("%s: It appears the batteries have been changed. Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, VOLTAGE_CALC(status_old.get_voltage_unloaded()), VOLTAGE_CALC(status_new.get_voltage_unloaded()));
             batteries_changed = true;
         } else if(is_batteries_large_voltage_jump(status_new.get_voltage_unloaded(), status_old.get_voltage_unloaded())) {
-            LOG_WARN("%s: The battery voltage had a large increase but we don't consider the batteries to have changed.  Milestones not updated.  Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, VOLTAGE_CALC(status_old.get_voltage_unloaded()), VOLTAGE_CALC(status_new.get_voltage_unloaded()));
             update_milestones = false;
             this->battery_voltage_large_jump_counter.counter++;
+            LOG_WARN("%s: The battery voltage had a large increase but we don't consider the batteries to have changed. battery_voltage_large_jump_counter <%u>  Milestones not updated.  Voltage (old:%4.2fv, new:%4.2fv)\n", __FUNCTION__, this->battery_voltage_large_jump_counter.counter, VOLTAGE_CALC(status_old.get_voltage_unloaded()), VOLTAGE_CALC(status_new.get_voltage_unloaded()));
             if(false == importing) {
                 ctrlm_db_attr_write(&this->battery_voltage_large_jump_counter);
             }
