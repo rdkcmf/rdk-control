@@ -470,10 +470,10 @@ ctrlm_rf4ce_rib_attr_t::status ctrlm_rf4ce_rib_entries_updated_t::read_rib(ctrlm
     if(data && len) {
         if(*len >= RIB_ENTRIES_UPDATED_LEN) {
             data[0]   = this->reu & 0xFF;
-            this->reu = ctrlm_rf4ce_rib_entries_updated_t::updated::UPDATED_FALSE;
             *len      = RIB_ENTRIES_UPDATED_LEN;
             ret       = ctrlm_rf4ce_rib_attr_t::status::SUCCESS;
             LOG_INFO("%s: %s read from RIB: %s\n", __FUNCTION__, this->get_name().c_str(), this->get_value().c_str());
+            this->reu = ctrlm_rf4ce_rib_entries_updated_t::updated::UPDATED_FALSE;
         } else {
             LOG_ERROR("%s: buffer is not large enough <%d>\n", __FUNCTION__, *len);
             ret = ctrlm_rf4ce_rib_attr_t::status::WRONG_SIZE;
