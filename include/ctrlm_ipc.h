@@ -147,7 +147,7 @@
 
 #define CTRLM_MAIN_CONTROLLER_ID_LAST_USED                     (0xFD) ///< An last used controller identifier
 
-#define CTRLM_MAIN_VERSION_LENGTH                                (18) ///< Maximum length of the version string
+#define CTRLM_MAIN_VERSION_LENGTH                                (20) ///< Maximum length of the version string
 #define CTRLM_MAIN_MAX_NETWORKS                                   (4) ///< Maximum number of networks
 #define CTRLM_MAIN_MAX_BOUND_CONTROLLERS                          (9) ///< Maximum number of bound controllers
 #define CTRLM_MAIN_MAX_CHIPSET_LENGTH                            (16) ///< Maximum length of chipset name string (including null termination)
