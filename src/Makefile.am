@@ -81,7 +81,8 @@ controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \
                        voice/endpoints/ctrlm_voice_endpoint.cpp            \
                        voice/endpoints/ctrlm_voice_endpoint_http.cpp       \
                        voice/endpoints/ctrlm_voice_endpoint_ws.cpp         \
-                       voice/endpoints/ctrlm_voice_endpoint_ws_nextgen.cpp
+                       voice/endpoints/ctrlm_voice_endpoint_ws_nextgen.cpp \
+                       voice/endpoints/ctrlm_voice_endpoint_ws_nsp.cpp
 
 if SUPPORT_VOICE_DEST_ALSA
 controlMgr_SOURCES  += voice/endpoints/ctrlm_voice_endpoint_sdt.cpp

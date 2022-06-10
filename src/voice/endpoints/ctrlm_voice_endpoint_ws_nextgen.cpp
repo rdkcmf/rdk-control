@@ -335,7 +335,7 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
        config_in.ws.app_config = stream_params_out;
 
        LOG_INFO("%s: session begin - ptt <%s> keyword begin <%u> end <%u> doa <%u> gain <%4.1f> db\n", __FUNCTION__, (stream_params->push_to_talk ? "TRUE" : "FALSE"), stream_params->keyword_sample_begin, stream_params->keyword_sample_end, stream_params->keyword_doa, stream_params->dynamic_gain);
-    } else if(xrsr_to_voice_device(dqm->src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+    } else if(xrsr_to_voice_device(dqm->src) != CTRLM_VOICE_DEVICE_MICROPHONE || ((xrsr_to_voice_device(dqm->src) == CTRLM_VOICE_DEVICE_MICROPHONE) && dqm->configuration.user_initiated)) {
        xrsv_ws_nextgen_stream_params_t *stream_params = (xrsv_ws_nextgen_stream_params_t *)malloc(sizeof(xrsv_ws_nextgen_stream_params_t));
 
        if(stream_params != NULL) {

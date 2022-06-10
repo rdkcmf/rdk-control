@@ -79,6 +79,7 @@ typedef enum {
     CTRLM_VOICE_FORMAT_ADPCM,
     CTRLM_VOICE_FORMAT_ADPCM_SKY,
     CTRLM_VOICE_FORMAT_PCM,
+    CTRLM_VOICE_FORMAT_PCM_RAW,
     CTRLM_VOICE_FORMAT_OPUS_XVP,
     CTRLM_VOICE_FORMAT_OPUS,
     CTRLM_VOICE_FORMAT_INVALID
@@ -666,6 +667,7 @@ const char *ctrlm_voice_command_status_str(ctrlm_voice_command_status_t status);
 const char *ctrlm_voice_command_status_tv_avr_str(ctrlm_voice_tv_avr_cmd_t cmd);
 const char *ctrlm_voice_audio_mode_str(ctrlm_voice_audio_mode_t mode);
 const char *ctrlm_voice_audio_timing_str(ctrlm_voice_audio_timing_t timing);
+const char *ctrlm_voice_session_response_status_str(ctrlm_voice_session_response_status_t status);
 ctrlm_hal_input_device_t voice_device_to_hal(ctrlm_voice_device_t device);
 xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format);
 ctrlm_voice_device_t xrsr_to_voice_device(xrsr_src_t device);

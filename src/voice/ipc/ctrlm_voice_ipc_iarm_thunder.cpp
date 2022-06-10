@@ -539,10 +539,6 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription(v
                 if (obj_transcription != NULL) {
                     str_transcription = std::string(json_string_value(obj_transcription));
                 }
-                if (str_transcription.empty()) {
-                    LOG_ERROR("%s: Empty transcription.\n", __FUNCTION__);
-                    result = false;
-                }
                 
                 ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_ADPCM;
                 ctrlm_voice_device_t device = CTRLM_VOICE_DEVICE_PTT;
@@ -558,6 +554,10 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription(v
                         device = CTRLM_VOICE_DEVICE_FF;
                     } else if (str_type.compare("mic") == 0) {
                         device = CTRLM_VOICE_DEVICE_MICROPHONE;
+                        format = CTRLM_VOICE_FORMAT_PCM;
+                    } else if (str_type.compare("rawmic") == 0) {
+                        device = CTRLM_VOICE_DEVICE_MICROPHONE;
+                        format = CTRLM_VOICE_FORMAT_PCM_RAW;
                     } else {
                         LOG_ERROR("%s: Invalid device type parameter.\n", __FUNCTION__);
                         result = false;
@@ -565,14 +565,20 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription(v
                 } else {
                     LOG_INFO("%s: Optional device type parameter not present, setting to PTT\n", __FUNCTION__);
                 }
+
+                if (str_transcription.empty() && device != CTRLM_VOICE_DEVICE_MICROPHONE) {
+                    LOG_ERROR("%s: Empty transcription.\n", __FUNCTION__);
+                    result = false;
+                }
+
                 if (true == result) {
                     ctrlm_voice_session_response_status_t voice_status = voice_obj->voice_session_req(
                             CTRLM_MAIN_NETWORK_ID_INVALID, CTRLM_MAIN_CONTROLLER_ID_INVALID, 
                             device, format, NULL, "APPLICATION", "0.0.0.0", "0.0.0.0", 0.0, 
-                            false, NULL, NULL, NULL, false, (const char*)str_transcription.c_str() );
+                            false, NULL, NULL, NULL, false, str_transcription.empty() ? NULL : str_transcription.c_str() );
                     if (voice_status != VOICE_SESSION_RESPONSE_AVAILABLE && 
                         voice_status != VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
-                        LOG_ERROR("%s: Failed opening voice session in ctrlm_voice_t, error = <%d>\n", __FUNCTION__, voice_status);
+                        LOG_ERROR("%s: Failed opening voice session <%s>\n", __FUNCTION__, ctrlm_voice_session_response_status_str(voice_status));
                         result = false;
                     }
                 }

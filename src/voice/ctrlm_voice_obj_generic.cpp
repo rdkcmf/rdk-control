@@ -36,6 +36,7 @@
 #include "ctrlm_voice_endpoint_http.h"
 #include "ctrlm_voice_endpoint_ws.h"
 #include "ctrlm_voice_endpoint_ws_nextgen.h"
+#include "ctrlm_voice_endpoint_ws_nsp.h"
 
 #ifdef SUPPORT_VOICE_DEST_ALSA
 #include "ctrlm_voice_endpoint_sdt.h"
@@ -50,6 +51,7 @@ ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
     this->obj_http       = NULL;
     this->obj_ws         = NULL;
     this->obj_ws_nextgen = NULL;
+    this->obj_ws_nsp     = NULL;
     #ifdef SUPPORT_VOICE_DEST_ALSA
     this->obj_sdt        = NULL;
     #endif
@@ -66,6 +68,7 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
     this->obj_ws         = new ctrlm_voice_endpoint_ws_t(this);
     this->obj_http       = new ctrlm_voice_endpoint_http_t(this);
     this->obj_ws_nextgen = new ctrlm_voice_endpoint_ws_nextgen_t(this);
+    this->obj_ws_nsp     = new ctrlm_voice_endpoint_ws_nsp_t(this);
     #ifdef SUPPORT_VOICE_DEST_ALSA
     this->obj_sdt        = new ctrlm_voice_endpoint_sdt_t(this);
     #endif
@@ -81,6 +84,10 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
         LOG_ERROR("%s: Failed to open speech WS NextGen\n", __FUNCTION__);
         xrsr_close();
         g_assert(0);
+    } else if(this->obj_ws_nsp->open() == false) {
+        LOG_ERROR("%s: Failed to open speech WS No Server Protocol\n", __FUNCTION__);
+        xrsr_close();
+        g_assert(0);
     }
     #ifdef SUPPORT_VOICE_DEST_ALSA
     else if(this->obj_sdt->open() == false) {
@@ -92,6 +99,7 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
     this->endpoints.push_back(this->obj_ws);
     this->endpoints.push_back(this->obj_http);
     this->endpoints.push_back(this->obj_ws_nextgen);
+    this->endpoints.push_back(this->obj_ws_nsp);
     #ifdef SUPPORT_VOICE_DEST_ALSA
     this->endpoints.push_back(this->obj_sdt);
     #endif
@@ -116,6 +124,10 @@ void ctrlm_voice_generic_t::voice_sdk_close() {
     if(this->obj_ws_nextgen != NULL) {
         delete this->obj_ws_nextgen;
         this->obj_ws_nextgen = NULL;
+    }
+    if(this->obj_ws_nsp != NULL) {
+        delete this->obj_ws_nsp;
+        this->obj_ws_nsp = NULL;
     }
     #ifdef SUPPORT_VOICE_DEST_ALSA
     if(this->obj_sdt != NULL) {
@@ -244,6 +256,32 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
                 routes[i].dsts[0].stream_until    = stream_until;
+                #ifdef ENABLE_DEEP_SLEEP
+                if(src == XRSR_SRC_MICROPHONE) {
+                    routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.standby_params;
+                }
+                #endif
+                i++;
+                LOG_INFO("%s: url translation from %s to %s\n", __FUNCTION__, url->c_str(), urls_translated[translated_index].c_str());
+            }
+        } else if(url->rfind("aows", 0) == 0) { // Audio only with no server protocol layer over websocket
+            xrsr_handlers_t    handlers_xrsr = {0};
+            int                translated_index = urls_translated.size();
+
+            urls_translated.push_back(url->substr(2));
+
+            if(!this->obj_ws_nsp->get_handlers(&handlers_xrsr)) {
+                LOG_ERROR("%s: failed to get handlers ws\n", __FUNCTION__);
+            } else {
+                routes[i].src                     = src;
+                routes[i].dst_qty                 = 1;
+                routes[i].dsts[0].url             = urls_translated[translated_index].c_str();
+                routes[i].dsts[0].handlers        = handlers_xrsr;
+                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM | XRSR_AUDIO_FORMAT_PCM_RAW;
+                routes[i].dsts[0].stream_time_min = 0;
+                routes[i].dsts[0].stream_from     = XRSR_STREAM_FROM_BEGINNING;
+                routes[i].dsts[0].stream_offset   = 0;
+                routes[i].dsts[0].stream_until    = XRSR_STREAM_UNTIL_END_OF_STREAM;
                 #ifdef ENABLE_DEEP_SLEEP
                 if(src == XRSR_SRC_MICROPHONE) {
                     routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.standby_params;

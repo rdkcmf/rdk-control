@@ -1175,10 +1175,16 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     bool l_session_by_text = (l_transcription_in != NULL);
     if (l_session_by_text) {
         LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, l_transcription_in);
-        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), l_transcription_in)) {
+        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), XRSR_AUDIO_FORMAT_NONE, l_transcription_in)) {
             LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
             return VOICE_SESSION_RESPONSE_BUSY;
         }
+    } else if(device_type == CTRLM_VOICE_DEVICE_MICROPHONE && stream_params == NULL) {
+       LOG_INFO("%s: Requesting the speech router start a session with the microphone\n", __FUNCTION__);
+       if (false == xrsr_session_request(voice_device_to_xrsr(device_type), (format == CTRLM_VOICE_FORMAT_PCM_RAW) ? XRSR_AUDIO_FORMAT_PCM_RAW : XRSR_AUDIO_FORMAT_PCM, NULL)) {
+           LOG_ERROR("%s: Failed to acquire the microphone session from the speech router.\n", __FUNCTION__);
+           return VOICE_SESSION_RESPONSE_BUSY;
+       }
     }
 
     ctrlm_hal_input_params_t hal_input_params;
@@ -1189,6 +1195,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     hal_input_params.input_format.sample_rate = 16000;
     hal_input_params.input_format.sample_size = is_standby_microphone() ? 4 : 1;
     hal_input_params.input_format.channel_qty = 1;
+    hal_input_params.require_stream_params    = (stream_params == NULL) ? false : true;
 
     ctrlm_hal_input_object_t hal_input_object = NULL;
     int fds[2] = { -1, -1 };
@@ -1467,6 +1474,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
             hal_input_params.input_format.sample_rate = 16000;
             hal_input_params.input_format.sample_size = 1;
             hal_input_params.input_format.channel_qty = 1;
+            hal_input_params.require_stream_params    = false;
 
             ret = ctrlm_xraudio_hal_input_session_begin(this->hal_input_object, &hal_input_params);
         }
@@ -2526,6 +2534,7 @@ const char *ctrlm_voice_format_str(ctrlm_voice_format_t format) {
         case CTRLM_VOICE_FORMAT_ADPCM:       return("ADPCM");
         case CTRLM_VOICE_FORMAT_ADPCM_SKY:   return("ADPCM_SKY");
         case CTRLM_VOICE_FORMAT_PCM:         return("PCM");
+        case CTRLM_VOICE_FORMAT_PCM_RAW:     return("PCM_RAW");
         case CTRLM_VOICE_FORMAT_OPUS_XVP:    return("OPUS_XVP");
         case CTRLM_VOICE_FORMAT_OPUS:        return("OPUS");
         case CTRLM_VOICE_FORMAT_INVALID:     return("INVALID");
@@ -2860,6 +2869,20 @@ const char *ctrlm_voice_command_status_tv_avr_str(ctrlm_voice_tv_avr_cmd_t cmd) 
         case CTRLM_VOICE_TV_AVR_CMD_VOLUME_MUTE: return ("VOLUME MUTE");
     }
     return(ctrlm_invalid_return(cmd));
+}
+
+const char *ctrlm_voice_session_response_status_str(ctrlm_voice_session_response_status_t status) {
+   switch(status) {
+      case VOICE_SESSION_RESPONSE_AVAILABLE:                           return("AVAILABLE");
+      case VOICE_SESSION_RESPONSE_BUSY:                                return("BUSY");
+      case VOICE_SESSION_RESPONSE_SERVER_NOT_READY:                    return("NOT_READY");
+      case VOICE_SESSION_RESPONSE_UNSUPPORTED_AUDIO_FORMAT:            return("UNSUPPORTED_AUDIO_FORMAT");
+      case VOICE_SESSION_RESPONSE_FAILURE:                             return("FAILURE");
+      case VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK:           return("AVAILABLE_SKIP_CHAN_CHECK");
+      case VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE:                 return("AVAILABLE_PAR_VOICE");
+      case VOICE_SESSION_RESPONSE_AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE: return("AVAILABLE_SKIP_CHAN_CHECK_PAR_VOICE");
+   }
+   return(ctrlm_invalid_return(status));
 }
 
 void ctrlm_voice_xrsr_session_capture_start(ctrlm_main_queue_msg_audio_capture_start_t *capture_start) {
