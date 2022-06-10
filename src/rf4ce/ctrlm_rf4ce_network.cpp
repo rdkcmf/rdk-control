@@ -1483,10 +1483,10 @@ void ctrlm_obj_network_rf4ce_t::req_process_rib_set(void *data, int size) {
          if(!rf4ce_rib_set_target((ctrlm_rf4ce_rib_attr_id_t)dqm->attribute_id, dqm->attribute_index, dqm->length, dqm->data, &rib_entries_updated)) {
             *dqm->cmd_result = CTRLM_RIB_REQUEST_ERROR;
          } else if(rib_entries_updated) {
-            guchar data[CTRLM_RF4CE_RIB_ATTR_LEN_RIB_ENTRIES_UPDATED];
-            data[0] = 0x01; // True
+            guchar flag[CTRLM_RF4CE_RIB_ATTR_LEN_RIB_ENTRIES_UPDATED];
+            flag[0] = 0x01; // True
             for(map<ctrlm_controller_id_t, ctrlm_obj_controller_rf4ce_t *>::iterator it = controllers_.begin(); it != controllers_.end(); it++) {
-               it->second->rf4ce_rib_set_target(CTRLM_RF4CE_RIB_ATTR_ID_RIB_ENTRIES_UPDATED, 0, CTRLM_RF4CE_RIB_ATTR_LEN_RIB_ENTRIES_UPDATED, data);
+               it->second->rf4ce_rib_set_target(CTRLM_RF4CE_RIB_ATTR_ID_RIB_ENTRIES_UPDATED, 0, CTRLM_RF4CE_RIB_ATTR_LEN_RIB_ENTRIES_UPDATED, flag);
             }
          }
       } else {
@@ -2976,7 +2976,7 @@ void ctrlm_obj_network_rf4ce_t::polling_config_read(json_config *conf) {
    guint8 default_polling_methods = 0;
    ctrlm_rf4ce_polling_configuration_t default_polling_config_hb = {0};
 
-   ctrlm_rf4ce_polling_configuration_t default_polling_config_mac;
+   ctrlm_rf4ce_polling_configuration_t default_polling_config_mac = {0};
    default_polling_config_mac.trigger = POLLING_TRIGGER_FLAG_TIME;
    default_polling_config_mac.time_interval = JSON_INT_VALUE_NETWORK_RF4CE_POLLING_DEFAULT_MAC_TIME_INTERVAL;
 
