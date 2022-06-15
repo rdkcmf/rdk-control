@@ -670,6 +670,8 @@ public:
 
    void ir_rf_database_status_download_reset(void *data, int size);
 
+   void metrics_tag_reset();
+
 private:
    ctrlm_obj_network_rf4ce_t *             obj_network_rf4ce_;
    bool                                    loading_db_;
@@ -765,6 +767,7 @@ private:
    guint                                   asb_tag_;
    // End ASB variables
 #endif
+   guint                                   metrics_tag_;
 
    // HACK for XR15-704
 #ifdef XR15_704

@@ -143,6 +143,7 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
 #ifdef ASB
    asb_key_derivation_method_used_(ASB_KEY_DERIVATION_NONE),
 #endif
+   metrics_tag_ (0),
 #ifdef XR15_704
    needs_reset_(false),
    did_reset_(false),
@@ -224,6 +225,12 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t() {
 
 ctrlm_obj_controller_rf4ce_t::~ctrlm_obj_controller_rf4ce_t() {
    LOG_INFO("ctrlm_obj_controller_rf4ce_t deconstructor\n");
+
+   if (metrics_tag_ != 0) {
+      LOG_WARN("%s: metrics timer destroyed\n", __FUNCTION__);
+      ctrlm_timeout_destroy(&metrics_tag_);
+      metrics_tag_ = 0;
+   }
 
    if(pairing_data_ != NULL) {
       ctrlm_hal_free(pairing_data_);
@@ -3315,10 +3322,15 @@ void ctrlm_obj_controller_rf4ce_t::asb_key_derivation_perform() {
 }
 #endif
 
-int handle_controller_metrics_timeout(void *data) {
+void ctrlm_obj_controller_rf4ce_t::metrics_tag_reset() {
+   metrics_tag_ = 0;
+}
+
+static gboolean handle_controller_metrics_timeout(void *data) {
    ctrlm_obj_controller_rf4ce_t *controller = (ctrlm_obj_controller_rf4ce_t *)data;
    ctrlm_main_queue_handler_push(CTRLM_HANDLER_CONTROLLER, (ctrlm_msg_handler_controller_t)&ctrlm_obj_controller_rf4ce_t::handle_controller_metrics, (void *)NULL, 0, (void *)controller);
-   return 0;
+   controller->metrics_tag_reset();
+   return false;
 }
 
 void ctrlm_obj_controller_rf4ce_t::handle_controller_metrics(void *data, int size) {
@@ -3328,11 +3340,11 @@ void ctrlm_obj_controller_rf4ce_t::handle_controller_metrics(void *data, int siz
       if(controller_type_ == RF4CE_CONTROLLER_TYPE_XR19) {
          ctrlm_rf4ce_polling_action_push(network_id_get(), controller_id_get(), RF4CE_POLLING_ACTION_METRICS, NULL, 0);
       }
-      ctrlm_timeout_create((60*60*24)*1000, handle_controller_metrics_timeout, this); // 24 hours in milliseconds
+      metrics_tag_ = ctrlm_timeout_create((60*60*24)*1000, handle_controller_metrics_timeout, this); // 24 hours in milliseconds
    } else {
       if(controller_type_ == RF4CE_CONTROLLER_TYPE_XR19) {
          LOG_DEBUG("%s: metrics timeout created\n", __FUNCTION__);
-         ctrlm_timeout_create(((60*60*24)-since_last)*1000, handle_controller_metrics_timeout, this); // 24 hours - time since in milliseconds
+         metrics_tag_ = ctrlm_timeout_create(((60*60*24)-since_last)*1000, handle_controller_metrics_timeout, this); // 24 hours - time since in milliseconds
       }
    }
 }
