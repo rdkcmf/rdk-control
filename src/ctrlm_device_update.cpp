@@ -1451,10 +1451,10 @@ gpointer ctrlm_device_update_thread(gpointer param) {
             ERR_CHK(safec_rc);
             safec_rc = strncpy_s(msg.temp_dir_path, sizeof(msg.temp_dir_path), g_ctrlm_device_update.prefs.temp_file_path.c_str(), sizeof(msg.temp_dir_path) - 1);
             ERR_CHK(safec_rc);
-	    msg.temp_dir_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
+            msg.temp_dir_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
             safec_rc = strncpy_s(msg.archive_file_path, sizeof(msg.archive_file_path), xconf_msg->update_file_name, sizeof(msg.archive_file_path) - 1);
             ERR_CHK(safec_rc);
-	    msg.archive_file_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
+            msg.archive_file_path[CTRLM_DEVICE_UPDATE_PATH_LENGTH - 1] = '\0';
             msg.semaphore = &semaphore;
             msg.network_managing_upgrade = &network_managing_upgrade;
 

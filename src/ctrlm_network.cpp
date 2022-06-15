@@ -770,7 +770,7 @@ void ctrlm_obj_network_t::req_process_network_managed_upgrade(void *data, int si
    }
 }
 
-void ctrlm_obj_network_t::req_process_network_continue_upgrade(void *data, int size) {
+void ctrlm_obj_network_t::req_process_upgrade_controllers(void *data, int size) {
    LOG_WARN("%s: not implemented for %s network\n", __FUNCTION__, name_get());
 }
 

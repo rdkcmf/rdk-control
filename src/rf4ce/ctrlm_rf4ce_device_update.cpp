@@ -246,7 +246,7 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_check_request(ctrlm_times
          LOG_INFO("%s: Image Check response - No image is available.  Check again in %u seconds.\n", __FUNCTION__, next_check_time);
 
          if (is_controller_type_z()) {
-            ota_failure_count_set(ota_failure_count_get() + 1);
+            ota_failure_type_z_cnt_set(ota_failure_type_z_cnt_get() + 1);
          }
       }
 #ifdef XR15_704
@@ -551,11 +551,11 @@ void ctrlm_obj_controller_rf4ce_t::device_update_image_download_complete(ctrlm_t
 
    if (result == RF4CE_DEVICE_UPDATE_RESULT_SUCCESS) {
       // Reset controller ota counter to zero
-      ota_failure_count_set(0);
+      ota_failure_type_z_cnt_set(0);
    } else {
       if (is_controller_type_z() || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_CRC || result == RF4CE_DEVICE_UPDATE_RESULT_ERROR_BAD_HASH) {
          // Increment ota counter
-         ota_failure_count_set(ota_failure_count_get() + 1);
+         ota_failure_type_z_cnt_set(ota_failure_type_z_cnt_get() + 1);
       }
    }
 

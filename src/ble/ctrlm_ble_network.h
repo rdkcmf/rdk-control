@@ -80,7 +80,7 @@ typedef struct {
 } ctrlm_main_queue_msg_continue_upgrade_t;
 
 typedef struct {
-   ctrlm_ble_controller_type_t   controller_type;
+   std::string                   product_name;
    std::string                   path;
    std::string                   image_filename;
    ctrlm_version_t               version_software;
@@ -145,9 +145,10 @@ public:
    void                          req_process_check_for_stale_remote(void *data, int size);
 
    virtual void                  req_process_network_managed_upgrade(void *data, int size);
-   virtual void                  req_process_network_continue_upgrade(void *data, int size);
+   virtual void                  req_process_upgrade_controllers(void *data, int size);
    virtual json_t *              xconf_export_controllers();
    void                          addUpgradeImage(ctrlm_ble_upgrade_image_info_t image_info);
+   void                          clearUpgradeImages();
 
    virtual void                  voice_command_status_set(void *data, int size);
    virtual void                  process_voice_controller_metrics(void *data, int size);
@@ -206,7 +207,7 @@ private:
 
    std::map <ctrlm_controller_id_t, ctrlm_obj_controller_ble_t *> controllers_;
 
-   std::map <ctrlm_ble_controller_type_t, ctrlm_ble_upgrade_image_info_t> upgrade_images_;
+   std::map <std::string, ctrlm_ble_upgrade_image_info_t> upgrade_images_;
 
    bool                  controller_is_bound(ctrlm_controller_id_t controller_id) const;
    void                  controller_remove(ctrlm_controller_id_t controller_id);

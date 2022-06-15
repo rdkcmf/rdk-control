@@ -190,6 +190,8 @@ void ctrlm_db_ble_read_device_id(ctrlm_network_id_t network_id, ctrlm_controller
 void ctrlm_db_ble_read_voice_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_ble_read_irdb_entry_id_name_tv(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
 void ctrlm_db_ble_read_irdb_entry_id_name_avr(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar **data, guint32 *length);
+void ctrlm_db_ble_read_ota_failure_cnt_last_success(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint32 &value);
+void ctrlm_db_ble_read_ota_failure_type_z_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 &value);
 
 void ctrlm_db_ble_write_controller_name(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value);
 void ctrlm_db_ble_write_controller_manufacturer(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, std::string value);
@@ -206,6 +208,8 @@ void ctrlm_db_ble_write_device_id(ctrlm_network_id_t network_id, ctrlm_controlle
 void ctrlm_db_ble_write_voice_metrics(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_ble_write_irdb_entry_id_name_tv(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
 void ctrlm_db_ble_write_irdb_entry_id_name_avr(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guchar *data, guint32 length);
+void ctrlm_db_ble_write_ota_failure_cnt_last_success(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint32 value);
+void ctrlm_db_ble_write_ota_failure_type_z_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 value);
 
 bool ctrlm_db_voice_valid();
 void ctrlm_db_voice_read_url_ptt(std::string &ptt);

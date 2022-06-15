@@ -68,9 +68,6 @@ public:
    ctrlm_obj_controller_ble_t(ctrlm_controller_id_t controller_id, ctrlm_obj_network_ble_t &network, ctrlm_ble_result_validation_t validation_result);
    ctrlm_obj_controller_ble_t();
 
-   static bool controllerTypeToXconfString(ctrlm_ble_controller_type_t type, std::string &xconfString);
-   static bool xconfStringToControllerType(std::string xconfString, ctrlm_ble_controller_type_t &controller_type);
-
    void db_create();
    void db_destroy();
    void db_load();
@@ -83,6 +80,7 @@ public:
 
    ctrlm_ble_controller_type_t   getControllerType(void);
    void                          setControllerType(std::string productName);
+   bool                          getOTAProductName(std::string &name);
    void                          setName(std::string controller_name);
    std::string                   getName( void );
    void                          setBatteryPercent(int percent);
@@ -117,6 +115,12 @@ public:
    bool                          getUpgradeInProgress(void);
    void                          setUpgradeAttempted(bool upgrade_attempted);
    bool                          getUpgradeAttempted(void);
+
+   virtual void                  ota_failure_cnt_incr();
+   virtual void                  ota_clear_all_failure_counters();
+   virtual void                  ota_failure_type_z_cnt_set(uint8_t ota_failures);
+   virtual uint8_t               ota_failure_type_z_cnt_get(void) const;
+   virtual bool                  is_controller_type_z(void) const;
 
    void                          setIrCode(int code);
    void                          setAudioGainLevel(guint8 gain);

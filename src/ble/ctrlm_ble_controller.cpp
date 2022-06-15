@@ -52,41 +52,6 @@ using namespace std;
 #define BROADCAST_PRODUCT_NAME_EC302                     ("SkyQ EC302")
 #define XCONF_PRODUCT_NAME_EC302                         ("EC302-10")
 
-// Static class functions
-
-bool ctrlm_obj_controller_ble_t::controllerTypeToXconfString(ctrlm_ble_controller_type_t type, string &xconfString) {
-   switch(type) {
-      case BLE_CONTROLLER_TYPE_PR1:
-         xconfString = XCONF_PRODUCT_NAME_PR1;
-         break;
-      case BLE_CONTROLLER_TYPE_LC103:
-         xconfString = XCONF_PRODUCT_NAME_LC103;
-         break;
-      case BLE_CONTROLLER_TYPE_EC302:
-         xconfString = XCONF_PRODUCT_NAME_EC302;
-         break;
-      case BLE_CONTROLLER_TYPE_IR:
-         return false;
-      default:
-         LOG_ERROR("%s: controller of type %s not mapped to XCONF string\n", __FUNCTION__, ctrlm_ble_controller_type_str(type));
-         return false;
-   }
-   return true;
-}
-
-bool ctrlm_obj_controller_ble_t::xconfStringToControllerType(string xconfString, ctrlm_ble_controller_type_t &controller_type) {
-   if (xconfString == XCONF_PRODUCT_NAME_PR1) {
-      controller_type = BLE_CONTROLLER_TYPE_PR1;
-   } else if (xconfString == XCONF_PRODUCT_NAME_LC103) {
-      controller_type = BLE_CONTROLLER_TYPE_LC103;
-   } else if (xconfString == XCONF_PRODUCT_NAME_EC302) {
-      controller_type = BLE_CONTROLLER_TYPE_EC302;
-   } else {
-      LOG_ERROR("%s: Unsupported XCONF product <%s>\n", __FUNCTION__, xconfString.c_str());
-      return false;
-   }
-   return true;
-}
 
 // Function Implementations
 
@@ -191,6 +156,12 @@ void ctrlm_obj_controller_ble_t::db_load() {
    }
    ctrlm_db_free(data);
 
+   ctrlm_db_ble_read_ota_failure_cnt_last_success(network_id, controller_id, ota_failure_cnt_from_last_success_);
+   LOG_INFO("%s: Controller %s <%s> OTA total failures since last successful upgrade = %d\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str(), ota_failure_cnt_from_last_success_);
+
+   ctrlm_db_ble_read_ota_failure_type_z_count(network_id, controller_id, ota_failure_type_z_cnt_);
+   LOG_INFO("%s: Controller %s <%s> OTA type Z failure count = %d.... is %s\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str(), ota_failure_type_z_cnt_get(), is_controller_type_z() ? "TYPE Z" : "NOT TYPE Z");
+
    stored_in_db_ = true;
 }
 
@@ -247,6 +218,29 @@ void ctrlm_obj_controller_ble_t::setControllerType(std::string productName) {
       controller_type_ = BLE_CONTROLLER_TYPE_UNKNOWN;
    }
    LOG_DEBUG("%s: controller_type_ set to <%s>\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_));
+}
+
+bool ctrlm_obj_controller_ble_t::getOTAProductName(string &name) {
+   switch(controller_type_) {
+      case BLE_CONTROLLER_TYPE_PR1:
+         name = XCONF_PRODUCT_NAME_PR1;
+         break;
+      case BLE_CONTROLLER_TYPE_LC103:
+         name = XCONF_PRODUCT_NAME_LC103;
+         if (is_controller_type_z()) {
+            name.append("Z");
+         }
+         break;
+      case BLE_CONTROLLER_TYPE_EC302:
+         name = XCONF_PRODUCT_NAME_EC302;
+         break;
+      case BLE_CONTROLLER_TYPE_IR:
+         return false;
+      default:
+         LOG_ERROR("%s: controller of type %s not mapped to OTA product name\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_));
+         return false;
+   }
+   return true;
 }
 
 void ctrlm_obj_controller_ble_t::setDeviceID(int device_id) {
@@ -441,14 +435,35 @@ guchar ctrlm_obj_controller_ble_t::property_read_irdb_entry_id_name_avr(guchar *
 }
 
 bool ctrlm_obj_controller_ble_t::swUpgradeRequired(ctrlm_version_t newVersion, bool force) {
-   LOG_DEBUG("%s: Controller %u: current rev = <%s>, new rev = <%s>, force = <%s>\n", __FUNCTION__, 
-         controller_id_get(), sw_revision_.toString().c_str(),newVersion.toString().c_str(), force ? "TRUE" : "FALSE");
    if ((unsigned)controller_type_ >= BLE_CONTROLLER_TYPE_IR) {
       return false;
    } else {
-      int rev_compare = sw_revision_.compare(newVersion);
-      // Need a sw upgrade if the current version is older than the new version, or force flag is true and versions aren't equal
-      return ((rev_compare < 0) && !upgrade_attempted_) || (force && (rev_compare != 0));
+      if (sw_revision_.empty()) {
+         LOG_WARN("%s: Controller <%s> does not have a valid software revision so not upgrading\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+         return false;
+      } else {
+         int rev_compare = sw_revision_.compare(newVersion);
+         bool required = false;
+         if (rev_compare == 0) {
+            LOG_WARN("%s: Controller <%s> already has requested software installed\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+            ota_clear_all_failure_counters();
+         } else if (upgrade_attempted_) {
+            // A type Z OTA failure is recognized by the OTA downloading 100% and completing successfully,
+            // but the remote never reboots and updates its software revision field to the new firmware rev.
+            // So if we've already attempted an upgrade during this upgrade procedure window but the revision is
+            // still not updated then its a type Z failure.
+            ota_failure_type_z_cnt_set(ota_failure_type_z_cnt_get() + 1);
+         } else if (force) {
+            // force flag is true and versions aren't equal, need upgrade
+            required = true;
+         } else if (rev_compare < 0) {
+            // Current rev is older and we haven't attempted an upgrade on this controller this session, so need upgrade
+            required = true;
+         }
+         LOG_DEBUG("%s: Controller %u: current rev = <%s>, new rev = <%s>, force = <%s>, upgrade_attempted_ = <%s>, rev_compare = <%d>, required = <%s>\n", __FUNCTION__, 
+               controller_id_get(), sw_revision_.toString().c_str(), newVersion.toString().c_str(), force ? "TRUE" : "FALSE", upgrade_attempted_ ? "TRUE" : "FALSE", rev_compare, required ? "TRUE" : "FALSE");
+         return required;
+      }
    }
 }
 
@@ -476,6 +491,49 @@ void ctrlm_obj_controller_ble_t::setUpgradePaused(bool paused) {
 
 bool ctrlm_obj_controller_ble_t::getUpgradePaused() {
    return upgrade_paused_;
+}
+
+void ctrlm_obj_controller_ble_t::ota_failure_cnt_incr() {
+   ctrlm_obj_controller_t::ota_failure_cnt_incr();
+   ctrlm_db_ble_write_ota_failure_cnt_last_success(network_id_get(), controller_id_get(), ota_failure_cnt_from_last_success_);
+   LOG_DEBUG("%s: Controller %s <%s> OTA failure count since last successful upgrade = %d\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str(), ota_failure_cnt_from_last_success_);
+}
+
+void ctrlm_obj_controller_ble_t::ota_clear_all_failure_counters() {
+   ctrlm_obj_controller_t::ota_clear_all_failure_counters();
+   ctrlm_db_ble_write_ota_failure_cnt_last_success(network_id_get(), controller_id_get(), ota_failure_cnt_from_last_success_);
+   LOG_DEBUG("%s: Controller %s <%s> OTA failure count since last successful upgrade reset to 0.\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+}
+
+void ctrlm_obj_controller_ble_t::ota_failure_type_z_cnt_set(uint8_t ota_failures) {
+   if (controller_type_ != BLE_CONTROLLER_TYPE_LC103) {
+      return ;
+   }
+   if (ota_failure_type_z_cnt_get() < ota_failures) {
+      LOG_WARN("%s: Controller %s <%s> type Z OTA failure suspected, incrementing counter.\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+   }
+   bool is_type_z_before = is_controller_type_z();
+   ctrlm_obj_controller_t::ota_failure_type_z_cnt_set(ota_failures);
+   bool is_type_z_after = is_controller_type_z();
+   if (is_type_z_before != is_type_z_after) {
+      LOG_WARN("%s: Controller %s <%s> switched from %s to %s\n",__FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str(), is_type_z_before ? "TYPE Z" : "NOT TYPE Z", is_type_z_after ? "TYPE Z" : "NOT TYPE Z");
+   }
+   ctrlm_db_ble_write_ota_failure_type_z_count(network_id_get(), controller_id_get(), ota_failure_type_z_cnt_get());
+   LOG_INFO("%s: Controller %s <%s> OTA type Z failure count updated to %d.... is %s\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str(), ota_failure_type_z_cnt_get(), is_controller_type_z() ? "TYPE Z" : "NOT TYPE Z");
+}
+
+uint8_t ctrlm_obj_controller_ble_t::ota_failure_type_z_cnt_get(void) const {
+   if (controller_type_ != BLE_CONTROLLER_TYPE_LC103) {
+      return 0;
+   }
+   return ctrlm_obj_controller_t::ota_failure_type_z_cnt_get();
+}
+
+bool ctrlm_obj_controller_ble_t::is_controller_type_z(void) const {
+   if (controller_type_ != BLE_CONTROLLER_TYPE_LC103) {
+      return false;
+   }
+   return ctrlm_obj_controller_t::is_controller_type_z();
 }
 
 void ctrlm_obj_controller_ble_t::setIrCode(int ircode) {
@@ -825,28 +883,34 @@ void ctrlm_obj_controller_ble_t::print_status() {
       time_last_key_str[0]        = '\0';
       strftime(time_last_key_str,        CTRLM_BLE_TIME_STR_LEN, "%F %T", localtime((time_t *)&last_key_time_));
    }
+
+   string ota_product_name;
+   getOTAProductName(ota_product_name);
+
    LOG_WARN("------------------------------------------------------------\n");
-   LOG_INFO("%s: Controller ID   : %u\n", __FUNCTION__, controller_id_get());
-   LOG_INFO("%s: Friendly Name   : %s\n", __FUNCTION__, product_name_.c_str());
-   LOG_INFO("%s: Manufacturer    : %s\n", __FUNCTION__, manufacturer_.c_str());
-   LOG_INFO("%s: Model           : %s\n", __FUNCTION__, model_.c_str());
-   LOG_INFO("%s: MAC Address     : %s\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
-   LOG_INFO("%s: Device ID       : %d\n", __FUNCTION__, device_id_);
-   LOG_INFO("%s: Connected       : %s\n", __FUNCTION__, (connected_==true) ? "true" : "false");
-   LOG_INFO("%s: Battery Level   : %d%%\n", __FUNCTION__, battery_percent_);
-   LOG_INFO("%s: HW Revision     : %s\n", __FUNCTION__, hw_revision_.toString().c_str());
-   LOG_INFO("%s: FW Revision     : %s\n", __FUNCTION__, fw_revision_.c_str());
-   LOG_INFO("%s: SW Revision     : %s\n", __FUNCTION__, sw_revision_.toString().c_str());
-   LOG_INFO("%s: Serial Number   : %s\n", __FUNCTION__, serial_number_.c_str());
+   LOG_INFO("%s: Controller ID                : %u\n", __FUNCTION__, controller_id_get());
+   LOG_INFO("%s: Friendly Name                : %s\n", __FUNCTION__, product_name_.c_str());
+   LOG_INFO("%s: OTA Product Name             : %s\n", __FUNCTION__, ota_product_name.c_str());
+   LOG_INFO("%s: Manufacturer                 : %s\n", __FUNCTION__, manufacturer_.c_str());
+   LOG_INFO("%s: Model                        : %s\n", __FUNCTION__, model_.c_str());
+   LOG_INFO("%s: MAC Address                  : %s\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+   LOG_INFO("%s: Device ID                    : %d\n", __FUNCTION__, device_id_);
+   LOG_INFO("%s: Connected                    : %s\n", __FUNCTION__, (connected_==true) ? "true" : "false");
+   LOG_INFO("%s: Battery Level                : %d%%\n", __FUNCTION__, battery_percent_);
+   LOG_INFO("%s: HW Revision                  : %s\n", __FUNCTION__, hw_revision_.toString().c_str());
+   LOG_INFO("%s: FW Revision                  : %s\n", __FUNCTION__, fw_revision_.c_str());
+   LOG_INFO("%s: SW Revision                  : %s\n", __FUNCTION__, sw_revision_.toString().c_str());
+   LOG_INFO("%s: Serial Number                : %s\n", __FUNCTION__, serial_number_.c_str());
    LOG_INFO("%s:\n", __FUNCTION__);
-   LOG_INFO("%s: Bound Time      : %s\n", __FUNCTION__, time_binding_str);
-   LOG_INFO("%s: Last Key Code   : 0x%X\n", __FUNCTION__, last_key_code_);
-   LOG_INFO("%s: Last Key Time   : %s\n", __FUNCTION__, time_last_key_str);
-   LOG_INFO("%s: Last Wakeup Key : 0x%X\n", __FUNCTION__, last_wakeup_key_code_);
-   LOG_INFO("%s: Wakeup Config   : %s\n", __FUNCTION__, ctrlm_rcu_wakeup_config_str(wakeup_config_));
+   LOG_INFO("%s: Bound Time                   : %s\n", __FUNCTION__, time_binding_str);
+   LOG_INFO("%s: Last Key Code                : 0x%X\n", __FUNCTION__, last_key_code_);
+   LOG_INFO("%s: Last Key Time                : %s\n", __FUNCTION__, time_last_key_str);
+   LOG_INFO("%s: Last Wakeup Key              : 0x%X\n", __FUNCTION__, last_wakeup_key_code_);
+   LOG_INFO("%s: Wakeup Config                : %s\n", __FUNCTION__, ctrlm_rcu_wakeup_config_str(wakeup_config_));
    if (wakeup_config_ == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM) {
-      LOG_INFO("%s: Wakeup Config Custom List   : %s\n", __FUNCTION__, wakeupCustomListToString().c_str());
+   LOG_INFO("%s: Wakeup Config Custom List    : %s\n", __FUNCTION__, wakeupCustomListToString().c_str());
    }
+   LOG_INFO("%s:\n", __FUNCTION__);
    LOG_INFO("%s: Voice Cmd Count Today        : %lu\n", __FUNCTION__, voice_cmd_count_today_);
    LOG_INFO("%s: Voice Packets Sent Today     : %lu\n", __FUNCTION__, voice_packets_sent_today_);
    LOG_INFO("%s: Voice Packets Lost Today     : %lu\n", __FUNCTION__, voice_packets_lost_today_);

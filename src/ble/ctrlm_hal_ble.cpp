@@ -350,10 +350,7 @@ bool ctrlm_hal_ble_dbus_init(void)
                                                     CTRLM_HAL_BLE_SKY_RCU_DBUS_INTERFACE_CONTROLLER,
                                                     NULL, &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         result = false;
     } else {
@@ -382,10 +379,7 @@ bool ctrlm_hal_ble_dbus_init(void)
                                                     CTRLM_HAL_BLE_SKY_RCU_DBUS_INTERFACE_PROPERTIES,
                                                     NULL, &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         result = false;
     } else {
@@ -624,7 +618,20 @@ static void ctrlm_hal_ble_DBusOnSignalReceivedCB (  GDBusProxy *proxy,
     } else if (0 == g_strcmp0(signal_name, "UpgradeError")) {
         gchar *upgrade_error;
         g_variant_get (parameters, "(s)", &upgrade_error);
-        LOG_WARN("%s: RCU Firmware Upgrade Error = <%s>\n", __FUNCTION__, upgrade_error);
+
+        ctrlm_hal_ble_RcuStatusData_t rcu_status;
+        rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_UPGRADE_ERROR;
+        rcu_status.rcu_data.ieee_address = ctrlm_ble_utils_GetIEEEAddressFromObjPath(g_dbus_proxy_get_object_path(proxy));
+        errno_t safec_rc = strcpy_s(rcu_status.rcu_data.upgrade_error, sizeof(rcu_status.rcu_data.upgrade_error), upgrade_error);
+        ERR_CHK(safec_rc);
+        if (NULL != g_ctrlm_hal_ble->main_init.ind_status) {
+            // report up to the network
+            if (CTRLM_HAL_RESULT_SUCCESS != g_ctrlm_hal_ble->main_init.ind_status(g_ctrlm_hal_ble->main_init.network_id, &rcu_status)) {
+                LOG_ERROR("%s: RCU status indication failed\n", __FUNCTION__);
+            }
+        } else {
+            LOG_WARN("%s: status callback to the network is NULL\n", __FUNCTION__);
+        }
         g_free(upgrade_error);
     } else {
         LOG_DEBUG("%s: Ignoring irrelevant signal: %s\n", __FUNCTION__,signal_name);
@@ -743,7 +750,7 @@ ctrlm_hal_result_t ctrlm_hal_ble_req_Unpair(unsigned long long ieee_address)
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_StartAudioStream(ctrlm_hal_ble_StartAudioStream_params_t *params)
 {
-    LOG_INFO("%s: Enter...\n", __FUNCTION__);
+    LOG_DEBUG("%s: Enter...\n", __FUNCTION__);
 
     ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
     GVariant  *reply = NULL;
@@ -767,16 +774,13 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_StartAudioStream(ctrlm_hal_ble_Start
         gint fd = -1;
         GError *error = NULL;
         fd = g_unix_fd_list_get (fd_list, 0, &error);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
+        if (fd < 0) {
+            LOG_ERROR ("%s, %d: Received invalid voice data file descriptor <-1>, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
             ret = CTRLM_HAL_RESULT_ERROR;
             g_clear_error (&error);
-        } else if (fd >= 0) {
+        } else {
             params->fd = fd;
             LOG_INFO("%s: Received valid voice data file descriptor, returning with params->fd = <%d>\n", __FUNCTION__, params->fd);
-        } else {
-            LOG_ERROR ("%s: Received invalid voice data file descriptor <-1>\n", __FUNCTION__);
-            ret = CTRLM_HAL_RESULT_ERROR;
         }
     } else {
         LOG_ERROR("%s: FAILED!!!\n", __FUNCTION__);
@@ -839,9 +843,7 @@ static void ctrlm_hal_ble_IR_ResultCB(GDBusProxy   *proxy,
     reply = g_dbus_proxy_call_finish (proxy, res, &error);
     if (NULL == reply) {
         // Will return NULL if there's an error reported
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         success = false;
     } else {
@@ -1004,10 +1006,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetDaemonLogLevel(daemon_logging_t *
                                                     NULL,
                                                     &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         return CTRLM_HAL_RESULT_ERROR;
     } else {
@@ -1052,10 +1051,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_SetDaemonLogLevel(daemon_logging_t l
                                                     NULL,
                                                     &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         return CTRLM_HAL_RESULT_ERROR;
     } else {
@@ -1075,19 +1071,37 @@ static void ctrlm_hal_ble_FwUpgrade_ResultCB(GDBusProxy   *proxy,
     LOG_DEBUG ("%s, Enter...\n", __FUNCTION__);
     GError *error = NULL;
     GVariant *reply;
+    bool success = false;
 
     reply = g_dbus_proxy_call_finish (proxy, res, &error);
     if (NULL == reply) {
         // Will return NULL if there's an error reported
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
-        g_clear_error (&error);
-        LOG_ERROR("%s: RCU firmware upgrade request FAILED!!\n", __FUNCTION__);
+        LOG_ERROR ("%s, %d: RCU firmware upgrade request FAILED!! error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
+        success = false;
     } else {
         LOG_INFO("%s: RCU firmware upgrade request SUCCESSFUL.\n", __FUNCTION__);
+        success = true;
     }
     if (NULL != reply) { g_variant_unref(reply); }
+
+    if (!success) {
+        // FW upgrade request failed, send indication up to the network
+        ctrlm_hal_ble_RcuStatusData_t rcu_status;
+        rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_UPGRADE_ERROR;
+        rcu_status.rcu_data.ieee_address = ctrlm_ble_utils_GetIEEEAddressFromObjPath(g_dbus_proxy_get_object_path(proxy));
+        errno_t safec_rc = strcpy_s(rcu_status.rcu_data.upgrade_error, sizeof(rcu_status.rcu_data.upgrade_error), (error == NULL) ? "" : error->message);
+        ERR_CHK(safec_rc);
+
+        if (NULL != g_ctrlm_hal_ble->main_init.ind_status) {
+            // report up to the network
+            if (CTRLM_HAL_RESULT_SUCCESS != g_ctrlm_hal_ble->main_init.ind_status(g_ctrlm_hal_ble->main_init.network_id, &rcu_status)) {
+                LOG_ERROR("%s: RCU status indication failed\n", __FUNCTION__);
+            }
+        } else {
+            LOG_WARN("%s: status callback to the network is NULL\n", __FUNCTION__);
+        }
+    }
+    g_clear_error (&error);
 }
 
 static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_params_t params)
@@ -1106,9 +1120,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_pa
 
         GError *error = NULL;
         if (g_unix_fd_list_append (fd_list, fd, &error) < 0) {
-            if (NULL != error) {
-                LOG_ERROR ("%s, %d: failed appending file descriptor to list, error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-            }
+            LOG_ERROR ("%s, %d: failed appending file descriptor to list, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
             g_clear_error (&error);
             ret = CTRLM_HAL_RESULT_ERROR;
         } else {
@@ -1167,10 +1179,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_Get
                                                     NULL,
                                                     &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         return CTRLM_HAL_RESULT_ERROR;
     } else {
@@ -1207,10 +1216,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_Get
                                                     NULL,
                                                     &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         return CTRLM_HAL_RESULT_ERROR;
     } else {
@@ -1259,10 +1265,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_Ge
                                                     NULL,
                                                     &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         return CTRLM_HAL_RESULT_ERROR;
     } else {
@@ -1292,11 +1295,8 @@ static void ctrlm_hal_ble_RcuAction_ResultCB(GDBusProxy   *proxy,
     reply = g_dbus_proxy_call_finish (proxy, res, &error);
     if (NULL == reply) {
         // Will return NULL if there's an error reported
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: RCU Action FAILED to send!! error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
-        LOG_ERROR("%s, RCU Action FAILED to send!!\n", __FUNCTION__);
     } else {
         LOG_INFO("%s, RCU Action sent SUCCESSFULLY.\n", __FUNCTION__);
     }
@@ -1345,11 +1345,8 @@ static void ctrlm_hal_ble_AdvertisingConfig_ResultCB(GDBusProxy   *proxy,
     reply = g_dbus_proxy_call_finish (proxy, res, &error);
     if (NULL == reply) {
         // Will return NULL if there's an error reported
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: Advertising Config FAILED to send to RCU!! error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
-        LOG_ERROR("%s, Advertising Config FAILED to send to RCU!!\n", __FUNCTION__);
     } else {
         LOG_INFO("%s, Adverting Config sent SUCCESSFULLY.\n", __FUNCTION__);
     }
@@ -1677,11 +1674,8 @@ static ctrlm_hal_result_t ctrlm_hal_ble_GetDbusProperty(GDBusProxy   *gdbus_prox
         LOG_DEBUG("%s: reply has type '%s'\n", __FUNCTION__, g_variant_get_type_string (reply));
         *propertyValue = reply;
     } else {
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: Failed to retrieve RCU property (%s) !! error = <%s>\n", __FUNCTION__, __LINE__, propertyName, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
-        LOG_ERROR("%s, %d: Failed to retrieve RCU property (%s) !!\n", __FUNCTION__,__LINE__, propertyName);
         return CTRLM_HAL_RESULT_ERROR;
     }
     return CTRLM_HAL_RESULT_SUCCESS;
@@ -1710,11 +1704,8 @@ static ctrlm_hal_result_t ctrlm_hal_ble_SetDbusProperty(GDBusProxy   *gdbus_prox
                                     G_DBUS_CALL_FLAGS_NONE, CTRLM_BLE_G_DBUS_CALL_TIMEOUT_DEFAULT,
                                     NULL, &error);
     if (NULL == reply) {
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: Failed to set RCU property (%s) !! error = <%s>\n", __FUNCTION__, __LINE__, propertyName, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
-        LOG_ERROR("%s, %d: Failed to set RCU property (%s) !!\n", __FUNCTION__,__LINE__, propertyName);
         return CTRLM_HAL_RESULT_ERROR;
     }
     return CTRLM_HAL_RESULT_SUCCESS;
@@ -1737,10 +1728,7 @@ static ctrlm_hal_result_t ctrlm_hal_ble_GetAllRcuProperties(ctrlm_hal_ble_RcuSta
                                                     NULL,
                                                     &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         return CTRLM_HAL_RESULT_ERROR;
     }
@@ -1756,11 +1744,8 @@ static ctrlm_hal_result_t ctrlm_hal_ble_GetAllRcuProperties(ctrlm_hal_ble_RcuSta
     if (NULL != reply) {
         ctrlm_hal_ble_ReadDbusDictRcuProperties(reply, rcu_status);
     } else {
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: Failed to retrieve all RCU properties!! error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
-        LOG_ERROR("%s, %d: Failed to retrieve RCU property!!\n", __FUNCTION__,__LINE__);
         ret = CTRLM_HAL_RESULT_ERROR;
     }
     if (NULL != reply) { g_variant_unref(reply); }
@@ -1878,10 +1863,7 @@ static bool ctrlm_hal_ble_SetupDeviceDbusProxy(unsigned long long ieee_address, 
                                                     CTRLM_HAL_BLE_SKY_RCU_DBUS_INTERFACE_DEVICE,
                                                     NULL, &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         result = false;
     } else {
@@ -1912,10 +1894,7 @@ static bool ctrlm_hal_ble_SetupUpgradeDbusProxy(unsigned long long ieee_address,
                                                     CTRLM_HAL_BLE_SKY_RCU_DBUS_INTERFACE_UPGRADE,
                                                     NULL, &error );
     if (NULL == gdbus_proxy) {
-        LOG_ERROR ("%s: NULL == gdbus_proxy\n", __FUNCTION__);
-        if (NULL != error) {
-            LOG_ERROR ("%s, %d: error = <%s>\n", __FUNCTION__, __LINE__, error->message);
-        }
+        LOG_ERROR ("%s, %d: NULL == gdbus_proxy, error = <%s>\n", __FUNCTION__, __LINE__, (error == NULL) ? "" : error->message);
         g_clear_error (&error);
         result = false;
     } else {

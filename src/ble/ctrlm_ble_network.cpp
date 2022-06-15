@@ -55,15 +55,15 @@ using namespace std;
 
 typedef struct {
    guint stale_remote_timer_tag;
-   guint upgrade_continue_timer_tag;
+   guint upgrade_controllers_timer_tag;
    guint upgrade_pause_timer_tag;
 } ctrlm_ble_network_t;
 
 static ctrlm_ble_network_t g_ctrlm_ble_network;
 
 
-static gboolean ctrlm_ble_network_continue_upgrade(gpointer user_data);
-static gboolean ctrlm_ble_network_resume_upgrade(gpointer user_data);
+static gboolean ctrlm_ble_upgrade_controllers(gpointer user_data);
+static gboolean ctrlm_ble_upgrade_resume(gpointer user_data);
 static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrade_image_info_t &image_info);
 static gboolean ctrlm_ble_check_for_stale_remote(gpointer user_data);
 
@@ -117,7 +117,7 @@ ctrlm_obj_network_ble_t::ctrlm_obj_network_ble_t(ctrlm_network_type_t type, ctrl
    hal_api_term_                = NULL;
 
    g_ctrlm_ble_network.stale_remote_timer_tag = 0;
-   g_ctrlm_ble_network.upgrade_continue_timer_tag = 0;
+   g_ctrlm_ble_network.upgrade_controllers_timer_tag = 0;
    g_ctrlm_ble_network.upgrade_pause_timer_tag = 0;
 
    // Initialize condition and mutex
@@ -140,21 +140,18 @@ ctrlm_obj_network_ble_t::~ctrlm_obj_network_ble_t() {
    LOG_INFO("ctrlm_obj_network_ble_t destructor - Type (%u) Id (%u) Name (%s)\n", type_, id_, name_.c_str());
 
    ctrlm_timeout_destroy(&g_ctrlm_ble_network.stale_remote_timer_tag);
-   ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
+   ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_controllers_timer_tag);
    ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
 
    ctrlm_ble_iarm_terminate();
-   
+
    for(auto it = controllers_.begin(); it != controllers_.end(); it++) {
       if(it->second != NULL) {
          delete it->second;
       }
    }
 
-   // Delete the temp directories where upgrade images were extracted
-   for (auto const &upgrade_image : upgrade_images_) {
-      ctrlm_archive_remove(upgrade_image.second.path);
-   }
+   clearUpgradeImages();
 }
 
 gboolean ctrlm_obj_network_ble_t::load_config(json_t *json_obj_net) {
@@ -323,17 +320,6 @@ void ctrlm_obj_network_ble_t::hal_init_complete()
                hal_api_get_all_rcu_props_(rcu_props);
             }
             controller_add(rcu_props.rcu_data);
-         }
-         for(auto it = controllers_.cbegin(); it != controllers_.cend(); ) {
-            if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType() &&
-               (hal_devices.end() == std::find(hal_devices.begin(), hal_devices.end(), it->second->getMacAddress()))) {
-               LOG_INFO("%s: Controller (ID = %u), MAC Address: <0x%llX> not paired according to HAL, so removing...\n", __FUNCTION__, it->first, it->second->getMacAddress());
-               //remote stored in network database is not a paired remote as reported by the HAL, so remove it.
-               controller_remove(it->first);
-               it = controllers_.erase(it);
-            } else {
-               ++it;
-            }
          }
       }
    }
@@ -1091,7 +1077,7 @@ static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrad
    gchar *contents = NULL;
    string xml;
 
-   LOG_INFO("%s: parsing upgrade file <%s>\n", __FUNCTION__, filename.c_str());
+   LOG_DEBUG("%s: parsing upgrade file <%s>\n", __FUNCTION__, filename.c_str());
 
    if(!g_file_test(filename.c_str(), G_FILE_TEST_EXISTS) || !g_file_get_contents(filename.c_str(), &contents, NULL, NULL)) {
       LOG_ERROR("%s: unable to get file contents <%s>\n", __FUNCTION__, filename.c_str());
@@ -1108,13 +1094,7 @@ static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrad
       LOG_ERROR("%s: Missing Product Name\n", __FUNCTION__);
       return false;
    }
-
-   ctrlm_ble_controller_type_t controller_type;
-   if (false == ctrlm_obj_controller_ble_t::xconfStringToControllerType(product_name, controller_type)) {
-      LOG_ERROR("%s: Unsupported product <%s>\n", __FUNCTION__, product_name.c_str());
-      return false;
-   }
-   image_info.controller_type = controller_type;
+   image_info.product_name = product_name;
 
    string version_string = ctrlm_xml_tag_text_get(xml, "image:softwareVersion");
    if(version_string.length() == 0) {
@@ -1150,12 +1130,12 @@ static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrad
 
    string force_update = ctrlm_xml_tag_text_get(xml, "image:force_update");
    if(force_update.length() == 0) {
-      LOG_INFO("%s: Missing force update flag\n", __FUNCTION__);
       image_info.force_update = false;
    } else if(force_update == "1"){
+      LOG_INFO("%s: force update flag = TRUE\n", __FUNCTION__);
       image_info.force_update = true;
    } else {
-      LOG_ERROR("%s: Invalid force update flag <%s>\n", __FUNCTION__, force_update.c_str());
+      LOG_ERROR("%s: Invalid force update flag <%s>, setting to FALSE\n", __FUNCTION__, force_update.c_str());
       image_info.force_update = false;
    }
 
@@ -1163,18 +1143,26 @@ static bool ctrlm_ble_parse_upgrade_image_info(string filename, ctrlm_ble_upgrad
 }
 
 void ctrlm_obj_network_ble_t::addUpgradeImage(ctrlm_ble_upgrade_image_info_t image_info) {
-   if (upgrade_images_.end() != upgrade_images_.find(image_info.controller_type)) {
+   if (upgrade_images_.end() != upgrade_images_.find(image_info.product_name)) {
       //compare version, and replace if newer
-      if (upgrade_images_[image_info.controller_type].version_software.compare(image_info.version_software) < 0 ||
+      if (upgrade_images_[image_info.product_name].version_software.compare(image_info.version_software) < 0 ||
           image_info.force_update) {
-         upgrade_images_[image_info.controller_type] = image_info;
+         upgrade_images_[image_info.product_name] = image_info;
       }
    } else {
-      upgrade_images_[image_info.controller_type] = image_info;
+      upgrade_images_[image_info.product_name] = image_info;
    }
 }
 
-static gboolean ctrlm_ble_network_continue_upgrade(gpointer user_data) {
+void ctrlm_obj_network_ble_t::clearUpgradeImages() {
+   // Delete the temp directories where upgrade images were extracted
+   for (auto const &upgrade_image : upgrade_images_) {
+      ctrlm_archive_remove(upgrade_image.second.path);
+   }
+   upgrade_images_.clear();
+}
+
+static gboolean ctrlm_ble_upgrade_controllers(gpointer user_data) {
    ctrlm_network_id_t* net_id =  (ctrlm_network_id_t*) user_data;
    if (net_id != NULL) {
       // Allocate a message and send it to Control Manager's queue
@@ -1183,13 +1171,13 @@ static gboolean ctrlm_ble_network_continue_upgrade(gpointer user_data) {
       ERR_CHK(safec_rc);
       msg.retry_all = false;
 
-      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, &msg, sizeof(msg), NULL, *net_id);
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_upgrade_controllers, &msg, sizeof(msg), NULL, *net_id);
    }
-   g_ctrlm_ble_network.upgrade_continue_timer_tag = 0;
+   g_ctrlm_ble_network.upgrade_controllers_timer_tag = 0;
    return false;
 }
 
-static gboolean ctrlm_ble_network_resume_upgrade(gpointer user_data) {
+static gboolean ctrlm_ble_upgrade_resume(gpointer user_data) {
    ctrlm_network_id_t* net_id =  (ctrlm_network_id_t*) user_data;
    if (net_id != NULL) {
       // Allocate a message and send it to Control Manager's queue
@@ -1198,13 +1186,13 @@ static gboolean ctrlm_ble_network_resume_upgrade(gpointer user_data) {
       ERR_CHK(safec_rc);
       msg.retry_all = true;   //clear upgrade_attempted flag for all controllers to retry upgrade for all
 
-      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, &msg, sizeof(msg), NULL, *net_id);
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_upgrade_controllers, &msg, sizeof(msg), NULL, *net_id);
    }
    g_ctrlm_ble_network.upgrade_pause_timer_tag = 0;
    return false;
 }
 
-void ctrlm_obj_network_ble_t::req_process_network_continue_upgrade(void *data, int size) {
+void ctrlm_obj_network_ble_t::req_process_upgrade_controllers(void *data, int size) {
    ctrlm_main_queue_msg_continue_upgrade_t *dqm = (ctrlm_main_queue_msg_continue_upgrade_t *)data;
 
    g_assert(dqm);
@@ -1217,54 +1205,79 @@ void ctrlm_obj_network_ble_t::req_process_network_continue_upgrade(void *data, i
 
    if (dqm->retry_all) {
       LOG_INFO("%s: Checking all controllers for upgrades from a clean state.\n", __PRETTY_FUNCTION__);
-      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
+      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_controllers_timer_tag);
       ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
       for (auto &controller : controllers_) {
          controller.second->setUpgradeAttempted(false);
          controller.second->setUpgradePaused(false);
+         controller.second->ota_failure_cnt_session_clear();
       }
    }
 
    if (!upgrade_in_progress_) {
       for (auto const &upgrade_image : upgrade_images_) {
          for (auto &controller : controllers_) {
-            if (controller.second->getControllerType() == upgrade_image.first) {
-               if (controller.second->swUpgradeRequired(upgrade_image.second.version_software, upgrade_image.second.force_update)) {
-                  ctrlm_version_t new_version = upgrade_image.second.version_software;
-                  LOG_INFO("%s: Attempting to upgrade controller %s from <%s> to <%s>\n", __PRETTY_FUNCTION__,
-                        ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str(),
-                        controller.second->getSwRevision().toString().c_str(),
-                        new_version.toString().c_str());
+            string ota_product_name;
+            if (true == controller.second->getOTAProductName(ota_product_name)) {
+               if (ota_product_name == upgrade_image.first) {
+                  if (controller.second->swUpgradeRequired(upgrade_image.second.version_software, upgrade_image.second.force_update)) {
+                     ctrlm_version_t new_version = upgrade_image.second.version_software;
+                     LOG_INFO("%s: Attempting to upgrade controller %s from <%s> to <%s>\n", __PRETTY_FUNCTION__,
+                           ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str(),
+                           controller.second->getSwRevision().toString().c_str(),
+                           new_version.toString().c_str());
 
-                  // Attempt an upgrade once per request.  In the event of a failure, we don't want a remote
-                  // continuously trying an upgrade.
-                  controller.second->setUpgradeAttempted(true);
+                     // Mark that an upgrade was attempted for the remote.  If there is a failure, it will retry only
+                     // a couple times to prevent continuously failing upgrade attempts.
+                     controller.second->setUpgradeAttempted(true);
 
-                  ctrlm_hal_ble_FwUpgrade_params_t params;
-                  params.file_path = upgrade_image.second.path + "/" + upgrade_image.second.image_filename;
-                  params.ieee_address = controller.second->getMacAddress();
-                  if (hal_api_fw_upgrade_) {
-                     hal_api_fw_upgrade_(params);
+                     ctrlm_hal_ble_FwUpgrade_params_t params;
+                     params.file_path = upgrade_image.second.path + "/" + upgrade_image.second.image_filename;
+                     params.ieee_address = controller.second->getMacAddress();
+                     if (hal_api_fw_upgrade_) {
+                        hal_api_fw_upgrade_(params);
+                     } else {
+                        LOG_FATAL("%s: hal_api_fw_upgrade_ is NULL!\n", __PRETTY_FUNCTION__);
+                     }
+
+                     // Not only will this timer be used to check if other remotes need upgrades, it will also check if the previous 
+                     // upgrades succeeded successfully.  Some OTA problems will not cause any errors to be returned, but the remote
+                     // simply will not take the reboot and the software revision will remain unchanged.
+                     LOG_DEBUG("%s: Upgrading one remote at a time, setting timer for %d minutes to check if other remotes need upgrades.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT / MINUTE_IN_MILLISECONDS);
+                     ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_controllers_timer_tag);
+                     g_ctrlm_ble_network.upgrade_controllers_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_upgrade_controllers, &id_);
+                     return;
                   } else {
-                     LOG_FATAL("%s: hal_api_fw_upgrade_ is NULL!\n", __PRETTY_FUNCTION__);
+                     LOG_INFO("%s: Software upgrade not required for controller %s.\n", __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str());
                   }
-
-                  LOG_DEBUG("%s: Upgrading one remote at a time, setting timer for %d minutes to check if other remotes need upgrades.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT / MINUTE_IN_MILLISECONDS);
-                  ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
-                  g_ctrlm_ble_network.upgrade_continue_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_network_continue_upgrade, &id_);
-                  return;
-               } else {
-                  LOG_INFO("%s: Software for controller %s already up to date.\n", __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str());
                }
             }
          }
       }
       // We looped through all the upgrade images and all the controllers and didn't trigger any upgrades, so stop upgrade process.
-      LOG_INFO("%s: Software for all controllers up to date.  Exiting upgrade procedure.\n", __PRETTY_FUNCTION__);
+      LOG_INFO("%s: Exiting controller upgrade procedure.\n", __PRETTY_FUNCTION__);
+
+      for (auto &controller : controllers_) {
+         if (true == controller.second->is_controller_type_z() && false == controller.second->getUpgradeAttempted()) {
+            // For type Z controllers, if no upgrade was even attempted after checking all available images then increment the type Z counter
+            LOG_WARN("%s: Odd... Controller %s is type Z and an upgrade was not attempted.  Increment counter to ensure it doesn't get stuck as type Z.\n", 
+                  __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str());
+            controller.second->ota_failure_type_z_cnt_set(controller.second->ota_failure_type_z_cnt_get() + 1);
+         }
+      }
+
+      // Make sure xconf config file is updated
+      ctrlm_main_queue_msg_header_t *msg = (ctrlm_main_queue_msg_header_t *)g_malloc(sizeof(ctrlm_main_queue_msg_header_t));
+      if(msg == NULL) {
+         LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
+      } else {
+         msg->type = CTRLM_MAIN_QUEUE_MSG_TYPE_EXPORT_CONTROLLER_LIST;
+         ctrlm_main_queue_msg_push((gpointer)msg);
+      }
    } else {
       LOG_INFO("%s: Upgrade currently in progress, setting timer for %d minutes to check if other remotes need upgrades.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT / MINUTE_IN_MILLISECONDS);
-      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_continue_timer_tag);
-      g_ctrlm_ble_network.upgrade_continue_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_network_continue_upgrade, &id_);
+      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_controllers_timer_tag);
+      g_ctrlm_ble_network.upgrade_controllers_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_upgrade_controllers, &id_);
    }
 }
 
@@ -1311,7 +1324,7 @@ void ctrlm_obj_network_ble_t::req_process_network_managed_upgrade(void *data, in
       ERR_CHK(safec_rc);
       msg.retry_all = true;
 
-      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_network_continue_upgrade, &msg, sizeof(msg), NULL, id_);
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::req_process_upgrade_controllers, &msg, sizeof(msg), NULL, id_);
    }
 }
 
@@ -1367,7 +1380,7 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
             report_status = false;
             print_status = false;
          } else {
-            LOG_DEBUG("%s: Controller (0x%llX) FOUND in the network, updating data...\n", __PRETTY_FUNCTION__, dqm->rcu_data.ieee_address);
+            LOG_DEBUG("%s: Controller <%s> FOUND in the network, updating data...\n", __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str());
             auto controller = controllers_[controller_id];
 
             switch (dqm->property_updated) {
@@ -1441,7 +1454,7 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   print_status = false;
                   break;
                case CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING:
-                  LOG_INFO("%s: Controller (0x%llX) firmware upgrading = %s\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.is_upgrading ? "TRUE" : "FALSE");
+                  LOG_INFO("%s: Controller <%s> firmware upgrading = %s\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), dqm->rcu_data.is_upgrading ? "TRUE" : "FALSE");
                   upgrade_in_progress_ = dqm->rcu_data.is_upgrading;
                   if (!dqm->rcu_data.is_upgrading) {
                      // If we get FALSE here, make sure the controller upgrade progress flag is cleared.  But we don't want to set the controller progress
@@ -1452,15 +1465,29 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   print_status = false;
                   break;
                case CTRLM_HAL_BLE_PROPERTY_UPGRADE_PROGRESS:
-                  LOG_INFO("%s: Controller (0x%llX) firmware upgrade %d%% complete...\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.upgrade_progress);
+                  LOG_INFO("%s: Controller <%s> firmware upgrade %d%% complete...\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), dqm->rcu_data.upgrade_progress);
                   // From a controller perspective, we cannot use the CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING flag above to determine if its actively upgrading.
                   // Instead, its more accurate to use the progress percentage to determine if the remote is actively receiving firmware packets.
                   controller->setUpgradeInProgress(dqm->rcu_data.upgrade_progress > 0 && dqm->rcu_data.upgrade_progress < 100);
                   report_status = false;
                   print_status = false;
                   break;
+               case CTRLM_HAL_BLE_PROPERTY_UPGRADE_ERROR:
+                  LOG_ERROR("%s: Controller <%s> firmware upgrade FAILED with error <%s>.\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), dqm->rcu_data.upgrade_error);
+                  report_status = false;
+                  print_status = false;
+                  if (controller->retry_ota()) {
+                     controller->setUpgradeAttempted(false);
+                     LOG_WARN("%s: Upgrade failed, setting timer for %d minutes to retry.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT / MINUTE_IN_MILLISECONDS);
+                     ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_controllers_timer_tag);
+                     g_ctrlm_ble_network.upgrade_controllers_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_upgrade_controllers, &id_);
+                  } else {
+                     LOG_ERROR("%s: Controller <%s> OTA upgrade keeps failing and reached maximum retries.  Won't try again until a new request is sent.\n", __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str());
+                  }
+                  controller->ota_failure_cnt_incr();
+                  break;
                case CTRLM_HAL_BLE_PROPERTY_UNPAIR_REASON:
-                  LOG_INFO("%s: Controller (0x%llX) notified reason for unpairing = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, ctrlm_ble_unpair_reason_str(dqm->rcu_data.unpair_reason));
+                  LOG_INFO("%s: Controller <%s> notified reason for unpairing = <%s>\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), ctrlm_ble_unpair_reason_str(dqm->rcu_data.unpair_reason));
                   report_status = false;
                   print_status = false;
                   if (this->unpair_on_remote_request_ && 
@@ -1475,19 +1502,22 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   }
                   break;
                case CTRLM_HAL_BLE_PROPERTY_REBOOT_REASON:
-                  LOG_INFO("%s: Controller (0x%llX) notified reason for rebooting = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, ctrlm_ble_reboot_reason_str(dqm->rcu_data.reboot_reason));
+                  LOG_INFO("%s: Controller <%s> notified reason for rebooting = <%s>\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), ctrlm_ble_reboot_reason_str(dqm->rcu_data.reboot_reason));
                   report_status = false;
                   print_status = false;
+                  if (dqm->rcu_data.reboot_reason == CTRLM_BLE_RCU_REBOOT_REASON_FW_UPDATE) {
+                     controller->ota_clear_all_failure_counters();
+                  }
                   break;
                case CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY:
-                  LOG_INFO("%s: Controller (0x%llX) notified last wakeup key = <0x%X>\n", __FUNCTION__, dqm->rcu_data.ieee_address, dqm->rcu_data.last_wakeup_key);
+                  LOG_INFO("%s: Controller <%s> notified last wakeup key = <0x%X>\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), dqm->rcu_data.last_wakeup_key);
                   controller->setLastWakeupKey(dqm->rcu_data.last_wakeup_key);
                   report_status = false;
                   print_status = false;
                   break;
                case CTRLM_HAL_BLE_PROPERTY_WAKEUP_CONFIG:
                   controller->setWakeupConfig(dqm->rcu_data.wakeup_config);
-                  LOG_INFO("%s: Controller (0x%llX) notified wakeup config = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, ctrlm_rcu_wakeup_config_str(controller->getWakeupConfig()));
+                  LOG_INFO("%s: Controller <%s> notified wakeup config = <%s>\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), ctrlm_rcu_wakeup_config_str(controller->getWakeupConfig()));
                   if (controller->getWakeupConfig() == CTRLM_RCU_WAKEUP_CONFIG_CUSTOM) {
                      // Don't report status yet if its a custom config.  Do that after we receive the custom list
                      report_status = false;
@@ -1496,7 +1526,7 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                   break;
                case CTRLM_HAL_BLE_PROPERTY_WAKEUP_CUSTOM_LIST:
                   controller->setWakeupCustomList(dqm->rcu_data.wakeup_custom_list, dqm->rcu_data.wakeup_custom_list_size);
-                  LOG_INFO("%s: Controller (0x%llX) notified wakeup custom list = <%s>\n", __FUNCTION__, dqm->rcu_data.ieee_address, controller->wakeupCustomListToString().c_str());
+                  LOG_INFO("%s: Controller <%s> notified wakeup custom list = <%s>\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str(), controller->wakeupCustomListToString().c_str());
                   if (controller->getWakeupConfig() != CTRLM_RCU_WAKEUP_CONFIG_CUSTOM) {
                      // Only report status if the config is set to custom
                      report_status = false;
@@ -1636,6 +1666,24 @@ void ctrlm_obj_network_ble_t::ind_process_paired(void *data, int size) {
       controllers_[id]->print_status();
    }
 
+   // Sync currently connected devices with the HAL
+   if (hal_api_get_devices_) {
+      vector<unsigned long long> hal_devices;
+      if (CTRLM_HAL_RESULT_SUCCESS == hal_api_get_devices_(hal_devices)) {
+         for(auto it = controllers_.cbegin(); it != controllers_.cend(); ) {
+            if (BLE_CONTROLLER_TYPE_IR != it->second->getControllerType() &&
+               (hal_devices.end() == std::find(hal_devices.begin(), hal_devices.end(), it->second->getMacAddress()))) {
+               LOG_INFO("%s: Controller (ID = %u), MAC Address: <0x%llX> not paired according to HAL, so removing...\n", __FUNCTION__, it->first, it->second->getMacAddress());
+               //remote stored in network database is not a paired remote as reported by the HAL, so remove it.
+               controller_remove(it->first);
+               it = controllers_.erase(it);
+            } else {
+               ++it;
+            }
+         }
+      }
+   }
+
    // Export new controller to xconf config file
    ctrlm_main_queue_msg_header_t *msg = (ctrlm_main_queue_msg_header_t *)g_malloc(sizeof(ctrlm_main_queue_msg_header_t));
    if(msg == NULL) {
@@ -1729,7 +1777,7 @@ void ctrlm_obj_network_ble_t::ind_process_keypress(void *data, int size) {
             LOG_INFO("%s: Upgrade cancelled since remote is being used.  Setting timer to resume upgrade in %d minutes.\n", __PRETTY_FUNCTION__, CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT / MINUTE_IN_MILLISECONDS);
             //delete existing timer and start again
             ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
-            g_ctrlm_ble_network.upgrade_pause_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT, ctrlm_ble_network_resume_upgrade, &id_);
+            g_ctrlm_ble_network.upgrade_pause_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT, ctrlm_ble_upgrade_resume, &id_);
          }
       }
 
@@ -2058,49 +2106,52 @@ json_t *ctrlm_obj_network_ble_t::xconf_export_controllers() {
    LOG_DEBUG("%s: Enter...\n", __FUNCTION__);
 
    // map to store unique types and min versions.
-   unordered_map<ctrlm_ble_controller_type_t, tuple <ctrlm_version_t, ctrlm_version_t> > minVersions;
+   unordered_map<std::string, tuple <ctrlm_version_t, ctrlm_version_t> > minVersions;
 
    for(auto const &ctr_it : controllers_) {
       ctrlm_obj_controller_ble_t *controller = ctr_it.second;
 
-      // we only want to send one line for each type with min version
-      auto type_it = minVersions.find(controller->getControllerType());
-      if (type_it != minVersions.end()) {
-
-         ctrlm_version_t revSw = get<0>(type_it->second);
-         ctrlm_version_t revHw = get<1>(type_it->second);
-
-         // we already have a product of this type so check for min version
-         ctrlm_version_t revController = controller->getSwRevision();
-         if (revSw.compare(revController) > 0) {
-            // revController is less than what we have in minVersions, so update value
-            revSw = revController;
-         }
-         //Currently we ignore hw version so dont check it
-
-         minVersions[type_it->first] = make_tuple(revSw, revHw);
+      string xconf_name;
+      ctrlm_version_t revController = controller->getSwRevision();
+      if (controller->is_controller_type_z()) {
+         ctrlm_version_t typeZ_rev(string("0.0.0"));
+         revController = typeZ_rev;
       }
-      else {
-         // we dont have type in map so add it;
-         tuple <ctrlm_version_t, ctrlm_version_t> revs = make_tuple(controller->getSwRevision(), controller->getHwRevision());
-         minVersions[controller->getControllerType()] = revs;
+      // we only want to send one line for each type with min version
+      if (true == controller->getOTAProductName(xconf_name)) {
+         auto type_it = minVersions.find(xconf_name);
+         if (type_it != minVersions.end()) {
+
+            ctrlm_version_t revSw = get<0>(type_it->second);
+            ctrlm_version_t revHw = get<1>(type_it->second);
+
+            // we already have a product of this type so check for min version
+            if (revSw.compare(revController) > 0) {
+               // revController is less than what we have in minVersions, so update value
+               revSw = revController;
+            }
+            //Currently we ignore hw version so dont check it
+
+            minVersions[type_it->first] = make_tuple(revSw, revHw);
+         }
+         else {
+            // we dont have type in map so add it;
+            tuple <ctrlm_version_t, ctrlm_version_t> revs = make_tuple(revController, controller->getHwRevision());
+            minVersions[xconf_name] = revs;
+         }
+      } else {
+         LOG_WARN("%s: controller of type %s ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller->getControllerType()));
       }
    }
    json_t *ret = json_array();
 
    for (auto const ctrlType : minVersions) {
-      string product_name;
-      if (false == ctrlm_obj_controller_ble_t::controllerTypeToXconfString(ctrlType.first, product_name)) {
-         LOG_WARN("%s: controller of type %s ignored\n", __FUNCTION__, ctrlm_ble_controller_type_str(ctrlType.first));
-         continue;
-      }
-
       ctrlm_version_t revSw = get<0>(ctrlType.second);
       ctrlm_version_t revHw = get<1>(ctrlType.second);
 
       json_t *temp = json_object();
-      LOG_INFO("%s: adding to json - Product = <%s>, FwVer = <%s>, HwVer = <%s>\n", __FUNCTION__, product_name.c_str(), revSw.toString().c_str(), revHw.toString().c_str());
-      json_object_set(temp, "Product", json_string(product_name.c_str()));
+      LOG_INFO("%s: adding to json - Product = <%s>, FwVer = <%s>, HwVer = <%s>\n", __FUNCTION__, ctrlType.first.c_str(), revSw.toString().c_str(), revHw.toString().c_str());
+      json_object_set(temp, "Product", json_string(ctrlType.first.c_str()));
       json_object_set(temp, "FwVer", json_string(revSw.toString().c_str()));
       json_object_set(temp, "HwVer", json_string(revHw.toString().c_str()));
 

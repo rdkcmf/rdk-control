@@ -2706,6 +2706,30 @@ void ctrlm_db_ble_read_irdb_entry_id_name_avr(ctrlm_network_id_t network_id, ctr
    ctrlm_db_read_blob(table, "irdb_entry_id_name_avr", data, length);
 }
 
+void ctrlm_db_ble_read_ota_failure_cnt_last_success(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint32 &value) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
+
+   sqlite_uint64 data;
+   if (0 > ctrlm_db_read_uint64(table, "ota_failure_cnt_last_success", &data)) {
+      LOG_WARN("%s: Failed to load OTA failure type Z count from db\n", __FUNCTION__);
+   } else {
+      value = (guint32) data;
+   }
+}
+
+void ctrlm_db_ble_read_ota_failure_type_z_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 &value) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
+
+   sqlite_uint64 data;
+   if (0 > ctrlm_db_read_uint64(table, "ota_failure_type_z_cnt", &data)) {
+      LOG_WARN("%s: Failed to load OTA failure type Z count from db\n", __FUNCTION__);
+   } else {
+      value = (guint8) data;
+   }
+}
+
 // --------------------------------------------------------------------------------------------------------------------------
 // BLE Write To Database
 // --------------------------------------------------------------------------------------------------------------------------
@@ -2814,6 +2838,24 @@ void ctrlm_db_ble_write_irdb_entry_id_name_avr(ctrlm_network_id_t network_id, ct
 
    ctrlm_db_write_blob(table, "irdb_entry_id_name_avr", data, length);
 }
+
+void ctrlm_db_ble_write_ota_failure_cnt_last_success(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint32 value) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "ota_failure_cnt_last_success", (guint64) value);
+}
+
+void ctrlm_db_ble_write_ota_failure_type_z_count(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, guint8 value) {
+   char table[CONTROLLER_TABLE_NAME_MAX_LEN];
+   ctrlm_db_ble_controller_entry_table_name(network_id, controller_id, table);
+
+   ctrlm_db_write_uint64(table, "ota_failure_type_z_cnt", (guint64) value);
+}
+
+// --------------------------------------------------------------------------------------------------------------------------
+// Voice Database
+// --------------------------------------------------------------------------------------------------------------------------
 
 bool ctrlm_db_voice_valid() {
    return(g_ctrlm_db.voice_is_valid);

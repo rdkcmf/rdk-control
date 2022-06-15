@@ -148,8 +148,7 @@ ctrlm_obj_controller_rf4ce_t::ctrlm_obj_controller_rf4ce_t(ctrlm_controller_id_t
    needs_reset_(false),
    did_reset_(false),
 #endif
-   mfg_test_result_(1),
-   ota_failures_(0)
+   mfg_test_result_(1)
 {
    LOG_INFO("ctrlm_obj_controller_rf4ce_t constructor - %u\n", controller_id);
 
@@ -903,7 +902,7 @@ void ctrlm_obj_controller_rf4ce_t::db_load() {
    if (data == NULL) {
       LOG_WARN("%s: Not read from DB - OTA failure count\n", __FUNCTION__);
    } else {
-      ota_failures_ = (uint8_t) data[0];
+      ota_failure_type_z_cnt_ = (uint8_t) data[0];
       ctrlm_db_free(data);
       data = NULL;
    }
@@ -3391,27 +3390,27 @@ gboolean ctrlm_obj_controller_rf4ce_t::is_batteries_large_voltage_jump(guchar ne
    return(new_voltage >= (battery_status_.get_voltage_unloaded() + battery_increase));
 }
 
-void ctrlm_obj_controller_rf4ce_t::ota_failure_count_set(uint8_t ota_failures) {
+void ctrlm_obj_controller_rf4ce_t::ota_failure_type_z_cnt_set(uint8_t ota_failures) {
    if (controller_type_ != RF4CE_CONTROLLER_TYPE_XR15V2 && controller_type_ != RF4CE_CONTROLLER_TYPE_XR16) {
       return ;
    }
-   ota_failures_  = (ota_failures >= 4) ? 0 : ota_failures;
-   ctrlm_db_rf4ce_write_ota_failures_count(network_id_get(), controller_id_get(), ota_failures_);
-   LOG_INFO("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_count_get());
+   ctrlm_obj_controller_t::ota_failure_type_z_cnt_set(ota_failures);
+   ctrlm_db_rf4ce_write_ota_failures_count(network_id_get(), controller_id_get(), ota_failure_type_z_cnt_get());
+   LOG_INFO("%s: Controller <%s> id %d OTA failure count = %d\n", __FUNCTION__, ctrlm_rf4ce_controller_type_str(controller_type_), controller_id_get(), ota_failure_type_z_cnt_get());
 }
 
-uint8_t ctrlm_obj_controller_rf4ce_t::ota_failure_count_get(void) {
+uint8_t ctrlm_obj_controller_rf4ce_t::ota_failure_type_z_cnt_get(void) const {
    if (controller_type_ != RF4CE_CONTROLLER_TYPE_XR15V2 && controller_type_ != RF4CE_CONTROLLER_TYPE_XR16) {
       return 0;
    }
-   return ota_failures_;
+   return ctrlm_obj_controller_t::ota_failure_type_z_cnt_get();
 }
 
-bool ctrlm_obj_controller_rf4ce_t::is_controller_type_z(void) {
+bool ctrlm_obj_controller_rf4ce_t::is_controller_type_z(void) const {
    if (controller_type_ != RF4CE_CONTROLLER_TYPE_XR15V2 && controller_type_ != RF4CE_CONTROLLER_TYPE_XR16) {
       return false;
    }
-   bool is_type_z = (ota_failures_ >= 2) ? true : false;
+   bool is_type_z = ctrlm_obj_controller_t::is_controller_type_z();
    LOG_INFO("%s: Controller id %d (%s) is %s\n", __FUNCTION__, controller_id_get(), ctrlm_rf4ce_controller_type_str(controller_type_), is_type_z ? "TYPE Z" : "NOT TYPE Z");
    return is_type_z;
 }

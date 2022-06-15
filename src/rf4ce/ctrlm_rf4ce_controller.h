@@ -603,9 +603,9 @@ public:
 
    void push_ir_codes(void);
 
-   void    ota_failure_count_set(uint8_t ota_failures);
-   uint8_t ota_failure_count_get(void);
-   bool    is_controller_type_z(void);
+   virtual void    ota_failure_type_z_cnt_set(uint8_t ota_failures);
+   virtual uint8_t ota_failure_type_z_cnt_get(void) const;
+   virtual bool    is_controller_type_z(void) const;
 
    // These functions are HACKS for XR15-704
 #ifdef XR15_704
@@ -778,8 +778,6 @@ private:
    guint8                                  mfg_test_result_;
 
    ctrlm_timestamp_t                       checkin_time_;    ///< OUT - Timestamp indicating the most recent poll indication of the controller
-
-   guint8                                  ota_failures_;
 
    #ifdef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
    guint32                                 short_rf_retry_period_;

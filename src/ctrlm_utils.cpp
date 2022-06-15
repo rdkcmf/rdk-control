@@ -1832,7 +1832,7 @@ void ctrlm_archive_extract_tmp_dir_make(std::string tmp_dir_path) {
 
 void ctrlm_archive_extract_ble_tmp_dir_make(std::string tmp_dir_path) {
    string dir = tmp_dir_path + "ctrlm/";
-   LOG_INFO("%s: <%s>\n", __FUNCTION__, dir.c_str());
+   LOG_DEBUG("%s: <%s>\n", __FUNCTION__, dir.c_str());
    errno = 0;
    if(0 != mkdir(dir.c_str(), S_IRWXU | S_IRWXG)){
       int errsv = errno;
@@ -1843,14 +1843,14 @@ void ctrlm_archive_extract_ble_tmp_dir_make(std::string tmp_dir_path) {
 
 bool ctrlm_archive_extract_ble_check_dir_exists(string path){
    struct stat st;
-   LOG_INFO("%s: test for dir <%s>\n", __FUNCTION__, path.c_str());
+   LOG_DEBUG("%s: test for dir <%s>\n", __FUNCTION__, path.c_str());
 
    if(stat(path.c_str(),&st) == 0){
        if((st.st_mode & S_IFDIR) != 0){
            return true;
        }
    }
-   LOG_INFO("%s: dir not found <%s>\n", __FUNCTION__, path.c_str());
+   LOG_DEBUG("%s: dir not found <%s>\n", __FUNCTION__, path.c_str());
    return false;
 }
 

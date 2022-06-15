@@ -89,6 +89,7 @@ typedef enum {
    CTRLM_HAL_BLE_PROPERTY_STATE,
    CTRLM_HAL_BLE_PROPERTY_IS_UPGRADING,
    CTRLM_HAL_BLE_PROPERTY_UPGRADE_PROGRESS,
+   CTRLM_HAL_BLE_PROPERTY_UPGRADE_ERROR,
    CTRLM_HAL_BLE_PROPERTY_UNPAIR_REASON,
    CTRLM_HAL_BLE_PROPERTY_REBOOT_REASON,
    CTRLM_HAL_BLE_PROPERTY_LAST_WAKEUP_KEY,
@@ -123,6 +124,7 @@ typedef struct {
    bool                          touch_mode_settable;
    bool                          is_upgrading;
    int                           upgrade_progress;
+   char                          upgrade_error[CTRLM_MAX_PARAM_STR_LEN];
    ctrlm_ble_RcuUnpairReason_t   unpair_reason;
    ctrlm_ble_RcuRebootReason_t   reboot_reason;
    uint16_t                      last_wakeup_key;

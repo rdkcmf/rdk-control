@@ -92,6 +92,10 @@ public:
       return 0;
    };
 
+   bool empty() {
+      return revs.empty();
+   }
+
    std::vector<uint16_t> revs;
 };
 
@@ -122,6 +126,15 @@ public:
    std::string           experience_get() const;
    std::string           stb_name_get() const;
 
+   virtual void          ota_failure_cnt_incr();
+   virtual void          ota_clear_all_failure_counters();
+   void                  ota_failure_cnt_session_clear();
+   bool                  retry_ota() const;
+
+   virtual void          ota_failure_type_z_cnt_set(uint8_t ota_failures);
+   virtual uint8_t       ota_failure_type_z_cnt_get(void) const;
+   virtual bool          is_controller_type_z(void) const;
+
 private:
    ctrlm_controller_id_t controller_id_;
    ctrlm_obj_network_t * obj_network_;
@@ -134,6 +147,10 @@ private:
 protected:
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_tv_;
    ctrlm_irdb_ir_entry_id_t irdb_entry_id_name_avr_;
+
+   uint32_t                 ota_failure_cnt_from_last_success_;
+   uint8_t                  ota_failure_cnt_session_;
+   uint8_t                  ota_failure_type_z_cnt_;
 };
 
 #endif
