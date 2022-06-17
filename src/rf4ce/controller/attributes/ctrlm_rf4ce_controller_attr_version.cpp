@@ -85,10 +85,10 @@ bool ctrlm_rf4ce_sw_version_t::read_db(ctrlm_db_ctx_t ctx) {
         size_t len = blob.to_buffer(buf, sizeof(buf));
         if(len >= 0) {
             if(len == SW_VERSION_LEN) {
-                this->major    = buf[0];
-                this->minor    = buf[1];
-                this->revision = buf[2];
-                this->patch    = buf[3];
+                this->major    = buf[0] & 0xFF;
+                this->minor    = buf[1] & 0xFF;
+                this->revision = buf[2] & 0xFF;
+                this->patch    = buf[3] & 0xFF;
                 ret = true;
                 LOG_INFO("%s: %s read from database: %s\n", __FUNCTION__, this->get_name().c_str(), this->get_value().c_str());
             } else {
@@ -146,10 +146,10 @@ ctrlm_rf4ce_rib_attr_t::status ctrlm_rf4ce_sw_version_t::write_rib(ctrlm_rf4ce_r
     if(data) {
         if(len == SW_VERSION_LEN) {
             ctrlm_sw_version_t temp(*this);
-            this->major    = data[0];
-            this->minor    = data[1];
-            this->revision = data[2];
-            this->patch    = data[3];
+            this->major    = data[0] & 0xFF;
+            this->minor    = data[1] & 0xFF;
+            this->revision = data[2] & 0xFF;
+            this->patch    = data[3] & 0xFF;
             ret = ctrlm_rf4ce_rib_attr_t::status::SUCCESS;
             LOG_INFO("%s: %s write to RIB: %s\n", __FUNCTION__, this->get_name().c_str(), this->get_value().c_str());
             if(*this != temp && false == importing) {
