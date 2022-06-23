@@ -148,6 +148,7 @@ typedef enum {
    CTRLM_RCU_RIB_ATTR_ID_POLLING_CONFIGURATION     = 0x09, ///< RIB Attribute - Polling Configuration
    CTRLM_RCU_RIB_ATTR_ID_PRIVACY                   = 0x0B, ///< RIB Attribute - Privacy
    CTRLM_RCU_RIB_ATTR_ID_CONTROLLER_CAPABILITIES   = 0x0C, ///< RIB Attribute - Controller Capabilities
+   CTRLM_RCU_RIB_ATTR_ID_RESPONSE_TIME             = 0x0D, ///< RIB Attribute - Response Time
    CTRLM_RCU_RIB_ATTR_ID_VOICE_COMMAND_STATUS      = 0x10, ///< RIB Attribute - Voice Command Status
    CTRLM_RCU_RIB_ATTR_ID_VOICE_COMMAND_LENGTH      = 0x11, ///< RIB Attribute - Voice Command Length
    CTRLM_RCU_RIB_ATTR_ID_MAXIMUM_UTTERANCE_LENGTH  = 0x12, ///< RIB Attribute - Maximum Utterance Length

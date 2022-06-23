@@ -34,6 +34,7 @@
 #include "ctrlm_device_update.h"
 #include "json_config.h"
 #include "ctrlm_rf4ce_ir_rf_db.h"
+#include "network/attributes/ctrlm_rf4ce_network_attr_config.h"
 #include "ctrlm_rfc.h"
 
 #define CTRLM_RF4CE_AUTOBIND_OCTET       ((JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_FAIL << 3) | JSON_INT_VALUE_NETWORK_RF4CE_AUTOBIND_CONFIG_QTY_PASS)
@@ -273,6 +274,8 @@ public:
    virtual std::string                  db_name_get() const;
    void                                 discovery_config_get(ctrlm_controller_discovery_config_t *config);
    bool                                 discovery_config_set(ctrlm_controller_discovery_config_t config);
+   virtual void                         configure_rib();
+   ctrlm_rf4ce_rib_t                   *get_rib();
    void                                 controllers_load();
    bool                                 controller_exists(ctrlm_controller_id_t controller_id);
    bool                                 controller_is_bound(ctrlm_controller_id_t controller_id);
@@ -318,6 +321,7 @@ public:
    void                                 power_state_change(ctrlm_main_queue_power_state_change_t *dqm);
 
    void                                 rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
+   void                                 rsp_time_updated_handler(const ctrlm_rf4ce_rsp_time_t& attr);
    void                                 notify_controllers_polling_configuration(void *data, size_t size);
 
 //   void                                 req_process_voice_settings_update(ctrlm_main_queue_msg_voice_settings_update_t *dqm);
@@ -457,6 +461,7 @@ private:
    ctrlm_rf4ce_autobind_status_t      autobind_status_;
    ctrlm_rf4ce_autobind_config_t      autobind_config_normal_;
    ctrlm_rf4ce_autobind_config_t      autobind_config_menu_;
+   ctrlm_rf4ce_rib_t                  rib_;
    target_irdb_status_t               target_irdb_status_;
    guchar                             class_inc_line_of_sight_;
    guchar                             class_inc_recently_booted_;
@@ -554,6 +559,7 @@ private:
    EVP_CIPHER_CTX*                         ctx_;
 #endif
    static ctrlm_obj_network_rf4ce_t       *instance;
+   ctrlm_rf4ce_rsp_time_t                  rsp_time_;
 
    static gboolean       bind_validation_failed(gpointer user_data);
    gboolean              load_config(json_t *json_obj_net_rf4ce);

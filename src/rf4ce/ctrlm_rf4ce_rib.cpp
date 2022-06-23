@@ -64,217 +64,61 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_get(gboolean target, ctrlm_timestam
          value_length = 0;
       }
    } else {
-      LOG_DEBUG("%s: falling back to legacy RIB implementation\n", __FUNCTION__);
-      value_length = 0;
-      switch(identifier) {
-         case CTRLM_RF4CE_RIB_ATTR_ID_PERIPHERAL_ID: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID) {
-               LOG_ERROR("%s: PERIPHERAL ID - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: PERIPHERAL ID - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               LOG_INFO("%s: PERIPHERAL ID\n", __FUNCTION__);
-               // add the payload to the response
-               value_length = property_read_peripheral_id(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID);
+      ctrlm_rf4ce_rib_t *network_rib = this->obj_network_rf4ce_->get_rib();
+      if(network_rib) {
+         rib_status = network_rib->read_attribute(target ? ctrlm_rf4ce_rib_attr_t::access::TARGET : ctrlm_rf4ce_rib_attr_t::access::CONTROLLER, identifier, index, (char *)data_buf, &value_length);
+         if(rib_status != ctrlm_rf4ce_rib_t::status::DOES_NOT_EXIST) {
+            LOG_INFO("%s: (%u, %u) NTWK RIB read <%02x, %02x, %s>\n", __FUNCTION__, network_id_get(), controller_id_get(), identifier, index, ctrlm_rf4ce_rib_t::status_str(rib_status).c_str());
+            if(rib_status != ctrlm_rf4ce_rib_t::status::SUCCESS) {
+               value_length = 0;
             }
-            break;
          }
-         case CTRLM_RF4CE_RIB_ATTR_ID_RF_STATISTICS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS) {
-               LOG_ERROR("%s: RF STATISTICS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: RF STATISTICS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               LOG_INFO("%s: RF STATISTICS\n", __FUNCTION__);
-               // add the payload to the response
-               value_length = property_read_rf_statistics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_SHORT_RF_RETRY_PERIOD: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD) {
-               LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_short_rf_retry_period(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD);
-
-               // This rib entry is the last entry read by the remote after binding is completed
-               if((controller_type_ == RF4CE_CONTROLLER_TYPE_XR2 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR5) &&
-                  validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS && configuration_result_ == CTRLM_RCU_CONFIGURATION_RESULT_PENDING) {
-                  LOG_INFO("%s: (%u, %u) Configuration Complete\n", __FUNCTION__, network_id_get(), controller_id_get());
-                  configuration_result_ = CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS;
-                  // Inform control manager that the configuration has completed
-                  ctrlm_inform_configuration_complete(network_id_get(), controller_id_get(), CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS);
+      }
+      if(rib_status == ctrlm_rf4ce_rib_t::status::DOES_NOT_EXIST) {
+         LOG_DEBUG("%s: falling back to legacy RIB implementation\n", __FUNCTION__);
+         value_length = 0;
+         switch(identifier) {
+            case CTRLM_RF4CE_RIB_ATTR_ID_PERIPHERAL_ID: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID) {
+                  LOG_ERROR("%s: PERIPHERAL ID - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: PERIPHERAL ID - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  LOG_INFO("%s: PERIPHERAL ID\n", __FUNCTION__);
+                  // add the payload to the response
+                  value_length = property_read_peripheral_id(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID);
                }
+               break;
             }
-            
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MAXIMUM_UTTERANCE_LENGTH: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH) {
-               LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_maximum_utterance_length(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH);
+            case CTRLM_RF4CE_RIB_ATTR_ID_RF_STATISTICS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS) {
+                  LOG_ERROR("%s: RF STATISTICS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: RF STATISTICS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  LOG_INFO("%s: RF STATISTICS\n", __FUNCTION__);
+                  // add the payload to the response
+                  value_length = property_read_rf_statistics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS);
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_COMMAND_ENCRYPTION: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION) {
-               LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_voice_command_encryption(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_DATA_RETRY: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY) {
-               LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_max_voice_data_retry(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_CSMA_BACKOFF: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF) {
-               LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_max_voice_csma_backoff(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MIN_VOICE_DATA_BACKOFF: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF) {
-               LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_min_voice_data_backoff(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_TARG_AUDIO_PROFILES: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_TARG_AUDIO_PROFILES) {
-               LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_voice_targ_audio_profiles(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_TARG_AUDIO_PROFILES);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_RIB_UPDATE_CHECK_INTERVAL: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL) {
-               LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_rib_update_check_interval(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_OPUS_ENCODING_PARAMS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS) {
-               LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_opus_encoding_params(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_SESSION_QOS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS) {
-               LOG_ERROR("%s: VOICE SESSION QOS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VOICE SESSION QOS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_voice_session_qos(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DOWNLOAD_RATE: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE) {
-               LOG_ERROR("%s: DOWNLOAD RATE - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DOWNLOAD RATE - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_download_rate(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_UPDATE_POLLING_PERIOD: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD) {
-               LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_update_polling_period(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DATA_REQUEST_WAIT_TIME: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME) {
-               LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_data_request_wait_time(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME);
-               if(!target) {
+            case CTRLM_RF4CE_RIB_ATTR_ID_SHORT_RF_RETRY_PERIOD: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD) {
+                  LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_short_rf_retry_period(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD);
+
                   // This rib entry is the last entry read by the remote after binding is completed
-                  if((controller_type_ == RF4CE_CONTROLLER_TYPE_XR11 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR15 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR15V2 ||
-                     controller_type_ == RF4CE_CONTROLLER_TYPE_XR16 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR18 || controller_type_ == RF4CE_CONTROLLER_TYPE_XRA) &&
+                  if((controller_type_ == RF4CE_CONTROLLER_TYPE_XR2 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR5) &&
                      validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS && configuration_result_ == CTRLM_RCU_CONFIGURATION_RESULT_PENDING) {
                      LOG_INFO("%s: (%u, %u) Configuration Complete\n", __FUNCTION__, network_id_get(), controller_id_get());
                      configuration_result_ = CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS;
@@ -282,179 +126,347 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_get(gboolean target, ctrlm_timestam
                      ctrlm_inform_configuration_complete(network_id_get(), controller_id_get(), CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS);
                   }
                }
+               
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE: {
-            if(target && length != CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE) {
-               LOG_ERROR("%s: IR RF DATABASE - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else {
-               // add the payload to the response
-               value_length = property_read_ir_rf_database(index, data_buf, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE);
+            case CTRLM_RF4CE_RIB_ATTR_ID_MAXIMUM_UTTERANCE_LENGTH: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH) {
+                  LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_maximum_utterance_length(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_COMMAND_ENCRYPTION: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION) {
+                  LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_voice_command_encryption(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_DATA_RETRY: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY) {
+                  LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_max_voice_data_retry(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_CSMA_BACKOFF: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF) {
+                  LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_max_voice_csma_backoff(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MIN_VOICE_DATA_BACKOFF: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF) {
+                  LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_min_voice_data_backoff(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_TARG_AUDIO_PROFILES: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_TARG_AUDIO_PROFILES) {
+                  LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_voice_targ_audio_profiles(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_TARG_AUDIO_PROFILES);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_RIB_UPDATE_CHECK_INTERVAL: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL) {
+                  LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_rib_update_check_interval(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_OPUS_ENCODING_PARAMS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS) {
+                  LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_opus_encoding_params(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_SESSION_QOS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS) {
+                  LOG_ERROR("%s: VOICE SESSION QOS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VOICE SESSION QOS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_voice_session_qos(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_DOWNLOAD_RATE: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE) {
+                  LOG_ERROR("%s: DOWNLOAD RATE - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DOWNLOAD RATE - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_download_rate(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_UPDATE_POLLING_PERIOD: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD) {
+                  LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_update_polling_period(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_DATA_REQUEST_WAIT_TIME: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME) {
+                  LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_data_request_wait_time(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME);
+                  if(!target) {
+                     // This rib entry is the last entry read by the remote after binding is completed
+                     if((controller_type_ == RF4CE_CONTROLLER_TYPE_XR11 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR15 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR15V2 ||
+                        controller_type_ == RF4CE_CONTROLLER_TYPE_XR16 || controller_type_ == RF4CE_CONTROLLER_TYPE_XR18 || controller_type_ == RF4CE_CONTROLLER_TYPE_XRA) &&
+                        validation_result_ == CTRLM_RF4CE_RESULT_VALIDATION_SUCCESS && configuration_result_ == CTRLM_RCU_CONFIGURATION_RESULT_PENDING) {
+                        LOG_INFO("%s: (%u, %u) Configuration Complete\n", __FUNCTION__, network_id_get(), controller_id_get());
+                        configuration_result_ = CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS;
+                        // Inform control manager that the configuration has completed
+                        ctrlm_inform_configuration_complete(network_id_get(), controller_id_get(), CTRLM_RCU_CONFIGURATION_RESULT_SUCCESS);
+                     }
+                  }
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE: {
+               if(target && length != CTRLM_RF4CE_RIB_ATTR_LEN_IR_RF_DATABASE) {
+                  LOG_ERROR("%s: IR RF DATABASE - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_ir_rf_database(index, data_buf, CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE);
 
-               if(value_length == 0) {
-                  LOG_ERROR("%s: IR RF DATABASE - Invalid Index (%u)\n", __FUNCTION__, index);
+                  if(value_length == 0) {
+                     LOG_ERROR("%s: IR RF DATABASE - Invalid Index (%u)\n", __FUNCTION__, index);
+                     status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+                  }
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_VALIDATION_CONFIGURATION: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION) {
+                  LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_validation_configuration(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_IRDB_STATUS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS) {
+                  LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // add the payload to the response
+                  value_length = property_read_target_irdb_status(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_ID_DATA: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA) {
+                  LOG_ERROR("%s: TARGET ID DATA - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
+                  LOG_ERROR("%s: TARGET ID DATA - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
+                  value_length = property_read_device_id(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_RECEIVER_ID) {
+                  value_length = property_read_receiver_id(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
+               } else {
+                  LOG_WARN("%s: Account ID not implemented yet\n", __FUNCTION__);
+                  value_length = 0;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_GENERAL_PURPOSE: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_GENERAL_PURPOSE) {
+                  LOG_ERROR("%s: GENERAL PURPOSE - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index == 0x00) { // Reset type
+                  value_length = property_read_reboot_diagnostics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_DIAGNOSTICS);
+               } else if(index == 0x01) { // Memory Stats
+                  value_length = property_read_memory_statistics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATISTICS);
+               } else {
+                  LOG_ERROR("%s: GENERAL PURPOSE - Invalid Index (%u)\n", __FUNCTION__, index);
                   status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
                }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VALIDATION_CONFIGURATION: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION) {
-               LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_validation_configuration(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_IRDB_STATUS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS) {
-               LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // add the payload to the response
-               value_length = property_read_target_irdb_status(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_ID_DATA: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA) {
-               LOG_ERROR("%s: TARGET ID DATA - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
-               LOG_ERROR("%s: TARGET ID DATA - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
-               value_length = property_read_device_id(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_RECEIVER_ID) {
-               value_length = property_read_receiver_id(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
-            } else {
-               LOG_WARN("%s: Account ID not implemented yet\n", __FUNCTION__);
-               value_length = 0;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_GENERAL_PURPOSE: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_GENERAL_PURPOSE) {
-               LOG_ERROR("%s: GENERAL PURPOSE - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index == 0x00) { // Reset type
-               value_length = property_read_reboot_diagnostics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_DIAGNOSTICS);
-            } else if(index == 0x01) { // Memory Stats
-               value_length = property_read_memory_statistics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATISTICS);
-            } else {
-               LOG_ERROR("%s: GENERAL PURPOSE - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MFG_TEST: {
-            if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST) { // Mfg Test timing data
-               if((length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) || (length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
-                  value_length = property_read_mfg_test(data_buf, length);
+            case CTRLM_RF4CE_RIB_ATTR_ID_MFG_TEST: {
+               if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST) { // Mfg Test timing data
+                  if((length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) || (length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+                     value_length = property_read_mfg_test(data_buf, length);
+                  } else {
+                     LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
+                     status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                  }
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT) { // Mfg Security Key Test Rib Result
+                  if(length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
+                     value_length = property_read_mfg_test_result(data_buf, length);
+                  } else {
+                     LOG_ERROR("%s: MFG Security Key Test Result  - Invalid Length (%u)\n", __FUNCTION__, length);
+                     status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                  }
                } else {
-                  LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
-                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                  LOG_ERROR("%s: MFG Test - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
                }
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT) { // Mfg Security Key Test Rib Result
-               if(length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
-                  value_length = property_read_mfg_test_result(data_buf, length);
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_METHODS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS) {
+                  LOG_ERROR("%s: POLLING METHODS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               }  else if(index > 0x00) {
+                  LOG_ERROR("%s: POLLING METHODS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
                } else {
-                  LOG_ERROR("%s: MFG Security Key Test Result  - Invalid Length (%u)\n", __FUNCTION__, length);
-                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                  value_length = property_read_polling_methods(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS);
                }
-            } else {
-               LOG_ERROR("%s: MFG Test - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               break;
+            }  
+            case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_CONFIGURATION: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION) {
+                  LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
+                  LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
+                  value_length = property_read_polling_configuration_mac(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+               } else {
+                  value_length = property_read_polling_configuration_heartbeat(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_METHODS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS) {
-               LOG_ERROR("%s: POLLING METHODS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            }  else if(index > 0x00) {
-               LOG_ERROR("%s: POLLING METHODS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               value_length = property_read_polling_methods(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS);
+            case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_CONFIGURATION: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION) {
+                  LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  value_length = property_read_far_field_configuration(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION);
+               }
+               break;
             }
-            break;
-         }  
-         case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_CONFIGURATION: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION) {
-               LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
-               LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
-               value_length = property_read_polling_configuration_mac(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
-            } else {
-               value_length = property_read_polling_configuration_heartbeat(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+            case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_METRICS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS) {
+                  LOG_ERROR("%s: FAR FIELD METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: FAR FIELD METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  value_length = property_read_far_field_metrics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS);
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_CONFIGURATION: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION) {
-               LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               value_length = property_read_far_field_configuration(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION);
+            case CTRLM_RF4CE_RIB_ATTR_ID_DSP_CONFIGURATION: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION) {
+                  LOG_ERROR("%s: DSP CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DSP CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  value_length = property_read_dsp_configuration(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION);
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_METRICS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS) {
-               LOG_ERROR("%s: FAR FIELD METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: FAR FIELD METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               value_length = property_read_far_field_metrics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS);
+            case CTRLM_RF4CE_RIB_ATTR_ID_DSP_METRICS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS) {
+                  LOG_ERROR("%s: DSP METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DSP METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  value_length = property_read_dsp_metrics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS);
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DSP_CONFIGURATION: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION) {
-               LOG_ERROR("%s: DSP CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DSP CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               value_length = property_read_dsp_configuration(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION);
+            default: {
+               LOG_INFO("%s: invalid identifier (0x%02X)\n", __FUNCTION__, identifier);
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DSP_METRICS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS) {
-               LOG_ERROR("%s: DSP METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DSP METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               value_length = property_read_dsp_metrics(data_buf, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS);
-            }
-            break;
-         }
-         default: {
-            LOG_INFO("%s: invalid identifier (0x%02X)\n", __FUNCTION__, identifier);
-            break;
          }
       }
    }
@@ -524,470 +536,483 @@ void ctrlm_obj_controller_rf4ce_t::rf4ce_rib_set(gboolean target, ctrlm_timestam
          status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
       }
    } else {
-      LOG_DEBUG("%s: falling back to legacy RIB implementation\n", __FUNCTION__);
+      ctrlm_rf4ce_rib_t *network_rib = this->obj_network_rf4ce_->get_rib();
+      if(network_rib) {
+         rib_status = network_rib->write_attribute(accessor, identifier, index, (char *)data, (size_t)length, &export_api, importing);
+         if(rib_status != ctrlm_rf4ce_rib_t::status::DOES_NOT_EXIST) {
+            LOG_INFO("%s: (%u, %u) NTWK RIB write <%02x, %02x, %s>\n", __FUNCTION__, network_id_get(), controller_id_get(), identifier, index, ctrlm_rf4ce_rib_t::status_str(rib_status).c_str());
+            if(rib_status == ctrlm_rf4ce_rib_t::status::SUCCESS) {
+               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            }
+         }
+      }
 
-      switch(identifier) {
-         case CTRLM_RF4CE_RIB_ATTR_ID_MAXIMUM_UTTERANCE_LENGTH: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier MAXIMUM UTTERANCE LENGTH\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH) {
-               LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_maximum_utterance_length(data, CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_COMMAND_ENCRYPTION: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier VOICE COMMAND ENCRYPTION\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION) {
-               LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_voice_command_encryption(data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_DATA_RETRY: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier MAX VOICE DATA RETRY\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY) {
-               LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_max_voice_data_retry(data, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_CSMA_BACKOFF: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier MAX VOICE CSMA BACKOFF\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF) {
-               LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_max_voice_csma_backoff(data, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MIN_VOICE_DATA_BACKOFF: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier MIN VOICE DATA BACKOFF\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF) {
-               LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_min_voice_data_backoff(data, CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_TARG_AUDIO_PROFILES: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier VOICE TARG AUDIO PROFILES\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_TARG_AUDIO_PROFILES) {
-               LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - NOT SUPPORTED\n", __FUNCTION__);
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_RIB_UPDATE_CHECK_INTERVAL: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier RIB UPDATE CHECK INTERVAL\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL) {
-               LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_rib_update_check_interval(data, CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DOWNLOAD_RATE: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier DOWNLOAD RATE\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE) {
-               LOG_ERROR("%s: DOWNLOAD RATE - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DOWNLOAD RATE - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_download_rate(data, CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_UPDATE_POLLING_PERIOD: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier UPDATE POLLING PERIOD\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD) {
-               LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_update_polling_period(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DATA_REQUEST_WAIT_TIME: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier DATA REQUEST WAIT TIME\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME) {
-               LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_data_request_wait_time(data, CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier IR RF DATABASE\n", __FUNCTION__);
-            } else if(length > CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE) {
-               LOG_ERROR("%s: IR RF DATABASE - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else {
-               // Store this data in the object
-               property_write_ir_rf_database(index, data, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_SHORT_RF_RETRY_PERIOD: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier SHORT RF RETRY PERIOD\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD) {
-               LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_short_rf_retry_period(data, CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VALIDATION_CONFIGURATION: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier VALIDATION CONFIGURATION\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION) {
-               LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_validation_configuration(data, CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_IRDB_STATUS: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier TARGET IRDB STATUS\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS) {
-               LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_target_irdb_status(data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
+      if(rib_status == ctrlm_rf4ce_rib_t::status::DOES_NOT_EXIST) {
+         LOG_DEBUG("%s: falling back to legacy RIB implementation\n", __FUNCTION__);
 
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+         switch(identifier) {
+            case CTRLM_RF4CE_RIB_ATTR_ID_MAXIMUM_UTTERANCE_LENGTH: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier MAXIMUM UTTERANCE LENGTH\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH) {
+                  LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MAXIMUM UTTERANCE LENGTH - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_maximum_utterance_length(data, CTRLM_RF4CE_RIB_ATTR_LEN_MAXIMUM_UTTERANCE_LENGTH);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_PERIPHERAL_ID: {
-            if(target && !ctrlm_is_production_build()) {
-               LOG_ERROR("%s: target failed to write to controller attribute identifier PERIPHERAL ID\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID) {
-               LOG_ERROR("%s: PERIPHERAL ID - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: PERIPHERAL ID - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_peripheral_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID);
+            case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_COMMAND_ENCRYPTION: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier VOICE COMMAND ENCRYPTION\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION) {
+                  LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VOICE COMMAND ENCRYPTION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_voice_command_encryption(data, CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_COMMAND_ENCRYPTION);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_DATA_RETRY: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier MAX VOICE DATA RETRY\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY) {
+                  LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MAX VOICE DATA RETRY - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_max_voice_data_retry(data, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_DATA_RETRY);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MAX_VOICE_CSMA_BACKOFF: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier MAX VOICE CSMA BACKOFF\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF) {
+                  LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MAX VOICE CSMA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_max_voice_csma_backoff(data, CTRLM_RF4CE_RIB_ATTR_LEN_MAX_VOICE_CSMA_BACKOFF);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MIN_VOICE_DATA_BACKOFF: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier MIN VOICE DATA BACKOFF\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF) {
+                  LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: MIN VOICE DATA BACKOFF - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_min_voice_data_backoff(data, CTRLM_RF4CE_RIB_ATTR_LEN_MIN_VOICE_DATA_BACKOFF);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_TARG_AUDIO_PROFILES: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier VOICE TARG AUDIO PROFILES\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_TARG_AUDIO_PROFILES) {
+                  LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  LOG_ERROR("%s: VOICE TARG AUDIO PROFILES - NOT SUPPORTED\n", __FUNCTION__);
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_RIB_UPDATE_CHECK_INTERVAL: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier RIB UPDATE CHECK INTERVAL\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL) {
+                  LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: RIB UPDATE CHECK INTERVAL - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_rib_update_check_interval(data, CTRLM_RF4CE_RIB_ATTR_LEN_RIB_UPDATE_CHECK_INTERVAL);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_DOWNLOAD_RATE: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier DOWNLOAD RATE\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE) {
+                  LOG_ERROR("%s: DOWNLOAD RATE - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DOWNLOAD RATE - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_download_rate(data, CTRLM_RF4CE_RIB_ATTR_LEN_DOWNLOAD_RATE);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_UPDATE_POLLING_PERIOD: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier UPDATE POLLING PERIOD\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD) {
+                  LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: UPDATE POLLING PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_update_polling_period(data, CTRLM_RF4CE_RIB_ATTR_LEN_UPDATE_POLLING_PERIOD);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_DATA_REQUEST_WAIT_TIME: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier DATA REQUEST WAIT TIME\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME) {
+                  LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DATA REQUEST WAIT TIME - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_data_request_wait_time(data, CTRLM_RF4CE_RIB_ATTR_LEN_DATA_REQUEST_WAIT_TIME);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_IR_RF_DATABASE: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier IR RF DATABASE\n", __FUNCTION__);
+               } else if(length > CTRLM_HAL_RF4CE_CONST_MAX_RIB_ATTRIBUTE_SIZE) {
+                  LOG_ERROR("%s: IR RF DATABASE - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else {
+                  // Store this data in the object
+                  property_write_ir_rf_database(index, data, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_SHORT_RF_RETRY_PERIOD: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier SHORT RF RETRY PERIOD\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD) {
+                  LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: SHORT RF RETRY PERIOD - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_short_rf_retry_period(data, CTRLM_RF4CE_RIB_ATTR_LEN_SHORT_RF_RETRY_PERIOD);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_VALIDATION_CONFIGURATION: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier VALIDATION CONFIGURATION\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION) {
+                  LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VALIDATION CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_validation_configuration(data, CTRLM_RF4CE_RIB_ATTR_LEN_VALIDATION_CONFIGURATION);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_IRDB_STATUS: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier TARGET IRDB STATUS\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS) {
+                  LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: TARGET IRDB STATUS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_target_irdb_status(data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_IRDB_STATUS);
 
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_RF_STATISTICS: {
-            if(target && !ctrlm_is_production_build()) {
-               LOG_ERROR("%s: target failed to write to controller attribute identifier RF STATISTICS\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS) {
-               LOG_ERROR("%s: RF STATISTICS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: RF STATISTICS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_rf_statistics(data, CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS);
+            case CTRLM_RF4CE_RIB_ATTR_ID_PERIPHERAL_ID: {
+               if(target && !ctrlm_is_production_build()) {
+                  LOG_ERROR("%s: target failed to write to controller attribute identifier PERIPHERAL ID\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID) {
+                  LOG_ERROR("%s: PERIPHERAL ID - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: PERIPHERAL ID - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_peripheral_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_PERIPHERAL_ID);
 
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_OPUS_ENCODING_PARAMS: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier OPUS ENCODING PARAMS\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS) {
-               LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_opus_encoding_params(data, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_RF_STATISTICS: {
+               if(target && !ctrlm_is_production_build()) {
+                  LOG_ERROR("%s: target failed to write to controller attribute identifier RF STATISTICS\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS) {
+                  LOG_ERROR("%s: RF STATISTICS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: RF STATISTICS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_rf_statistics(data, CTRLM_RF4CE_RIB_ATTR_LEN_RF_STATISTICS);
+
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_SESSION_QOS: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier VOICE SESSION QOS\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS) {
-               LOG_ERROR("%s: VOICE SESSION QOS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: VOICE SESSION QOS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               // Store this data in the object
-               property_write_voice_session_qos(data, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_OPUS_ENCODING_PARAMS: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier OPUS ENCODING PARAMS\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS) {
+                  LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: OPUS ENCODING PARAMS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_opus_encoding_params(data, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_ID_DATA: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier TARGET ID DATA\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA) {
-               LOG_ERROR("%s: TARGET ID DATA - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
-               LOG_ERROR("%s: TARGET ID DATA - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
-               property_write_device_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_RECEIVER_ID) {
-               property_write_receiver_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
-            } else {
-               LOG_WARN("%s: Account ID not implemented yet\n", __FUNCTION__);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_UNSUPPORTED_ATTRIBUTE;
+            case CTRLM_RF4CE_RIB_ATTR_ID_VOICE_SESSION_QOS: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier VOICE SESSION QOS\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_VOICE_SESSION_QOS) {
+                  LOG_ERROR("%s: VOICE SESSION QOS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: VOICE SESSION QOS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  // Store this data in the object
+                  property_write_voice_session_qos(data, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_MFG_TEST: {
-            if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST) { // Mfg Test timing data
-               if(target) {
-                  if((length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) || (length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
-                     // Store this data in the object
-                     property_write_mfg_test(data, length);
-                     status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_TARGET_ID_DATA: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier TARGET ID DATA\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA) {
+                  LOG_ERROR("%s: TARGET ID DATA - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
+                  LOG_ERROR("%s: TARGET ID DATA - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_DEVICE_ID) {
+                  property_write_device_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_TARGET_ID_DATA_RECEIVER_ID) {
+                  property_write_receiver_id(data, CTRLM_RF4CE_RIB_ATTR_LEN_TARGET_ID_DATA);
+               } else {
+                  LOG_WARN("%s: Account ID not implemented yet\n", __FUNCTION__);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_UNSUPPORTED_ATTRIBUTE;
+               }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_MFG_TEST: {
+               if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST) { // Mfg Test timing data
+                  if(target) {
+                     if((length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST) || (length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_HAPTICS)) {
+                        // Store this data in the object
+                        property_write_mfg_test(data, length);
+                        status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+                     } else {
+                        LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
+                        status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                     }
                   } else {
-                     LOG_ERROR("%s: MFG Test - Invalid Length (%u)\n", __FUNCTION__, length);
-                     status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                     LOG_ERROR("%s: controller write to read only identifier MFG TEST\n", __FUNCTION__);
+                  }
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT) { // Mfg Security Key Test Rib Result
+                  if(!target || ctrlm_is_production_build()) {
+                     if(length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
+                        // Store this data in the object
+                        property_write_mfg_test_result(data, length);
+                        status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+                     } else {
+                        LOG_ERROR("%s: MFG Security Key Test Result - Invalid Length (%u)\n", __FUNCTION__, length);
+                        status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+                     }
+                  } else {
+                     LOG_ERROR("%s: target failed to write to controller attribute identifier MFG SECURITY KEY TEST RESULT\n", __FUNCTION__);
                   }
                } else {
-                  LOG_ERROR("%s: controller write to read only identifier MFG TEST\n", __FUNCTION__);
+                  LOG_ERROR("%s: MFG TEST - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
                }
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_MFG_TEST_RESULT) { // Mfg Security Key Test Rib Result
-               if(!target || ctrlm_is_production_build()) {
-                  if(length == CTRLM_RF4CE_RIB_ATTR_LEN_MFG_TEST_RESULT) {
-                     // Store this data in the object
-                     property_write_mfg_test_result(data, length);
-                     status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-                  } else {
-                     LOG_ERROR("%s: MFG Security Key Test Result - Invalid Length (%u)\n", __FUNCTION__, length);
-                     status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-                  }
+               break;
+            }
+            case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_METHODS: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier POLLING METHODS\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS) {
+                  LOG_ERROR("%s: POLLING METHODS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               }  else if(index > 0x00) {
+                  LOG_ERROR("%s: POLLING METHODS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
                } else {
-                  LOG_ERROR("%s: target failed to write to controller attribute identifier MFG SECURITY KEY TEST RESULT\n", __FUNCTION__);
+                  property_write_polling_methods(data, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
                }
-            } else {
-               LOG_ERROR("%s: MFG TEST - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_METHODS: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier POLLING METHODS\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS) {
-               LOG_ERROR("%s: POLLING METHODS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            }  else if(index > 0x00) {
-               LOG_ERROR("%s: POLLING METHODS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               property_write_polling_methods(data, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_METHODS);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_CONFIGURATION: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier POLLING CONFIGURATION\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION) {
+                  LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
+                  LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
+                  property_write_polling_configuration_mac(data, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               } else {
+                  property_write_polling_configuration_heartbeat(data, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_POLLING_CONFIGURATION: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier POLLING CONFIGURATION\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION) {
-               LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
-               LOG_ERROR("%s: POLLING CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else if(index == CTRLM_RF4CE_RIB_ATTR_INDEX_POLLING_CONFIGURATION_MAC) {
-               property_write_polling_configuration_mac(data, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            } else {
-               property_write_polling_configuration_heartbeat(data, CTRLM_RF4CE_RIB_ATTR_LEN_POLLING_CONFIGURATION);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_PRIVACY: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PRIVACY) {
+                  LOG_ERROR("%s: PRIVACY - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: PRIVACY - Invalid Index (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  property_write_privacy(data, CTRLM_RF4CE_RIB_ATTR_LEN_PRIVACY);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_PRIVACY: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_PRIVACY) {
-               LOG_ERROR("%s: PRIVACY - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: PRIVACY - Invalid Index (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               property_write_privacy(data, CTRLM_RF4CE_RIB_ATTR_LEN_PRIVACY);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_CONFIGURATION: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier FAR FIELD CONFIGURATION\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION) {
+                  LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  property_write_far_field_configuration(data, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_CONFIGURATION: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier FAR FIELD CONFIGURATION\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION) {
-               LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: FAR FIELD CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               property_write_far_field_configuration(data, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_CONFIGURATION);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_METRICS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS) {
+                  LOG_ERROR("%s: FAR FIELD METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: FAR FIELD METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  property_write_far_field_metrics(data, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_FAR_FIELD_METRICS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS) {
-               LOG_ERROR("%s: FAR FIELD METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: FAR FIELD METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               property_write_far_field_metrics(data, CTRLM_RF4CE_RIB_ATTR_LEN_FAR_FIELD_METRICS);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_DSP_CONFIGURATION: {
+               if(!target) {
+                  LOG_ERROR("%s: controller write to read only identifier DSP CONFIGURATION\n", __FUNCTION__);
+               } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION) {
+                  LOG_ERROR("%s: DSP CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DSP CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  property_write_dsp_configuration(data, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DSP_CONFIGURATION: {
-            if(!target) {
-               LOG_ERROR("%s: controller write to read only identifier DSP CONFIGURATION\n", __FUNCTION__);
-            } else if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION) {
-               LOG_ERROR("%s: DSP CONFIGURATION - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DSP CONFIGURATION - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               property_write_dsp_configuration(data, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_CONFIGURATION);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_DSP_METRICS: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS) {
+                  LOG_ERROR("%s: DSP METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x00) {
+                  LOG_ERROR("%s: DSP METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else {
+                  property_write_dsp_metrics(data, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_DSP_METRICS: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS) {
-               LOG_ERROR("%s: DSP METRICS - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x00) {
-               LOG_ERROR("%s: DSP METRICS - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else {
-               property_write_dsp_metrics(data, CTRLM_RF4CE_RIB_ATTR_LEN_DSP_METRICS);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            case CTRLM_RF4CE_RIB_ATTR_ID_GENERAL_PURPOSE: {
+               if(length != CTRLM_RF4CE_RIB_ATTR_LEN_GENERAL_PURPOSE) {
+                  LOG_ERROR("%s: GENERAL PURPOSE - Invalid Length (%u)\n", __FUNCTION__, length);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
+               } else if(index > 0x01) {
+                  LOG_ERROR("%s: GENERAL PURPOSE - Invalid Index (%u)\n", __FUNCTION__, index);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
+               } else if(index == 0x01) { // Memory Stats
+                  // Store this data in the object
+                  property_write_memory_stats(data, CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATS);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               } else { // Reboot Stats
+                  // Store this data in the object
+                  property_write_reboot_stats(data, CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_STATS);
+                  status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+               }
+               break;
             }
-            break;
-         }
-         case CTRLM_RF4CE_RIB_ATTR_ID_GENERAL_PURPOSE: {
-            if(length != CTRLM_RF4CE_RIB_ATTR_LEN_GENERAL_PURPOSE) {
-               LOG_ERROR("%s: GENERAL PURPOSE - Invalid Length (%u)\n", __FUNCTION__, length);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_PARAMETER;
-            } else if(index > 0x01) {
-               LOG_ERROR("%s: GENERAL PURPOSE - Invalid Index (%u)\n", __FUNCTION__, index);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_INVALID_INDEX;
-            } else if(index == 0x01) { // Memory Stats
-               // Store this data in the object
-               property_write_memory_stats(data, CTRLM_RF4CE_RIB_ATTR_LEN_MEMORY_STATS);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
-            } else { // Reboot Stats
-               // Store this data in the object
-               property_write_reboot_stats(data, CTRLM_RF4CE_RIB_ATTR_LEN_REBOOT_STATS);
-               status = CTRLM_RF4CE_RIB_RSP_STATUS_SUCCESS;
+            default: {
+               LOG_INFO("%s: invalid identifier (0x%02X)\n", __FUNCTION__, identifier);
+               break;
             }
-            break;
-         }
-         default: {
-            LOG_INFO("%s: invalid identifier (0x%02X)\n", __FUNCTION__, identifier);
-            break;
          }
       }
    }

@@ -54,10 +54,9 @@ public:
 
 public:
     /**
-     * This static function is used by Glib to call this component on the gmain thread
-     * @param data This is a pointer to the RFC object
+     * This function initiates the RFC component to retrieve all of the RFC values.
      */
-    static int fetch_attributes(void *data);
+    void fetch_attributes();
 
 public:
     /**

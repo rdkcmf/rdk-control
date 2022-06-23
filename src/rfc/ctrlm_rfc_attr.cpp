@@ -142,6 +142,8 @@ bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, bool &val, int index) con
                     val = json_is_true(temp);
                     ret = true;
                     LOG_INFO("%s: RFC - <%s, %s>\n", __FUNCTION__, path.c_str(), (val ? "TRUE" : "FALSE"));
+                } else {
+                    LOG_DEBUG("%s: %s is wrong type in config file\n", __FUNCTION__, path.c_str());
                 }
             } else {
                 LOG_DEBUG("%s: %s doesn't exist in rfc attribute\n", __FUNCTION__, path.c_str());
@@ -181,6 +183,8 @@ bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, int &val, int min, int ma
                         ret = true;
                         LOG_INFO("%s: RFC - <%s, %d>\n", __FUNCTION__, path.c_str(), val);
                     }
+                } else {
+                    LOG_DEBUG("%s: %s is wrong type in config file\n", __FUNCTION__, path.c_str());
                 }
             } else {
                 LOG_DEBUG("%s: %s doesn't exist in rfc attribute\n", __FUNCTION__, path.c_str());
@@ -202,6 +206,36 @@ bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, std::string &val) const {
                     val = json_string_value(temp);
                     ret = true;
                     LOG_INFO("%s: RFC - <%s, %s>\n", __FUNCTION__, path.c_str(), val.c_str());
+                } else {
+                    LOG_DEBUG("%s: %s is wrong type in config file\n", __FUNCTION__, path.c_str());
+                }
+            } else {
+                LOG_DEBUG("%s: %s doesn't exist in rfc attribute\n", __FUNCTION__, path.c_str());
+            }
+        } else {
+            LOG_WARN("%s: json object for attr doesn't exist\n", __FUNCTION__);
+        }
+    } // No need for else, debug log printed in check_config_file
+    return(ret);
+}
+
+bool ctrlm_rfc_attr_t::get_rfc_value(std::string path, double &val, double min, double max) const {
+    bool ret = false;
+    if(!this->check_config_file(path)) {
+        if(this->value_json) {
+            json_t *temp = ctrlm_utils_json_from_path(this->value_json, path, false);
+            if(temp) {
+                if(json_is_real(temp)) {
+                    double temp_dbl = json_real_value(temp);
+                    if(temp_dbl > max || temp_dbl < min) {
+                        LOG_ERROR("%s: float out of range (%f)\n", __FUNCTION__, temp_dbl);
+                    } else {
+                        val = temp_dbl;
+                        ret = true;
+                        LOG_INFO("%s: RFC - <%s, %f>\n", __FUNCTION__, path.c_str(), val);
+                    }
+                } else {
+                    LOG_DEBUG("%s: %s is wrong type in config file\n", __FUNCTION__, path.c_str());
                 }
             } else {
                 LOG_DEBUG("%s: %s doesn't exist in rfc attribute\n", __FUNCTION__, path.c_str());

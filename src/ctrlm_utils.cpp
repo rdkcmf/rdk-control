@@ -495,6 +495,7 @@ const char *ctrlm_rcu_rib_attr_id_str(ctrlm_rcu_rib_attr_id_t attribute_id) {
       case CTRLM_RCU_RIB_ATTR_ID_POLLING_CONFIGURATION:     return("POLLING_CONFIGURATION");
       case CTRLM_RCU_RIB_ATTR_ID_PRIVACY:                   return("PRIVACY");
       case CTRLM_RCU_RIB_ATTR_ID_CONTROLLER_CAPABILITIES:   return("CONTROLLER_CAPABILITIES");
+      case CTRLM_RCU_RIB_ATTR_ID_RESPONSE_TIME:             return("RESPONSE_TIME");
       case CTRLM_RCU_RIB_ATTR_ID_VOICE_COMMAND_STATUS:      return("VOICE_COMMAND_STATUS");
       case CTRLM_RCU_RIB_ATTR_ID_VOICE_COMMAND_LENGTH:      return("VOICE_COMMAND_LENGTH");
       case CTRLM_RCU_RIB_ATTR_ID_MAXIMUM_UTTERANCE_LENGTH:  return("MAXIMUM_UTTERANCE_LENGTH");

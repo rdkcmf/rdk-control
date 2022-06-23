@@ -99,29 +99,22 @@ void ctrlm_rfc_t::remove_attribute(ctrlm_rfc_t::attrs type) {
     this->attributes.erase(type);
 }
 
-int ctrlm_rfc_t::fetch_attributes(void *data) {
-    int ret = 0;
-    ctrlm_rfc_t *rfc = (ctrlm_rfc_t *)data;
-    if(rfc) {
-        LOG_INFO("%s: fetching RFC attributes\n", __FUNCTION__);
-        for(const auto &itr : rfc->attributes) {
-            ctrlm_rfc_attr_t *attr = itr.second;
-            if(attr->is_enabled()) {
-                LOG_INFO("%s: fetching <%s>\n", __FUNCTION__, attr->get_tr181_string().c_str());
-                std::string value = rfc->tr181_call(attr);
-                if(!value.empty()) {
-                    attr->set_rfc_value(value);
-                } else {
-                    LOG_DEBUG("%s: tr181 value for <%s> is empty\n", __FUNCTION__, attr->get_tr181_string().c_str());
-                }
+void ctrlm_rfc_t::fetch_attributes() {
+    LOG_INFO("%s: fetching RFC attributes\n", __FUNCTION__);
+    for(const auto &itr : this->attributes) {
+        ctrlm_rfc_attr_t *attr = itr.second;
+        if(attr->is_enabled()) {
+            LOG_INFO("%s: fetching <%s>\n", __FUNCTION__, attr->get_tr181_string().c_str());
+            std::string value = this->tr181_call(attr);
+            if(!value.empty()) {
+                attr->set_rfc_value(value);
             } else {
-                LOG_DEBUG("%s: rfc is disabled for <%s>\n", __FUNCTION__, attr->get_tr181_string().c_str());
+                LOG_DEBUG("%s: tr181 value for <%s> is empty\n", __FUNCTION__, attr->get_tr181_string().c_str());
             }
+        } else {
+            LOG_DEBUG("%s: rfc is disabled for <%s>\n", __FUNCTION__, attr->get_tr181_string().c_str());
         }
-    } else {
-        LOG_ERROR("%s: ctrlm_rfc_t is NULL\n", __FUNCTION__);
     }
-    return(ret);
 }
 
 std::string ctrlm_rfc_t::tr181_call(ctrlm_rfc_attr_t *attr) {

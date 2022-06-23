@@ -115,7 +115,7 @@
             }
          },
          "xr11v2" : {
-            "methods"                    :         2,
+            "methods"                    :         0,
             "heartbeat" : {
                "trigger"                 :         1,
                "kp_counter"              :         0,
@@ -126,7 +126,7 @@
             }
          },
          "xr15v1" : {
-            "methods"                    :         2,
+            "methods"                    :         0,
             "heartbeat" : {
                "trigger"                 :         1,
                "kp_counter"              :         0,
@@ -137,7 +137,7 @@
             }
          },
          "xr15v2" : {
-            "methods"                    :         2,
+            "methods"                    :         1,
             "heartbeat" : {
                "trigger"                 :         1,
                "kp_counter"              :         0,
@@ -159,7 +159,7 @@
             }
          },
          "xr19v1" : {
-            "methods"                    :         1,
+            "methods"                    :         0,
             "heartbeat" : {
                "trigger"                 :         1,
                "kp_counter"              :         0,
@@ -167,7 +167,7 @@
             }
          },
          "xrav1" : {
-            "methods"                    :         2,
+            "methods"                    :         0,
             "heartbeat" : {
                "trigger"                 :         1,
                "kp_counter"              :         0,
@@ -207,6 +207,11 @@
          "ic_atten_update"               :       255,
          "ic_detect"                     :       15,
          "force_settings"                :     false
+      },
+      "rsp_time": {
+         "xrc"                           :     150,
+         "xvp"                           :     150,
+         "xdiu"                          :     155
       }
    },
    "network_ble" : {

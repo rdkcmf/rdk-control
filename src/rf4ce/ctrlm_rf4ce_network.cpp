@@ -268,10 +268,14 @@ ctrlm_obj_network_rf4ce_t::ctrlm_obj_network_rf4ce_t(ctrlm_network_type_t type, 
 #endif
    instance = this;
 
+   this->configure_rib();
+
    ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
    if(rfc) {
       rfc->add_changed_listener(ctrlm_rfc_t::attrs::RF4CE, std::bind(&ctrlm_obj_network_rf4ce_t::rfc_retrieved_handler, this, std::placeholders::_1));
    }
+
+   rsp_time_.set_updated_listener(std::bind(&ctrlm_obj_network_rf4ce_t::rsp_time_updated_handler, this, std::placeholders::_1));
 }
 
 #ifndef CONTROLLER_SPECIFIC_NETWORK_ATTRIBUTES
@@ -772,7 +776,7 @@ ctrlm_hal_result_t ctrlm_obj_network_rf4ce_t::req_data(ctrlm_rf4ce_profile_id_t 
    params.flag_indirect       = tx_indirect;
 #endif
    params.tx_window_start     = tx_window_start;
-   params.tx_window_duration  = CTRLM_RF4CE_CONST_RESPONSE_WAIT_TIME * 1000;
+   params.tx_window_duration  = rsp_time_.get_us((uint8_t)profile_id);
    params.length              = length;
    params.data                = data;
    params.cb_data_read        = cb_data_read;
@@ -908,6 +912,14 @@ void ctrlm_obj_network_rf4ce_t::indirect_tx_interval_set() {
    property_get(CTRLM_HAL_NETWORK_PROPERTY_INDIRECT_TX_TIMEOUT, (void**)&actual_indirect_timeout_msec);
    LOG_INFO("%s: Setting Indirect TX timeout to %u msec; Actual %u msec\n", __FUNCTION__, indirect_timeout_msec, actual_indirect_timeout_msec);
 #endif
+}
+
+ctrlm_rf4ce_rib_t *ctrlm_obj_network_rf4ce_t::get_rib() {
+   return(&this->rib_);
+}
+
+void ctrlm_obj_network_rf4ce_t::configure_rib() {
+   this->rib_.add_attribute(&this->rsp_time_);
 }
 
 void ctrlm_obj_network_rf4ce_t::discovery_config_get(ctrlm_controller_discovery_config_t *config) {
@@ -3375,6 +3387,8 @@ void ctrlm_obj_network_rf4ce_t::process_xconf() {
    } else {
       LOG_INFO("%s: TR181 RF4CE Host Packet Decryption set to %s\n", __FUNCTION__, (host_decryption_ ? "TRUE" : "FALSE"));
    }
+
+   rsp_time_.legacy_rfc();
 }
 
 // ASB Functions
@@ -4154,6 +4168,9 @@ ctrlm_hal_result_t ctrlm_obj_network_rf4ce_t::network_init(GThread *ctrlm_main_t
    if(!(target_irdb_status_read_from_db())) {
       target_irdb_status_set(most_recent_controller_irdb_status_get());
    }
+   
+   // Read any attributes that require controllers to be loaded beforehand
+   rsp_time_.read_config();
 
    // Call the base class function
    result = ctrlm_obj_network_t::network_init(ctrlm_main_thread);
@@ -4799,6 +4816,11 @@ void ctrlm_obj_network_rf4ce_t::rfc_retrieved_handler(const ctrlm_rfc_attr_t& at
    attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_ATTEN_UPDATE, dsp_configuration_.ic_config_atten_update, 0x00, 0xFF);
    attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_DETECT, dsp_configuration_.ic_config_detect, 0x00, 0xFF);
    // End DSP
+}
+
+void ctrlm_obj_network_rf4ce_t::rsp_time_updated_handler(const ctrlm_rf4ce_rsp_time_t& attr) {
+   LOG_INFO("%s: rsp times have changed.. notify remotes via heartbeat action\n", __FUNCTION__);
+   ctrlm_rf4ce_polling_action_push(network_id_get(), CTRLM_MAIN_CONTROLLER_ID_ALL, RF4CE_POLLING_ACTION_PROFILE_CONFIGURATION, NULL, 0);
 }
 
 void ctrlm_obj_network_rf4ce_t::notify_controllers_polling_configuration(void *data, size_t size) {

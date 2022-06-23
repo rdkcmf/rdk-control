@@ -47,6 +47,10 @@
 #define CTRLM_RF4CE_TR181_RF4CE_RSP_IDLE_FF                  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.RF4CE.FF.RspIdle"
 #define CTRLM_RF4CE_TR181_RF4CE_VOICE_ENCRYPTION             "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.RF4CE.VoiceEncryption.Enable"
 #define CTRLM_RF4CE_TR181_RF4CE_HOST_PACKET_DECRYPTION       "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.RF4CE.HostPacketDecryption.Enable"
+#define CTRLM_RF4CE_TR181_RSP_TIME_PREFIX                    "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.RF4CE.RspTime."
+#define CTRLM_RF4CE_TR181_RSP_TIME_XRC                       CTRLM_RF4CE_TR181_RSP_TIME_PREFIX "XRC"
+#define CTRLM_RF4CE_TR181_RSP_TIME_XVP                       CTRLM_RF4CE_TR181_RSP_TIME_PREFIX "XVP"
+#define CTRLM_RF4CE_TR181_RSP_TIME_XDIU                      CTRLM_RF4CE_TR181_RSP_TIME_PREFIX "XDIU"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_MODE                  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioMode"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_TIMING                "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioTiming"
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_CONFIDENCE_THRESHOLD  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioConfidenceThreshold"
@@ -64,4 +68,16 @@ ctrlm_tr181_result_t ctrlm_tr181_string_get(const char *parameter, char *s, size
 ctrlm_tr181_result_t ctrlm_tr181_bool_get(const char *parameter, bool *b);
 ctrlm_tr181_result_t ctrlm_tr181_int_get(const char *parameter, int *i, int min = INT_MIN, int max = INT_MAX);
 ctrlm_tr181_result_t ctrlm_tr181_real_get(const char *parameter, double *d, double min = DBL_MIN, double max = DBL_MAX);
+template <typename T>
+ctrlm_tr181_result_t ctrlm_tr181_int_get(const char *parameter, T *i, int min = INT_MIN, int max = INT_MAX) {
+   ctrlm_tr181_result_t ret = CTRLM_TR181_RESULT_FAILURE;
+   int temp = 0;
+   if(i) {
+      ret = ctrlm_tr181_int_get(parameter, &temp, min, max);
+      if(ret == CTRLM_TR181_RESULT_SUCCESS) {
+         *i = (T)temp;
+      }
+   }
+   return(ret);
+}
 #endif

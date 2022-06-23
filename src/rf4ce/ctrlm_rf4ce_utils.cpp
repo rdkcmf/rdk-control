@@ -344,20 +344,21 @@ void ctrlm_rf4ce_polling_action_free(void *data) {
 
 const char *ctrlm_rf4ce_polling_action_str(ctrlm_rf4ce_polling_action_t action) {
    switch(action) {
-      case RF4CE_POLLING_ACTION_NONE:                return("NONE");
-      case RF4CE_POLLING_ACTION_REBOOT:              return("REBOOT");
-      case RF4CE_POLLING_ACTION_REPAIR:              return("REPAIR");
-      case RF4CE_POLLING_ACTION_CONFIGURATION:       return("CONFIGURATION");
-      case RF4CE_POLLING_ACTION_OTA:                 return("OTA");
-      case RF4CE_POLLING_ACTION_ALERT:               return("ALERT");
-      case RF4CE_POLLING_ACTION_IRDB_STATUS:         return("IRDB STATUS");
-      case RF4CE_POLLING_ACTION_POLL_CONFIGURATION:  return("POLLING CONFIGURATION");
-      case RF4CE_POLLING_ACTION_VOICE_CONFIGURATION: return("VOICE CONFIGURATION");
-      case RF4CE_POLLING_ACTION_DSP_CONFIGURATION:   return("DSP CONFIGURATION");
-      case RF4CE_POLLING_ACTION_METRICS:             return("METRICS");
-      case RF4CE_POLLING_ACTION_EOS:                 return("EOS");
-      case RF4CE_POLLING_ACTION_BATTERY_STATUS:      return("BATTERY STATUS");
-      case RF4CE_POLLING_ACTION_IRRF_STATUS:         return("IRRF STATUS");
+      case RF4CE_POLLING_ACTION_NONE:                  return("NONE");
+      case RF4CE_POLLING_ACTION_REBOOT:                return("REBOOT");
+      case RF4CE_POLLING_ACTION_REPAIR:                return("REPAIR");
+      case RF4CE_POLLING_ACTION_CONFIGURATION:         return("CONFIGURATION");
+      case RF4CE_POLLING_ACTION_OTA:                   return("OTA");
+      case RF4CE_POLLING_ACTION_ALERT:                 return("ALERT");
+      case RF4CE_POLLING_ACTION_IRDB_STATUS:           return("IRDB STATUS");
+      case RF4CE_POLLING_ACTION_POLL_CONFIGURATION:    return("POLLING CONFIGURATION");
+      case RF4CE_POLLING_ACTION_VOICE_CONFIGURATION:   return("VOICE CONFIGURATION");
+      case RF4CE_POLLING_ACTION_DSP_CONFIGURATION:     return("DSP CONFIGURATION");
+      case RF4CE_POLLING_ACTION_METRICS:               return("METRICS");
+      case RF4CE_POLLING_ACTION_EOS:                   return("EOS");
+      case RF4CE_POLLING_ACTION_BATTERY_STATUS:        return("BATTERY STATUS");
+      case RF4CE_POLLING_ACTION_PROFILE_CONFIGURATION: return("PROFILE CONFIGURATION");
+      case RF4CE_POLLING_ACTION_IRRF_STATUS:           return("IRRF STATUS");
    }
    return("");
 }

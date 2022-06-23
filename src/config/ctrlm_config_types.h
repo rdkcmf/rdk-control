@@ -68,6 +68,22 @@ public:
      * @return True if the value has been placed in value, otherwise False
      */
     bool get_config_value(int &value, int min = INT_MIN, int max = INT_MAX);
+    /**
+     * Function template for all int types that is used to get the value from the config file
+     * @param value The reference to where the value from the config file should be placed
+     * @param min The minimum value that should be allowed
+     * @param max The maximum value that should be allowed
+     * @return True if the value has been placed in value, otherwise False
+     */
+    template <typename T>
+    bool get_config_value(T &value, int min = INT_MIN, int max = INT_MAX) {
+         int temp = 0;
+         if(get_config_value(temp, min, max)) {
+            value = (T)temp;
+            return true;
+         }
+         return false;
+    }
 };
 
 class ctrlm_config_string_t : public ctrlm_config_obj_t {

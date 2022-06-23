@@ -112,6 +112,7 @@ controlMgr_SOURCES  += rf4ce/ctrlm_rf4ce_battery.cpp                            
                        rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_battery.cpp \
                        rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_voice.cpp   \
                        rf4ce/controller/attributes/ctrlm_rf4ce_controller_attr_irdb.cpp    \
+                       rf4ce/network/attributes/ctrlm_rf4ce_network_attr_config.cpp        \
                        rf4ce/rib/ctrlm_rf4ce_rib_attr.cpp                                  \
                        rf4ce/rib/ctrlm_rf4ce_rib.cpp
 

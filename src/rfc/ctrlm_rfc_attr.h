@@ -23,6 +23,7 @@
 #include <functional>
 #include <jansson.h>
 #include <climits>
+#include <float.h>
 
 class ctrlm_rfc_attr_t;
 /**
@@ -98,6 +99,7 @@ public:
     bool get_rfc_value(std::string path, std::string &val) const;
     bool get_rfc_value(std::string path, std::vector<std::string> &val) const;
     bool get_rfc_value(std::string path, int &val, int min = INT_MIN, int max = INT_MAX, int index = -1) const;
+    bool get_rfc_value(std::string path, double &val, double min = -DBL_MAX, double max = DBL_MAX) const;
     template <typename T>
     bool get_rfc_value(std::string path, T &val, int min = INT_MIN, int max = INT_MAX, int index = -1) const {
          int value = 0;

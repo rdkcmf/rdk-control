@@ -307,6 +307,7 @@ static void     ctrlm_networks_terminate(void);
 static void     ctrlm_thread_monitor_init(void);
 static void     ctrlm_terminate(void);
 static gboolean ctrlm_message_queue_delay(gpointer data);
+static void     ctrlm_trigger_startup_actions(void);
 
 static gpointer ctrlm_main_thread(gpointer param);
 static void     ctrlm_queue_msg_destroy(gpointer msg);
@@ -578,6 +579,10 @@ int main(int argc, char *argv[]) {
       return(-1);
    }
 
+   // Launch a thread to handle DB writes asynchronously
+   // Create an asynchronous queue to receive incoming messages from the networks
+   g_ctrlm.queue = g_async_queue_new_full(ctrlm_queue_msg_destroy);
+
    g_ctrlm.mask_pii = ctrlm_is_production_build() ? JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_0 : JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_1;
 
    LOG_INFO("ctrlm_main: load device mac\n");
@@ -599,7 +604,6 @@ int main(int argc, char *argv[]) {
    ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
    if(rfc) {
       rfc->add_changed_listener(ctrlm_rfc_t::attrs::GLOBAL, &ctrlm_global_rfc_values_retrieved);
-      g_idle_add(&ctrlm_rfc_t::fetch_attributes, (void *)rfc);
    }
    // TODO: We could possibly schedule this to run once every few hours or whatever
    //       the team decides is best.
@@ -663,10 +667,6 @@ int main(int argc, char *argv[]) {
       eh.set_minidump_descriptor(descriptor_json);
    }
 #endif
-
-   // Launch a thread to handle DB writes asynchronously
-   // Create an asynchronous queue to receive incoming messages from the networks
-   g_ctrlm.queue = g_async_queue_new_full(ctrlm_queue_msg_destroy);
 
    // Database init must occur after network qty and type are known
    LOG_INFO("ctrlm_main: pre-init networks\n");
@@ -770,10 +770,8 @@ int main(int argc, char *argv[]) {
       g_ctrlm.keycode_logging_poll_tag = ctrlm_timeout_create(g_ctrlm.keycode_logging_poll_val, ctrlm_keycode_logging_poll, NULL);
    }
 
-   ctrlm_ntp_check(NULL);
+   ctrlm_trigger_startup_actions();
 
-   // initialize IARM calls in the context of this thread after main loop will be started
-   ctrlm_timeout_create(1, ctrlm_start_iarm, NULL);
    LOG_INFO("ctrlm_main: Enter main loop\n");
    g_main_loop_run(g_ctrlm.main_loop);
 
@@ -2925,6 +2923,18 @@ gpointer ctrlm_main_thread(gpointer param) {
             }
             #endif
             #endif
+            break;
+         }
+         case CTRLM_MAIN_QUEUE_MSG_TYPE_STARTUP: {
+            LOG_DEBUG("%s: message type CTRLM_MAIN_QUEUE_MSG_TYPE_STARTUP\n", __FUNCTION__);
+            // All main thread startup activities can be placed here.
+            // RFC Retrieval, NTP check, register for IARM calls
+            ctrlm_start_iarm(NULL);
+            ctrlm_rfc_t *rfc = ctrlm_rfc_t::get_instance();
+            if(rfc) {
+               rfc->fetch_attributes();
+            }
+            ctrlm_timeout_create(1000, ctrlm_ntp_check, NULL);
             break;
          }
          case CTRLM_MAIN_QUEUE_MSG_TYPE_HANDLER: {
@@ -5911,4 +5921,15 @@ gboolean ctrlm_start_iarm(gpointer user_data) {
 
 ctrlm_power_state_t ctrlm_main_get_power_state(void) {
    return(g_ctrlm.power_state);
+}
+
+void ctrlm_trigger_startup_actions(void) {
+   ctrlm_main_queue_msg_header_t *msg = (ctrlm_main_queue_msg_header_t *)g_malloc(sizeof(ctrlm_main_queue_msg_header_t));
+   if(msg == NULL) {
+      LOG_ERROR("%s: Out of memory\n", __FUNCTION__);
+   } else {
+      msg->type       = CTRLM_MAIN_QUEUE_MSG_TYPE_STARTUP;
+      msg->network_id = CTRLM_MAIN_NETWORK_ID_ALL;
+      ctrlm_main_queue_msg_push((gpointer)msg);
+   }
 }
