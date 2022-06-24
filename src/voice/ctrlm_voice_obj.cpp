@@ -227,7 +227,7 @@ ctrlm_voice_t::~ctrlm_voice_t() {
 }
 
 bool ctrlm_voice_t::vsdk_is_privacy_enabled(void) {
-   bool privacy;
+   bool privacy = true;
 
    if(!xrsr_privacy_mode_get(&privacy)) {
       LOG_ERROR("%s: error getting privacy mode, defaulting to ON\n", __FUNCTION__);
@@ -371,6 +371,9 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
             for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
                 uint8_t voice_device_status = CTRLM_VOICE_DEVICE_STATUS_NONE;
                 ctrlm_db_voice_read_device_status(i, (int *)&voice_device_status);
+                if((i == CTRLM_VOICE_DEVICE_MICROPHONE) && (voice_device_status & CTRLM_VOICE_DEVICE_STATUS_PRIVACY)) {
+                    this->voice_privacy_enable(false);
+                }
                 if((voice_device_status & CTRLM_VOICE_DEVICE_STATUS_LEGACY) && (voice_device_status != CTRLM_VOICE_DEVICE_STATUS_DISABLED)) { // Convert from legacy to current (some value other than DISABLED set)
                     LOG_INFO("%s: Converting legacy device status value 0x%02X\n", __FUNCTION__, voice_device_status);
                     voice_device_status = CTRLM_VOICE_DEVICE_STATUS_NONE;
@@ -424,11 +427,11 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
 
     // Update routes
     this->voice_sdk_update_routes();
-    
+
     #ifdef CTRLM_LOCAL_MIC
-    // Read privacy mode state from the hardware (not the DB)
-    bool privacy_enabled = this->vsdk_is_privacy_enabled();
-    if(privacy_enabled != this->voice_is_privacy_enabled()) {
+    // Read privacy mode state from the DB in case power cycle lost HW GPIO state
+    bool privacy_enabled = this->voice_is_privacy_enabled();
+    if(privacy_enabled != this->vsdk_is_privacy_enabled()) {
         privacy_enabled ? this->voice_privacy_enable(false) : this->voice_privacy_disable(false);
     }
     #endif
@@ -2954,6 +2957,7 @@ void ctrlm_voice_t::voice_privacy_enable(bool update_vsdk) {
     }
 
     this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] |= CTRLM_VOICE_DEVICE_STATUS_PRIVACY;
+    ctrlm_db_voice_write_device_status(CTRLM_VOICE_DEVICE_MICROPHONE, (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] & CTRLM_VOICE_DEVICE_STATUS_MASK_DB));
 
     #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
     if(update_vsdk && this->xrsr_opened && !xrsr_privacy_mode_set(true)) {
@@ -2973,6 +2977,7 @@ void ctrlm_voice_t::voice_privacy_disable(bool update_vsdk) {
     }
 
     this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] &= ~CTRLM_VOICE_DEVICE_STATUS_PRIVACY;
+    ctrlm_db_voice_write_device_status(CTRLM_VOICE_DEVICE_MICROPHONE, (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] & CTRLM_VOICE_DEVICE_STATUS_MASK_DB));
 
     #ifdef CTRLM_LOCAL_MIC_DISABLE_VIA_PRIVACY
     if(update_vsdk && this->xrsr_opened && !xrsr_privacy_mode_set(false)) {
