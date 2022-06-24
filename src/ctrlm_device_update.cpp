@@ -1803,24 +1803,30 @@ gboolean ctrlm_device_update_rf4ce_begin(ctrlm_network_id_t network_id, ctrlm_co
    // In failure scenarios below, use the default poll time
    begin_info->when = RF4CE_DEVICE_UPDATE_IMAGE_CHECK_POLL_TIME;
    begin_info->time = g_ctrlm_device_update.prefs.check_poll_time_image;
+   ctrlm_device_update_rf4ce_image_info_t *image_info = &(*g_ctrlm_device_update.rf4ce_images)[image_id];
 
    DEVICE_UPDATE_MUTEX_LOCK();
-
-   // Attempt to acquire a session
-   if(g_ctrlm_device_update.rf4ce_session_active_count >= RF4CE_SIMULTANEOUS_SESSION_QTY) {
-      LOG_INFO("%s: Too many sessions are in progress (%u)\n", __FUNCTION__, g_ctrlm_device_update.rf4ce_session_active_count);
+   // check if the CFIResponse failed to transmit on time
+   if(g_ctrlm_device_update.rf4ce_sessions.count(controller_id) > 0           &&
+      g_ctrlm_device_update.rf4ce_sessions[controller_id].image_id == image_id ) {
+      LOG_WARN("%s: Controller %d already has a session active for image %d\n", __FUNCTION__, controller_id, image_id);
+      begin_info->background_download = g_ctrlm_device_update.rf4ce_sessions[controller_id].background_download;
       DEVICE_UPDATE_MUTEX_UNLOCK();
-      return(false);
-   }
-   ctrlm_device_update_rf4ce_image_info_t *image_info = &(*g_ctrlm_device_update.rf4ce_images)[image_id];
-   g_ctrlm_device_update.session_count++;
-   g_ctrlm_device_update.rf4ce_session_active_count++;
-   g_ctrlm_device_update.rf4ce_session_count++;
-   image_info->reader_count++;
+      return(true);
+   } else if(g_ctrlm_device_update.rf4ce_sessions.count(controller_id) == 0) {
+      // Attempt to acquire a session
+      if(g_ctrlm_device_update.rf4ce_session_active_count >= RF4CE_SIMULTANEOUS_SESSION_QTY) {
+         LOG_INFO("%s: Too many sessions are in progress (%u)\n", __FUNCTION__, g_ctrlm_device_update.rf4ce_session_active_count);
+         DEVICE_UPDATE_MUTEX_UNLOCK();
+         return(false);
+      }
+      g_ctrlm_device_update.session_count++;
+      g_ctrlm_device_update.rf4ce_session_active_count++;
+      g_ctrlm_device_update.rf4ce_session_count++;
+      image_info->reader_count++;
 
-   LOG_INFO("%s: RF4CE Active Download Session Count %u\n", __FUNCTION__, g_ctrlm_device_update.rf4ce_session_active_count);
+      LOG_INFO("%s: RF4CE Active Download Session Count %u\n", __FUNCTION__, g_ctrlm_device_update.rf4ce_session_active_count);
 
-   if(g_ctrlm_device_update.rf4ce_sessions.count(controller_id) == 0) {
       // Create the mapping from controller id to session
       g_ctrlm_device_update.rf4ce_sessions[controller_id].session_id            = (session_id_in == NULL) ? ctrlm_device_update_new_session_id() : *session_id_in;
       g_ctrlm_device_update.rf4ce_sessions[controller_id].image_id              = image_id;
