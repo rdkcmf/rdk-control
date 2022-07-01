@@ -318,6 +318,7 @@ public:
    void                                 power_state_change(ctrlm_main_queue_power_state_change_t *dqm);
 
    void                                 rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
+   void                                 notify_controllers_polling_configuration(void *data, size_t size);
 
 //   void                                 req_process_voice_settings_update(ctrlm_main_queue_msg_voice_settings_update_t *dqm);
    void req_process_rib_set(void *data, int size);

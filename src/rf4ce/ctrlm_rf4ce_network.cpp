@@ -4762,6 +4762,8 @@ void ctrlm_obj_network_rf4ce_t::rfc_retrieved_handler(const ctrlm_rfc_attr_t& at
    }
    // End Controller Specific Polling
 
+   ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, &ctrlm_obj_network_rf4ce_t::notify_controllers_polling_configuration, NULL, 0, (void*)this);
+
    // ASB
 #ifdef ASB
    attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_ASB JSON_PATH_SEPERATOR JSON_BOOL_NAME_NETWORK_RF4CE_ASB_ENABLE, asb_enabled_);
@@ -4797,4 +4799,11 @@ void ctrlm_obj_network_rf4ce_t::rfc_retrieved_handler(const ctrlm_rfc_attr_t& at
    attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_ATTEN_UPDATE, dsp_configuration_.ic_config_atten_update, 0x00, 0xFF);
    attr.get_rfc_value(JSON_OBJ_NAME_NETWORK_RF4CE_DSP JSON_PATH_SEPERATOR JSON_INT_NAME_NETWORK_RF4CE_DSP_IC_DETECT, dsp_configuration_.ic_config_detect, 0x00, 0xFF);
    // End DSP
+}
+
+void ctrlm_obj_network_rf4ce_t::notify_controllers_polling_configuration(void *data, size_t size) {
+   // Notify Controllers of potential polling changes
+   for(auto &itr : this->controllers_) {
+      itr.second->update_polling_configurations(true);
+   }
 }
