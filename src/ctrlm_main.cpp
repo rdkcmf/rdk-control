@@ -1026,7 +1026,7 @@ gboolean ctrlm_authservice_poll(gpointer user_data) {
       LOG_FATAL("%s: Out of memory\n", __FUNCTION__);
       g_assert(0);
       ctrlm_quit_main_loop();
-      g_ctrlm.authservice_poll_tag = 0;
+      ctrlm_timeout_destroy(&g_ctrlm.authservice_poll_tag);
       return(false);
    }
 
@@ -1044,10 +1044,11 @@ gboolean ctrlm_authservice_poll(gpointer user_data) {
    sem_destroy(&semaphore);
 
    if(ret == FALSE) {
-      g_ctrlm.authservice_poll_tag = 0;
+      ctrlm_timeout_destroy(&g_ctrlm.authservice_poll_tag);
    }
 
    if(switch_poll_interval) {
+      ctrlm_timeout_destroy(&g_ctrlm.authservice_poll_tag);
       g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.authservice_poll_val, ctrlm_authservice_poll, NULL);
    }
 
@@ -1271,11 +1272,10 @@ gboolean ctrlm_load_device_mac(void) {
 
 #ifdef AUTH_ENABLED
 void ctrlm_main_auth_start_poll() {
-   if(g_ctrlm.authservice_poll_tag == 0) {
-      g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
-                                                          ctrlm_authservice_poll,
-                                                          NULL);
-   }
+   ctrlm_timeout_destroy(&g_ctrlm.authservice_poll_tag);
+   g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
+                                                         ctrlm_authservice_poll,
+                                                         NULL);
 }
 
 #ifdef AUTH_RECEIVER_ID
@@ -4635,20 +4635,16 @@ void ctrlm_main_sat_enabled_set(gboolean sat_enabled) {
 void ctrlm_main_invalidate_service_access_token(void) {
    if(g_ctrlm.sat_enabled) {
       sem_wait(&g_ctrlm.service_access_token_semaphore);
-      if(g_ctrlm.has_service_access_token) {
-         LOG_INFO("%s: Invalidating SAT Token...\n", __FUNCTION__);
-         g_ctrlm.has_service_access_token = false;
-         #ifdef AUTH_ENABLED
-         if(g_ctrlm.service_access_token_expiration_tag != 0) {
-            ctrlm_timeout_destroy(&g_ctrlm.service_access_token_expiration_tag);
-         }
-         if(g_ctrlm.authservice_poll_tag == 0) {
-            g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted ? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
-                                                                ctrlm_authservice_poll,
-                                                                NULL);
-         }
-         #endif
-      }
+      // We want to poll for SAT token whether we have it or not
+      LOG_INFO("%s: Invalidating SAT Token...\n", __FUNCTION__);
+      g_ctrlm.has_service_access_token = false;
+      #ifdef AUTH_ENABLED
+      ctrlm_timeout_destroy(&g_ctrlm.service_access_token_expiration_tag);
+      ctrlm_timeout_destroy(&g_ctrlm.authservice_poll_tag);
+      g_ctrlm.authservice_poll_tag = ctrlm_timeout_create(g_ctrlm.recently_booted ? g_ctrlm.authservice_fast_poll_val : g_ctrlm.authservice_poll_val,
+                                                               ctrlm_authservice_poll,
+                                                               NULL);
+      #endif
       sem_post(&g_ctrlm.service_access_token_semaphore);
    }
 }

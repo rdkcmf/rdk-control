@@ -184,18 +184,23 @@ void ctrlm_thunder_plugin_t::on_thunder_ready(bool boot) {
     }
 }
 
-bool ctrlm_thunder_plugin_t::call_plugin(std::string method, void *params, void *response) {
+bool ctrlm_thunder_plugin_t::call_plugin(std::string method, void *params, void *response, unsigned int retries) {
     bool ret = false;
+    unsigned int attempts = 0;
     auto clientObject = (JSONRPC::LinkType<Core::JSON::IElement>*)this->plugin_client;
     JsonObject *jsonParams = (JsonObject *)params;
     JsonObject *jsonResponse = (JsonObject *)response;
     if(clientObject) {
         if(!method.empty() && jsonParams && jsonResponse) {
-            uint32_t thunderRet = clientObject->Invoke<JsonObject, JsonObject>(CALL_TIMEOUT, _T(method), *jsonParams, *jsonResponse);
-            if(thunderRet == Core::ERROR_NONE) {
-                ret = true;
-            } else {
-                THUNDER_LOG_ERROR("%s: Thunder call failed <%s> <%u>\n", __FUNCTION__, method.c_str(), thunderRet);
+            uint32_t thunderRet = Core::ERROR_TIMEDOUT;
+            while(thunderRet == Core::ERROR_TIMEDOUT && attempts <= retries) { // We only want to retry if return code is for TIMEDOUT
+                thunderRet = clientObject->Invoke<JsonObject, JsonObject>(CALL_TIMEOUT, _T(method), *jsonParams, *jsonResponse);
+                if(thunderRet == Core::ERROR_NONE) {
+                    ret = true;
+                } else {
+                    attempts += 1;
+                    THUNDER_LOG_ERROR("%s: Thunder call failed <%s> <%u>, attempt %u of %u\n", __FUNCTION__, method.c_str(), thunderRet, attempts, (thunderRet == Core::ERROR_TIMEDOUT ? retries : 0) + 1); // retries + initial attempt
+                }
             }
         } else {
             THUNDER_LOG_ERROR("%s: Invalid parameters\n", __FUNCTION__);
