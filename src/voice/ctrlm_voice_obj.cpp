@@ -3004,7 +3004,7 @@ void ctrlm_voice_t::voice_privacy_disable(bool update_vsdk) {
 
 void ctrlm_voice_t::voice_device_enable(ctrlm_voice_device_t device, bool db_write, bool *update_routes) {
     sem_wait(&this->device_status_semaphore);
-    if(this->device_status[device] & CTRLM_VOICE_DEVICE_STATUS_DISABLED) {
+    if((this->device_status[device] & CTRLM_VOICE_DEVICE_STATUS_DISABLED) == 0x00) { // if device IS NOT disabled
         sem_post(&this->device_status_semaphore);
         LOG_WARN("%s: already enabled\n", __FUNCTION__);
         return;
@@ -3022,7 +3022,7 @@ void ctrlm_voice_t::voice_device_enable(ctrlm_voice_device_t device, bool db_wri
 
 void ctrlm_voice_t::voice_device_disable(ctrlm_voice_device_t device, bool db_write, bool *update_routes) {
     sem_wait(&this->device_status_semaphore);
-    if(!(this->device_status[device] & CTRLM_VOICE_DEVICE_STATUS_DISABLED)) {
+    if(this->device_status[device] & CTRLM_VOICE_DEVICE_STATUS_DISABLED) { // if device IS enabled
         sem_post(&this->device_status_semaphore);
         LOG_WARN("%s: already disabled\n", __FUNCTION__);
         return;
