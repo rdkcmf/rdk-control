@@ -2875,7 +2875,7 @@ void ctrlm_obj_controller_rf4ce_t::get_last_battery_event(ctrlm_rcu_battery_even
 bool ctrlm_obj_controller_rf4ce_t::import_check_validation() {
    bool ret                = TRUE;
    ctrlm_sw_version_t zeros(0,0,0,0);
-   ctrlm_sw_version_t invalid(0xFF, 0xFF, 0xFF);
+   ctrlm_sw_version_t invalid(0xFF, 0xFF, 0xFF, 0xFF);
 
    if(version_software_   == zeros &&
       version_irdb_       == zeros &&
