@@ -2129,7 +2129,9 @@ void ctrlm_network_list_get(vector<ctrlm_network_id_t> *list) {
 // Determine if the network id is valid
 gboolean ctrlm_network_id_is_valid(ctrlm_network_id_t network_id) {
    if(g_ctrlm.networks.count(network_id) == 0) {
-      LOG_ERROR("%s: Invalid Network Id %u\n", __FUNCTION__, network_id);
+      if(network_id != CTRLM_MAIN_NETWORK_ID_DSP) {
+         LOG_ERROR("%s: Invalid Network Id %u\n", __FUNCTION__, network_id);
+      }
       return(false);
    }
    return(true);
@@ -2163,7 +2165,9 @@ gboolean ctrlm_controller_id_is_valid(ctrlm_network_id_t network_id, ctrlm_contr
 // Return the network type
 ctrlm_network_type_t ctrlm_network_type_get(ctrlm_network_id_t network_id) {
    if(!ctrlm_network_id_is_valid(network_id)) {
-      LOG_ERROR("%s: Invalid Network Id\n", __FUNCTION__);
+      if(network_id != CTRLM_MAIN_NETWORK_ID_DSP) {
+         LOG_ERROR("%s: Invalid Network Id\n", __FUNCTION__);
+      }
       return(CTRLM_NETWORK_TYPE_INVALID);
    }
    return(g_ctrlm.network_type[network_id]);
@@ -2940,7 +2944,9 @@ gpointer ctrlm_main_thread(gpointer param) {
                            nets.push_back(itr.second);
                         }
                      } else {
-                        LOG_ERROR("%s: Invalid Network ID! %u\n", __FUNCTION__, dqm->header.network_id);
+                        if(dqm->header.network_id != CTRLM_MAIN_NETWORK_ID_DSP) {
+                           LOG_ERROR("%s: Invalid Network ID! %u\n", __FUNCTION__, dqm->header.network_id);
+                        }
                         break;
                      }
                      for(const auto &itr : nets) {
