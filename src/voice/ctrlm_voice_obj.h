@@ -173,10 +173,10 @@ typedef struct {
    guint32 keyword_sample_qty;
    guint16 doa;
    bool    standard_search_pt_triggered;
-   uint8_t standard_search_pt;
+   double  standard_search_pt;
    bool    high_search_pt_support;
    bool    high_search_pt_triggered;
-   uint8_t high_search_pt;
+   double  high_search_pt;
    double  dynamic_gain;
    struct {
       bool     selected;
@@ -291,7 +291,7 @@ typedef struct {
    unsigned long               utterance_duration_min;
    unsigned long               ffv_leading_samples;
    bool                        force_voice_settings;
-   unsigned long               keyword_sensitivity;
+   double                      keyword_sensitivity;
    bool                        vrex_test_flag;
    std::string                 opus_encoder_params_str;
    guchar                      opus_encoder_params[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS];

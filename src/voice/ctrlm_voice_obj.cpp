@@ -110,7 +110,7 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->prefs.utterance_duration_min    = JSON_INT_VALUE_VOICE_MINIMUM_DURATION;
     this->prefs.ffv_leading_samples       = JSON_INT_VALUE_VOICE_FFV_LEADING_SAMPLES;
     this->prefs.force_voice_settings      = JSON_BOOL_VALUE_VOICE_FORCE_VOICE_SETTINGS;
-    this->prefs.keyword_sensitivity       = JSON_INT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY;
+    this->prefs.keyword_sensitivity       = JSON_FLOAT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY;
     this->prefs.vrex_test_flag            = JSON_BOOL_VALUE_VOICE_VREX_TEST_FLAG;
     this->prefs.force_toggle_fallback     = JSON_BOOL_VALUE_VOICE_FORCE_TOGGLE_FALLBACK;
     this->prefs.par_voice_enabled         = false;
@@ -329,7 +329,7 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_STR_NAME_VOICE_APP_ID_WS,                    this->prefs.app_id_ws);
         conf.config_value_get(JSON_STR_NAME_VOICE_LANGUAGE,                     this->prefs.guide_language);
         conf.config_value_get(JSON_BOOL_NAME_VOICE_FORCE_VOICE_SETTINGS,        this->prefs.force_voice_settings);
-        conf.config_value_get(JSON_INT_NAME_VOICE_KEYWORD_DETECT_SENSITIVITY,   this->prefs.keyword_sensitivity);
+        conf.config_value_get(JSON_FLOAT_NAME_VOICE_KEYWORD_DETECT_SENSITIVITY, this->prefs.keyword_sensitivity, 0.0, DBL_MAX);
         conf.config_value_get(JSON_BOOL_NAME_VOICE_VREX_TEST_FLAG,              this->prefs.vrex_test_flag);
         conf.config_value_get(JSON_BOOL_NAME_VOICE_FORCE_TOGGLE_FALLBACK,       this->prefs.force_toggle_fallback);
         conf.config_value_get(JSON_STR_NAME_VOICE_OPUS_ENCODER_PARAMS,          this->prefs.opus_encoder_params_str);
@@ -801,10 +801,10 @@ void ctrlm_voice_t::process_xconf(json_t **json_obj_vsdk, bool local_conf) {
 
    // CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_BEEP doesn't exist because this is a user configurable setting via configureVoice thunder api
 
-   int keyword_sensitivity = 0;
-   result = ctrlm_tr181_int_get(CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY, &keyword_sensitivity);
+   double keyword_sensitivity = 0.0;
+   result = ctrlm_tr181_real_get(CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY, &keyword_sensitivity);
    if(result == CTRLM_TR181_RESULT_SUCCESS) {
-      this->prefs.keyword_sensitivity = (keyword_sensitivity > 0) ? keyword_sensitivity : JSON_INT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY;
+      this->prefs.keyword_sensitivity = (keyword_sensitivity < 0.0) ? JSON_FLOAT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY : keyword_sensitivity;
    }
 
    result = ctrlm_tr181_string_get(CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION, &vsdk_config_str[0], CTRLM_RFC_MAX_PARAM_LEN);
@@ -3165,7 +3165,7 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
     attr.get_rfc_value(JSON_STR_NAME_VOICE_APP_ID_HTTP,                  this->prefs.app_id_http);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_APP_ID_WS,                    this->prefs.app_id_ws);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_LANGUAGE,                     this->prefs.guide_language);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_KEYWORD_DETECT_SENSITIVITY,   this->prefs.keyword_sensitivity);
+    attr.get_rfc_value(JSON_FLOAT_NAME_VOICE_KEYWORD_DETECT_SENSITIVITY, this->prefs.keyword_sensitivity);
     attr.get_rfc_value(JSON_BOOL_NAME_VOICE_VREX_TEST_FLAG,              this->prefs.vrex_test_flag);
     attr.get_rfc_value(JSON_BOOL_NAME_VOICE_FORCE_TOGGLE_FALLBACK,       this->prefs.force_toggle_fallback);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_OPUS_ENCODER_PARAMS,          this->prefs.opus_encoder_params_str);

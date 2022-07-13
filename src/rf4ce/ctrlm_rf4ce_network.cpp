@@ -3633,8 +3633,8 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
       stream_params.keyword_sample_qty           = (dqm->data[7] << 24) | (dqm->data[6] << 16) | (dqm->data[5] << 8) | dqm->data[4];
       stream_params.doa                          = (dqm->data[9] <<  8) | dqm->data[8];
       stream_params.standard_search_pt_triggered = ((dqm->data[10] & 0x80) > 0);
-      stream_params.standard_search_pt           =  dqm->data[10] & 0x7F; // only 7 bits, top bit represents if it was triggered
-      stream_params.high_search_pt               =  dqm->data[11] & 0x7F; // only 7 bits, top bit represents if it was triggered
+      stream_params.standard_search_pt           = (double)(dqm->data[10] & 0x7F); // only 7 bits, top bit represents if it was triggered
+      stream_params.high_search_pt               = (double)(dqm->data[11] & 0x7F); // only 7 bits, top bit represents if it was triggered
       stream_params.high_search_pt_support       = (stream_params.high_search_pt != 0x7F);
       stream_params.high_search_pt_triggered     = ((dqm->data[11] & 0x80) > 0);
       stream_params.dynamic_gain                 = (double)((int8_t)dqm->data[12]);
@@ -3675,7 +3675,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
          stream_params.push_to_talk = false;
       }
       // TODO Handle beam fields
-      LOG_INFO("%s: processing session request - type <%s> voice format <%s> pksq <%u> ksq <%u> doa <%u> sp <%u> sp triggered <%s> hsp <%u> hsp triggered <%s>\n", __FUNCTION__, ctrlm_voice_device_str(device_type), ctrlm_voice_format_str(voice_format), stream_params.pre_keyword_sample_qty, stream_params.keyword_sample_qty, stream_params.doa, stream_params.standard_search_pt, (stream_params.standard_search_pt_triggered ? "YES" : "NO"), (stream_params.high_search_pt_support ? stream_params.high_search_pt : 0), (stream_params.high_search_pt_support ? (stream_params.high_search_pt_triggered ? "YES" : "NO") : "N/A"));
+      LOG_INFO("%s: processing session request - type <%s> voice format <%s> pksq <%u> ksq <%u> doa <%u> sp <%f> sp triggered <%s> hsp <%f> hsp triggered <%s>\n", __FUNCTION__, ctrlm_voice_device_str(device_type), ctrlm_voice_format_str(voice_format), stream_params.pre_keyword_sample_qty, stream_params.keyword_sample_qty, stream_params.doa, stream_params.standard_search_pt, (stream_params.standard_search_pt_triggered ? "YES" : "NO"), (stream_params.high_search_pt_support ? stream_params.high_search_pt : 0), (stream_params.high_search_pt_support ? (stream_params.high_search_pt_triggered ? "YES" : "NO") : "N/A"));
       switch(stream_begin_) {
          case VOICE_SESSION_RESPONSE_STREAM_KEYWORD_BEGIN: {
             if((int32_t)stream_params.pre_keyword_sample_qty + stream_offset_ < 0) {
@@ -3703,7 +3703,7 @@ void ctrlm_obj_network_rf4ce_t::ind_process_voice_session_request(void *data, in
             break;
          }
       }
-      LOG_INFO("%s: processing session request - type <%s> voice format <%s> pksq <%u> ksq <%u> doa <%u> sp <%u> sp triggered <%s> hsp <%u> hsp triggered <%s>\n", __FUNCTION__, ctrlm_voice_device_str(device_type), ctrlm_voice_format_str(voice_format), stream_params.pre_keyword_sample_qty, stream_params.keyword_sample_qty, stream_params.doa, stream_params.standard_search_pt, (stream_params.standard_search_pt_triggered ? "YES" : "NO"), (stream_params.high_search_pt_support ? stream_params.high_search_pt : 0), (stream_params.high_search_pt_support ? (stream_params.high_search_pt_triggered ? "YES" : "NO") : "N/A"));
+      LOG_INFO("%s: processing session request - type <%s> voice format <%s> pksq <%u> ksq <%u> doa <%u> sp <%f> sp triggered <%s> hsp <%f> hsp triggered <%s>\n", __FUNCTION__, ctrlm_voice_device_str(device_type), ctrlm_voice_format_str(voice_format), stream_params.pre_keyword_sample_qty, stream_params.keyword_sample_qty, stream_params.doa, stream_params.standard_search_pt, (stream_params.standard_search_pt_triggered ? "YES" : "NO"), (stream_params.high_search_pt_support ? stream_params.high_search_pt : 0), (stream_params.high_search_pt_support ? (stream_params.high_search_pt_triggered ? "YES" : "NO") : "N/A"));
    } else {
       LOG_INFO("%s: processing session request - type <%s> voice format <%s>\n", __FUNCTION__, ctrlm_voice_device_str(device_type), ctrlm_voice_format_str(voice_format));
    }
