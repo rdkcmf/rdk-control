@@ -18,8 +18,9 @@
 */
 #include "ctrlm_voice_endpoint_ws_nextgen.h"
 
-#define NEXTGEN_AUDIO_MODEL_PTT "ptt"
-#define NEXTGEN_AUDIO_MODEL_HF  "hf"
+#define NEXTGEN_AUDIO_MODEL_PTT  "ptt"
+#define NEXTGEN_AUDIO_MODEL_HF   "hf"
+#define NEXTGEN_AUDIO_PROFILE_HF "FFV"
 
 // Structures
 typedef struct {
@@ -267,9 +268,12 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
     }
 
     if(xrsr_to_voice_device(dqm->src) == CTRLM_VOICE_DEVICE_MICROPHONE) {
+        xrsv_ws_nextgen_update_audio_profile(this->xrsv_obj_ws_nextgen, NEXTGEN_AUDIO_PROFILE_HF);
         xrsv_ws_nextgen_update_audio_model(this->xrsv_obj_ws_nextgen, NEXTGEN_AUDIO_MODEL_HF);
     } else {
-        xrsv_ws_nextgen_update_audio_profile(this->xrsv_obj_ws_nextgen, controller_name_to_audio_profile(info.controller_name.c_str()));
+        // VREX wanted specific naming for the current XR lineup (possibly for stats?).. we need to send the product name if we don't have a mapping to audio_profile
+        const char *audio_profile = controller_name_to_audio_profile(info.controller_name.c_str());
+        xrsv_ws_nextgen_update_audio_profile(this->xrsv_obj_ws_nextgen, audio_profile != NULL ? audio_profile : info.controller_name.c_str());
         xrsv_ws_nextgen_update_audio_model(this->xrsv_obj_ws_nextgen, controller_name_to_audio_model(info.controller_name.c_str()));
     }
 
@@ -616,7 +620,9 @@ const char *controller_name_to_audio_profile(const char *controller) {
         return("XI6V");
     } else if(!strncmp(controller, "XRA-", 4)) {
         return("XRA");
+    } else if(strlen(controller) == 0) {
+        return("UNKNOWN");
     }
-    return("GENERIC");
+    return(NULL);
 }
 // End Static Helper Functions
