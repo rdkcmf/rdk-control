@@ -259,12 +259,22 @@
       "audio_ducking_type"               :         0,
       "audio_ducking_level"              :       0.5,
       "audio_ducking_beep"               :     false,
-      "standby_connect_check_interval"   :       200,
-      "standby_timeout_connect"          :     15000,
-      "standby_timeout_inactivity"       :     15000,
-      "standby_timeout_session"          :     15000,
-      "standby_ipv4_fallback"            :      true,
-      "standby_backoff_delay"            :       100,
+      "dst_params_standby" : {
+         "connect_check_interval"        :       200,
+         "timeout_connect"               :     15000,
+         "timeout_inactivity"            :     15000,
+         "timeout_session"               :     15000,
+         "ipv4_fallback"                 :      true,
+         "backoff_delay"                 :       100
+      },
+      "dst_params_low_latency" : {
+         "connect_check_interval"        :        10,
+         "timeout_connect"               :      2000,
+         "timeout_inactivity"            :     10000,
+         "timeout_session"               :      5000,
+         "ipv4_fallback"                 :      true,
+         "backoff_delay"                 :        50
+      },
       "par_voice_eos_method"             :         1,
       "par_voice_eos_timeout"            :      2500
    },

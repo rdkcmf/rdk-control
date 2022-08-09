@@ -76,16 +76,6 @@ typedef struct {
 } ctrlm_voice_audio_settings_t;
 
 typedef enum {
-    CTRLM_VOICE_FORMAT_ADPCM,
-    CTRLM_VOICE_FORMAT_ADPCM_SKY,
-    CTRLM_VOICE_FORMAT_PCM,
-    CTRLM_VOICE_FORMAT_PCM_RAW,
-    CTRLM_VOICE_FORMAT_OPUS_XVP,
-    CTRLM_VOICE_FORMAT_OPUS,
-    CTRLM_VOICE_FORMAT_INVALID
-} ctrlm_voice_format_t;
-
-typedef enum {
    VOICE_COMMAND_STATUS_PENDING    = 0,
    VOICE_COMMAND_STATUS_TIMEOUT    = 1,
    VOICE_COMMAND_STATUS_OFFLINE    = 2,
@@ -298,8 +288,9 @@ typedef struct {
    guchar                      opus_encoder_params[CTRLM_RCU_RIB_ATTR_LEN_OPUS_ENCODING_PARAMS];
    bool                        force_toggle_fallback;
    #ifdef ENABLE_DEEP_SLEEP
-   xrsr_dst_params_t           standby_params;
+   xrsr_dst_params_t           dst_params_standby;
    #endif
+   xrsr_dst_params_t           dst_params_low_latency;
    bool                        par_voice_enabled;
    uint8_t                     par_voice_eos_method;
    uint16_t                    par_voice_eos_timeout;
@@ -383,7 +374,7 @@ class ctrlm_voice_t {
     ctrlm_voice_t();
     virtual ~ctrlm_voice_t();
 
-    ctrlm_voice_session_response_status_t voice_session_req(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_device_t device_type, ctrlm_voice_format_t format, voice_session_req_stream_params *stream_params, const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status=false, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_rsp_confirm_t *cb_confirm=NULL, void **cb_confirm_param=NULL, bool use_external_data_pipe=false, const char *transcription_in=NULL);
+    ctrlm_voice_session_response_status_t voice_session_req(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_device_t device_type, ctrlm_voice_format_t format, voice_session_req_stream_params *stream_params, const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status=false, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_rsp_confirm_t *cb_confirm=NULL, void **cb_confirm_param=NULL, bool use_external_data_pipe=false, const char *transcription_in=NULL, bool low_latency=false);
     void                                  voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp=NULL, uint8_t *lqi=NULL);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd);
@@ -392,7 +383,7 @@ class ctrlm_voice_t {
     void                                  voice_session_controller_stats_rxd_timeout();
     void                                  voice_session_stats(ctrlm_voice_stats_session_t session);
     void                                  voice_session_stats(ctrlm_voice_stats_reboot_t reboot);
-    void                                  voice_session_term();
+    bool                                  voice_session_term(std::string &session_id);
     void                                  voice_session_info(ctrlm_voice_session_info_t *data);
     bool                                  voice_session_id_is_current(uuid_t uuid);
     unsigned long                         voice_session_id_get();

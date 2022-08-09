@@ -32,4 +32,4 @@ ltmain.sh
 m4/
 missing
 src/Makefile.in
-
+src/voice/ipc/ctrlm_voice_ipc_request_type.c

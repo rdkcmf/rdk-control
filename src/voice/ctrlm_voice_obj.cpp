@@ -128,13 +128,20 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->vsdk_config                     = NULL;
 
     #ifdef ENABLE_DEEP_SLEEP
-    this->prefs.standby_params.connect_check_interval = JSON_INT_VALUE_VOICE_STANDBY_CONNECT_CHECK_INTERVAL;
-    this->prefs.standby_params.timeout_connect        = JSON_INT_VALUE_VOICE_STANDBY_TIMEOUT_CONNECT;
-    this->prefs.standby_params.timeout_inactivity     = JSON_INT_VALUE_VOICE_STANDBY_TIMEOUT_INACTIVITY;
-    this->prefs.standby_params.timeout_session        = JSON_INT_VALUE_VOICE_STANDBY_TIMEOUT_SESSION;
-    this->prefs.standby_params.ipv4_fallback          = JSON_BOOL_VALUE_VOICE_STANDBY_IPV4_FALLBACK;
-    this->prefs.standby_params.backoff_delay          = JSON_INT_VALUE_VOICE_STANDBY_BACKOFF_DELAY;
+    this->prefs.dst_params_standby.connect_check_interval = JSON_INT_VALUE_VOICE_DST_PARAMS_STANDBY_CONNECT_CHECK_INTERVAL;
+    this->prefs.dst_params_standby.timeout_connect        = JSON_INT_VALUE_VOICE_DST_PARAMS_STANDBY_TIMEOUT_CONNECT;
+    this->prefs.dst_params_standby.timeout_inactivity     = JSON_INT_VALUE_VOICE_DST_PARAMS_STANDBY_TIMEOUT_INACTIVITY;
+    this->prefs.dst_params_standby.timeout_session        = JSON_INT_VALUE_VOICE_DST_PARAMS_STANDBY_TIMEOUT_SESSION;
+    this->prefs.dst_params_standby.ipv4_fallback          = JSON_BOOL_VALUE_VOICE_DST_PARAMS_STANDBY_IPV4_FALLBACK;
+    this->prefs.dst_params_standby.backoff_delay          = JSON_INT_VALUE_VOICE_DST_PARAMS_STANDBY_BACKOFF_DELAY;
     #endif
+
+    this->prefs.dst_params_low_latency.connect_check_interval = JSON_INT_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_CONNECT_CHECK_INTERVAL;
+    this->prefs.dst_params_low_latency.timeout_connect        = JSON_INT_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_CONNECT;
+    this->prefs.dst_params_low_latency.timeout_inactivity     = JSON_INT_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_INACTIVITY;
+    this->prefs.dst_params_low_latency.timeout_session        = JSON_INT_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_SESSION;
+    this->prefs.dst_params_low_latency.ipv4_fallback          = JSON_BOOL_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_IPV4_FALLBACK;
+    this->prefs.dst_params_low_latency.backoff_delay          = JSON_INT_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_BACKOFF_DELAY;
 
     voice_session_info_reset();
 
@@ -360,13 +367,20 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         conf.config_value_get(JSON_BOOL_NAME_VOICE_AUDIO_DUCKING_BEEP,          audio_settings.ducking_beep);
 
         #ifdef ENABLE_DEEP_SLEEP
-        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.standby_params.connect_check_interval);
-        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_CONNECT,        this->prefs.standby_params.timeout_connect);
-        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.standby_params.timeout_inactivity);
-        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_SESSION,        this->prefs.standby_params.timeout_session);
-        conf.config_value_get(JSON_BOOL_NAME_VOICE_STANDBY_IPV4_FALLBACK,         this->prefs.standby_params.ipv4_fallback);
-        conf.config_value_get(JSON_INT_NAME_VOICE_STANDBY_BACKOFF_DELAY,          this->prefs.standby_params.backoff_delay);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_standby.connect_check_interval);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_CONNECT,        this->prefs.dst_params_standby.timeout_connect);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_standby.timeout_inactivity);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_SESSION,        this->prefs.dst_params_standby.timeout_session);
+        conf.config_value_get(JSON_BOOL_NAME_VOICE_DST_PARAMS_STANDBY_IPV4_FALLBACK,         this->prefs.dst_params_standby.ipv4_fallback);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_BACKOFF_DELAY,          this->prefs.dst_params_standby.backoff_delay);
         #endif
+
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_low_latency.connect_check_interval);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_CONNECT,        this->prefs.dst_params_low_latency.timeout_connect);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_low_latency.timeout_inactivity);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_SESSION,        this->prefs.dst_params_low_latency.timeout_session);
+        conf.config_value_get(JSON_BOOL_NAME_VOICE_DST_PARAMS_LOW_LATENCY_IPV4_FALLBACK,         this->prefs.dst_params_low_latency.ipv4_fallback);
+        conf.config_value_get(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_BACKOFF_DELAY,          this->prefs.dst_params_low_latency.backoff_delay);
 
         this->voice_params_opus_encoder_validate();
 
@@ -614,10 +628,6 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
         return(true);
     }
 
-    if(this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING) {
-        LOG_WARN("%s: Ignoring vrex settings from Thunder due to voice session in progress.\n", __FUNCTION__);
-        return(false);
-    }
 
     if(conf.config_object_set(settings)) {
         bool enable;
@@ -1136,7 +1146,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
                                                                        ctrlm_voice_device_t device_type, ctrlm_voice_format_t format,
                                                                        voice_session_req_stream_params *stream_params,
                                                                        const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status,
-                                                                       ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe, const char *l_transcription_in) {
+                                                                       ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe, const char *l_transcription_in, bool low_latency) {
     if(CTRLM_VOICE_STATE_SRC_INVALID == this->state_src) {
         LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
         this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_SERVER_NOT_READY);
@@ -1175,13 +1185,21 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     bool l_session_by_text = (l_transcription_in != NULL);
     if (l_session_by_text) {
         LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, l_transcription_in);
-        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), XRSR_AUDIO_FORMAT_NONE, l_transcription_in)) {
+        if (false == xrsr_session_request(voice_device_to_xrsr(device_type), XRSR_AUDIO_FORMAT_NONE, l_transcription_in, false)) {
             LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
             return VOICE_SESSION_RESPONSE_BUSY;
         }
     } else if(device_type == CTRLM_VOICE_DEVICE_MICROPHONE && stream_params == NULL) {
-       LOG_INFO("%s: Requesting the speech router start a session with the microphone\n", __FUNCTION__);
-       if (false == xrsr_session_request(voice_device_to_xrsr(device_type), (format == CTRLM_VOICE_FORMAT_PCM_RAW) ? XRSR_AUDIO_FORMAT_PCM_RAW : XRSR_AUDIO_FORMAT_PCM, NULL)) {
+       LOG_INFO("%s: Requesting the speech router start a session with the microphone - format <%s> low latency <%s>\n", __FUNCTION__, ctrlm_voice_format_str(format), low_latency ? "YES" : "NO");
+       xrsr_audio_format_t xrsr_format = XRSR_AUDIO_FORMAT_PCM;
+       if(format == CTRLM_VOICE_FORMAT_PCM_RAW) {
+          xrsr_format = XRSR_AUDIO_FORMAT_PCM_RAW;
+       } else if(format == CTRLM_VOICE_FORMAT_PCM_32_BIT) {
+          xrsr_format = XRSR_AUDIO_FORMAT_PCM_32_BIT;
+       } else if(format == CTRLM_VOICE_FORMAT_PCM_32_BIT_MULTI) {
+          xrsr_format = XRSR_AUDIO_FORMAT_PCM_32_BIT_MULTI;
+       }
+       if (false == xrsr_session_request(voice_device_to_xrsr(device_type), xrsr_format, NULL, low_latency)) {
            LOG_ERROR("%s: Failed to acquire the microphone session from the speech router.\n", __FUNCTION__);
            return VOICE_SESSION_RESPONSE_BUSY;
        }
@@ -1285,7 +1303,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     #endif
 
     // Start packet timeout, but not if this is a voice session by text or standby microphone
-    if (!this->is_session_by_text && !is_standby_microphone()) {
+    if (!this->is_session_by_text && device_type != CTRLM_VOICE_DEVICE_MICROPHONE) {
         if(this->network_type == CTRLM_NETWORK_TYPE_IP) {
             this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
         } else {
@@ -1309,6 +1327,23 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
 
     LOG_DEBUG("%s: Voice session acquired <%d, %d, %s> pipe wr <%d> rd <%d>\n", __FUNCTION__, network_id, controller_id, ctrlm_voice_format_str(format), this->audio_pipe[PIPE_WRITE], this->audio_pipe[PIPE_READ]);
     return (this->prefs.par_voice_enabled) ? VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE : VOICE_SESSION_RESPONSE_AVAILABLE;
+}
+
+bool ctrlm_voice_t::voice_session_term(std::string &session_id) {
+   if(CTRLM_VOICE_STATE_SRC_INVALID == this->state_src) {
+       LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
+       return(false);
+   }
+
+   if(this->ipc_common_data.session_id_server == session_id && (this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || this->state_dst != CTRLM_VOICE_STATE_DST_READY)) {
+       // Cancel current speech router session
+       LOG_INFO("%s: session id svr <%s> req <%s> src <%s> dst <%s>\n", __FUNCTION__, this->ipc_common_data.session_id_server.c_str(), session_id.c_str(), ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
+       xrsr_session_terminate();
+       return(true);
+   } else {
+      LOG_WARN("%s: session id <%s> src <%s> dst <%s> invalid or not active\n", __FUNCTION__, session_id.c_str(), ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
+   }
+   return(false);
 }
 
 void ctrlm_voice_t::voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp) {
@@ -2316,6 +2351,13 @@ void ctrlm_voice_t::voice_stream_begin_callback(ctrlm_voice_stream_begin_cb_t *s
       LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
    }
    this->state_dst = CTRLM_VOICE_STATE_DST_STREAMING;
+
+   if(this->voice_ipc) {
+       // call the ipc's stream begin event handler
+       ctrlm_voice_ipc_event_stream_begin_t begin;
+       begin.common = this->ipc_common_data;
+       this->voice_ipc->stream_begin(begin);
+   }
 }
 
 void ctrlm_voice_t::voice_stream_kwd_callback(ctrlm_voice_cb_header_t *kwd) {
@@ -2531,13 +2573,15 @@ void ctrlm_voice_t::voice_server_return_code_callback(long ret_code) {
 // Helper Functions
 const char *ctrlm_voice_format_str(ctrlm_voice_format_t format) {
     switch(format) {
-        case CTRLM_VOICE_FORMAT_ADPCM:       return("ADPCM");
-        case CTRLM_VOICE_FORMAT_ADPCM_SKY:   return("ADPCM_SKY");
-        case CTRLM_VOICE_FORMAT_PCM:         return("PCM");
-        case CTRLM_VOICE_FORMAT_PCM_RAW:     return("PCM_RAW");
-        case CTRLM_VOICE_FORMAT_OPUS_XVP:    return("OPUS_XVP");
-        case CTRLM_VOICE_FORMAT_OPUS:        return("OPUS");
-        case CTRLM_VOICE_FORMAT_INVALID:     return("INVALID");
+        case CTRLM_VOICE_FORMAT_ADPCM:            return("ADPCM");
+        case CTRLM_VOICE_FORMAT_ADPCM_SKY:        return("ADPCM_SKY");
+        case CTRLM_VOICE_FORMAT_PCM:              return("PCM");
+        case CTRLM_VOICE_FORMAT_PCM_32_BIT:       return("PCM_32_BIT");
+        case CTRLM_VOICE_FORMAT_PCM_32_BIT_MULTI: return("PCM_32_BIT_MULTI");
+        case CTRLM_VOICE_FORMAT_PCM_RAW:          return("PCM_RAW");
+        case CTRLM_VOICE_FORMAT_OPUS_XVP:         return("OPUS_XVP");
+        case CTRLM_VOICE_FORMAT_OPUS:             return("OPUS");
+        case CTRLM_VOICE_FORMAT_INVALID:          return("INVALID");
     }
     return("UNKNOWN");
 }
@@ -2702,6 +2746,15 @@ xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format) {
             break;
         }
         case CTRLM_VOICE_FORMAT_PCM: {
+            ret = XRAUDIO_ENCODING_PCM;
+        }
+        case CTRLM_VOICE_FORMAT_PCM_32_BIT: {
+            ret = XRAUDIO_ENCODING_PCM;
+        }
+        case CTRLM_VOICE_FORMAT_PCM_32_BIT_MULTI: {
+            ret = XRAUDIO_ENCODING_PCM;
+        }
+        case CTRLM_VOICE_FORMAT_PCM_RAW: {
             ret = XRAUDIO_ENCODING_PCM;
         }
         default: {
@@ -3233,13 +3286,20 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
     }
 
     #ifdef ENABLE_DEEP_SLEEP
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.standby_params.connect_check_interval);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_CONNECT,        this->prefs.standby_params.timeout_connect);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.standby_params.timeout_inactivity);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_TIMEOUT_SESSION,        this->prefs.standby_params.timeout_session);
-    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_STANDBY_IPV4_FALLBACK,         this->prefs.standby_params.ipv4_fallback);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_STANDBY_BACKOFF_DELAY,          this->prefs.standby_params.backoff_delay);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_standby.connect_check_interval);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_CONNECT,        this->prefs.dst_params_standby.timeout_connect);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_standby.timeout_inactivity);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_SESSION,        this->prefs.dst_params_standby.timeout_session);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_DST_PARAMS_STANDBY_IPV4_FALLBACK,         this->prefs.dst_params_standby.ipv4_fallback);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_BACKOFF_DELAY,          this->prefs.dst_params_standby.backoff_delay);
     #endif
+
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_low_latency.connect_check_interval);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_CONNECT,        this->prefs.dst_params_low_latency.timeout_connect);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_low_latency.timeout_inactivity);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_SESSION,        this->prefs.dst_params_low_latency.timeout_session);
+    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_DST_PARAMS_LOW_LATENCY_IPV4_FALLBACK,         this->prefs.dst_params_low_latency.ipv4_fallback);
+    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_BACKOFF_DELAY,          this->prefs.dst_params_low_latency.backoff_delay);
 
     this->voice_params_opus_encoder_validate();
 

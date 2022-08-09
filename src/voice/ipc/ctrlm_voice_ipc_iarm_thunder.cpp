@@ -22,6 +22,7 @@
 #include <functional>
 #include "jansson.h"
 #include "ctrlm_voice_obj.h"
+#include "ctrlm_voice_ipc_request_type.h"
 #include <string>
 #include <algorithm>
 
@@ -45,6 +46,7 @@
 #define JSON_WW_FEEDBACK                              "wwFeedback"
 #define JSON_PRV                                      "prv"
 #define JSON_CAPABILITIES                             "capabilities"
+#define JSON_TYPES                                    "types"
 #define JSON_MESSAGE                                  "message"
 #define JSON_STREAM_END_REASON                        "reason"
 #define JSON_SESSION_END_RESULT                       "result"
@@ -115,8 +117,22 @@ bool ctrlm_voice_ipc_iarm_thunder_t::register_ipc() const {
         ret = false;
     }
 
-    LOG_INFO("%s: Registering for %s IARM call\n", __FUNCTION__, CTRLM_VOICE_IARM_CALL_SESSION_BY_TEXT);
-    rc = IARM_Bus_RegisterCall(CTRLM_VOICE_IARM_CALL_SESSION_BY_TEXT, &ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription);
+    LOG_INFO("%s: Registering for %s IARM call\n", __FUNCTION__, CTRLM_VOICE_IARM_CALL_SESSION_TYPES);
+    rc = IARM_Bus_RegisterCall(CTRLM_VOICE_IARM_CALL_SESSION_TYPES, &ctrlm_voice_ipc_iarm_thunder_t::voice_session_types);
+    if(rc != IARM_RESULT_SUCCESS) {
+        LOG_ERROR("%s: Failed to register %d\n", __FUNCTION__, rc);
+        ret = false;
+    }
+
+    LOG_INFO("%s: Registering for %s IARM call\n", __FUNCTION__, CTRLM_VOICE_IARM_CALL_SESSION_REQUEST);
+    rc = IARM_Bus_RegisterCall(CTRLM_VOICE_IARM_CALL_SESSION_REQUEST, &ctrlm_voice_ipc_iarm_thunder_t::voice_session_request);
+    if(rc != IARM_RESULT_SUCCESS) {
+        LOG_ERROR("%s: Failed to register %d\n", __FUNCTION__, rc);
+        ret = false;
+    }
+
+    LOG_INFO("%s: Registering for %s IARM call\n", __FUNCTION__, CTRLM_VOICE_IARM_CALL_SESSION_TERMINATE);
+    rc = IARM_Bus_RegisterCall(CTRLM_VOICE_IARM_CALL_SESSION_TERMINATE, &ctrlm_voice_ipc_iarm_thunder_t::voice_session_terminate);
     if(rc != IARM_RESULT_SUCCESS) {
         LOG_ERROR("%s: Failed to register %d\n", __FUNCTION__, rc);
         ret = false;
@@ -512,7 +528,48 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::send_voice_message(void *data) {
     return(ret);
 }
 
-IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription(void *data) {
+IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::voice_session_types(void *data) {
+    json_t *obj_result = NULL;
+    ctrlm_voice_iarm_call_json_t *call_data = (ctrlm_voice_iarm_call_json_t *)data;
+
+    if(call_data == NULL || CTRLM_VOICE_IARM_BUS_API_REVISION != call_data->api_revision) {
+        return(IARM_RESULT_INVALID_PARAM);
+    }
+
+    ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+    if(voice_obj) {
+        LOG_INFO("%s: payload = <%s>\n", __FUNCTION__, call_data->payload);
+
+        obj_result         = json_object();
+        json_t *obj_types  = json_array();
+
+        int rc = json_array_append_new(obj_types, json_string("ptt_transcription"));
+
+        #ifdef CTRLM_LOCAL_MIC
+        rc |= json_array_append_new(obj_types, json_string("mic_stream_single"));
+        rc |= json_array_append_new(obj_types, json_string("mic_stream_multi"));
+        rc |= json_array_append_new(obj_types, json_string("mic_factory_test"));
+        #endif
+
+        rc |= json_object_set_new_nocheck(obj_result, JSON_TYPES, obj_types);
+        rc |= json_object_set_new_nocheck(obj_result, JSON_THUNDER_RESULT, json_true());
+
+        if(rc) {
+            LOG_WARN("%s: JSON error..\n", __FUNCTION__);
+        }
+    } else {
+         LOG_ERROR("%s: Voice Object is NULL!\n", __FUNCTION__);
+    }
+    if(obj_result != NULL) {
+         json_result(obj_result, call_data->result, sizeof(call_data->result));
+    } else {
+         json_result_bool(false, call_data->result, sizeof(call_data->result));
+    }
+
+    return(IARM_RESULT_SUCCESS);
+}
+
+IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::voice_session_request(void *data) {
     IARM_Result_t ret = IARM_RESULT_SUCCESS;
     bool result       = true;
     ctrlm_voice_iarm_call_json_t *call_data = (ctrlm_voice_iarm_call_json_t *)data;
@@ -534,54 +591,96 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::start_session_with_transcription(v
                 LOG_ERROR("%s: json object not found", __FUNCTION__);
                 result = false;
             } else {
-                json_t *obj_transcription = json_object_get(obj, "transcription");
-                std::string str_transcription = "";
-                if (obj_transcription != NULL) {
-                    str_transcription = std::string(json_string_value(obj_transcription));
-                }
+                ctrlm_voice_ipc_request_config_t request_config;
+                request_config.low_latency            = false;
+                request_config.requires_transcription = false;
+                request_config.format                 = CTRLM_VOICE_FORMAT_ADPCM;
+                request_config.device                 = CTRLM_VOICE_DEVICE_PTT;
                 
-                ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_ADPCM;
-                ctrlm_voice_device_t device = CTRLM_VOICE_DEVICE_PTT;
                 json_t *obj_type = json_object_get(obj, "type");
                 std::string str_type = "";
-                if (obj_type != NULL) {
+                std::string str_transcription = "";
+                if (obj_type != NULL || !json_is_string(obj_type)) {
                     str_type = std::string(json_string_value(obj_type));
                     transform(str_type.begin(), str_type.end(), str_type.begin(), ::tolower);
 
-                    if (str_type.compare("ptt") == 0) {
-                        device = CTRLM_VOICE_DEVICE_PTT;
-                    } else if (str_type.compare("ff") == 0) {
-                        device = CTRLM_VOICE_DEVICE_FF;
-                    } else if (str_type.compare("mic") == 0) {
-                        device = CTRLM_VOICE_DEVICE_MICROPHONE;
-                        format = CTRLM_VOICE_FORMAT_PCM;
-                    } else if (str_type.compare("rawmic") == 0) {
-                        device = CTRLM_VOICE_DEVICE_MICROPHONE;
-                        format = CTRLM_VOICE_FORMAT_PCM_RAW;
-                    } else {
-                        LOG_ERROR("%s: Invalid device type parameter.\n", __FUNCTION__);
+                    const char *str_request_type = str_type.c_str();
+                    voice_session_request_type_handler_t *handler = voice_session_request_type_handler_get(str_request_type, strlen(str_request_type));
+
+                    if(handler == NULL) {
+                        LOG_ERROR("%s: request type <%s> is invalid.\n", __FUNCTION__, str_request_type);
                         result = false;
+                    } else {
+                        if(!(*handler->func)(&request_config)) {
+                            LOG_ERROR("%s: request type <%s> is not supported.\n", __FUNCTION__, str_request_type);
+                            result = false;
+                        } else if(request_config.requires_transcription) {
+                            json_t *obj_transcription = json_object_get(obj, "transcription");
+                            if(obj_transcription == NULL || !json_is_string(obj_transcription)) {
+                                LOG_ERROR("%s: invalid transcription parameter.\n", __FUNCTION__);
+                                result = false;
+                            } else {
+                                str_transcription = std::string(json_string_value(obj_transcription));
+                                if(str_transcription.empty()) {
+                                    LOG_ERROR("%s: Empty transcription.\n", __FUNCTION__);
+                                    result = false;
+                                }
+                            }
+                        }
                     }
                 } else {
-                    LOG_INFO("%s: Optional device type parameter not present, setting to PTT\n", __FUNCTION__);
-                }
-
-                if (str_transcription.empty() && device != CTRLM_VOICE_DEVICE_MICROPHONE) {
-                    LOG_ERROR("%s: Empty transcription.\n", __FUNCTION__);
+                    LOG_ERROR("%s: request type parameter not present\n", __FUNCTION__);
                     result = false;
                 }
 
                 if (true == result) {
                     ctrlm_voice_session_response_status_t voice_status = voice_obj->voice_session_req(
                             CTRLM_MAIN_NETWORK_ID_INVALID, CTRLM_MAIN_CONTROLLER_ID_INVALID, 
-                            device, format, NULL, "APPLICATION", "0.0.0.0", "0.0.0.0", 0.0, 
-                            false, NULL, NULL, NULL, false, str_transcription.empty() ? NULL : str_transcription.c_str() );
+                            request_config.device, request_config.format, NULL, "APPLICATION", "0.0.0.0", "0.0.0.0", 0.0,
+                            false, NULL, NULL, NULL, false, str_transcription.empty() ? NULL : str_transcription.c_str(), request_config.low_latency);
                     if (voice_status != VOICE_SESSION_RESPONSE_AVAILABLE && 
                         voice_status != VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE) {
                         LOG_ERROR("%s: Failed opening voice session <%s>\n", __FUNCTION__, ctrlm_voice_session_response_status_str(voice_status));
                         result = false;
                     }
                 }
+            }
+        } else {
+            LOG_ERROR("%s: Voice Object is NULL!\n", __FUNCTION__);
+            result = false;
+        }
+        json_result_bool(result, call_data->result, sizeof(call_data->result));
+    }
+
+    return(ret);
+}
+
+IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::voice_session_terminate(void *data) {
+    IARM_Result_t ret = IARM_RESULT_SUCCESS;
+    bool result       = true;
+    ctrlm_voice_iarm_call_json_t *call_data = (ctrlm_voice_iarm_call_json_t *)data;
+
+    if(call_data == NULL || CTRLM_VOICE_IARM_BUS_API_REVISION != call_data->api_revision) {
+        result = false;
+        ret = IARM_RESULT_INVALID_PARAM;
+    } else {
+        ctrlm_voice_t *voice_obj = ctrlm_get_voice_obj();
+        if(voice_obj) {
+            LOG_INFO("%s: payload = <%s>\n", __FUNCTION__, call_data->payload);
+
+            json_error_t error;
+            json_t *obj = json_loads((const char *)call_data->payload, JSON_REJECT_DUPLICATES, &error);
+            if(obj == NULL) {
+                LOG_ERROR("%s: invalid json", __FUNCTION__);
+                result = false;
+            } else if(!json_is_object(obj)) {
+                LOG_ERROR("%s: json object not found", __FUNCTION__);
+                result = false;
+            } else {
+                json_t *obj_session_id = json_object_get(obj, "sessionId");
+                std::string str_session_id = std::string(json_string_value(obj_session_id));
+
+                result = voice_obj->voice_session_term(str_session_id);
             }
         } else {
             LOG_ERROR("%s: Voice Object is NULL!\n", __FUNCTION__);
@@ -676,4 +775,72 @@ bool broadcast_event(const char *bus_name, int event, const char *str) {
         LOG_ERROR("%s: Failed to allocate data for IARM event\n", __FUNCTION__);
     }
     return(ret);
+}
+
+bool ctrlm_voice_ipc_request_supported_ptt_transcription(ctrlm_voice_ipc_request_config_t *config) {
+   config->requires_transcription = true;
+   config->device                 = CTRLM_VOICE_DEVICE_PTT;
+   config->format                 = CTRLM_VOICE_FORMAT_INVALID;
+   config->low_latency            = false;
+   return(true);
+}
+
+bool ctrlm_voice_ipc_request_supported_mic_transcription(ctrlm_voice_ipc_request_config_t *config) {
+   #if 1
+   return(false);
+   #else
+   config->requires_transcription = true;
+   config->device                 = CTRLM_VOICE_DEVICE_MICROPHONE;
+   config->format                 = CTRLM_VOICE_FORMAT_INVALID;
+   config->low_latency            = false;
+   return(true);
+   #endif
+}
+
+bool ctrlm_voice_ipc_request_supported_mic_stream_default(ctrlm_voice_ipc_request_config_t *config) {
+   #if 1
+   return(false);
+   #else
+   config->requires_transcription = false;
+   config->device                 = CTRLM_VOICE_DEVICE_MICROPHONE;
+   config->format                 = CTRLM_VOICE_FORMAT_PCM;
+   config->low_latency            = false;
+   return(true);
+   #endif
+}
+
+bool ctrlm_voice_ipc_request_supported_mic_stream_single(ctrlm_voice_ipc_request_config_t *config) {
+   #ifndef CTRLM_LOCAL_MIC
+   return(false);
+   #else
+   config->requires_transcription = false;
+   config->device                 = CTRLM_VOICE_DEVICE_MICROPHONE;
+   config->format                 = CTRLM_VOICE_FORMAT_PCM_32_BIT;
+   config->low_latency            = true;
+   return(true);
+   #endif
+}
+
+bool ctrlm_voice_ipc_request_supported_mic_stream_multi(ctrlm_voice_ipc_request_config_t *config) {
+   #ifndef CTRLM_LOCAL_MIC
+   return(false);
+   #else
+   config->requires_transcription = false;
+   config->device                 = CTRLM_VOICE_DEVICE_MICROPHONE;
+   config->format                 = CTRLM_VOICE_FORMAT_PCM_32_BIT_MULTI;
+   config->low_latency            = true;
+   return(true);
+   #endif
+}
+
+bool ctrlm_voice_ipc_request_supported_mic_factory_test(ctrlm_voice_ipc_request_config_t *config) {
+   #ifndef CTRLM_LOCAL_MIC
+   return(false);
+   #else
+   config->requires_transcription = false;
+   config->device                 = CTRLM_VOICE_DEVICE_MICROPHONE;
+   config->format                 = CTRLM_VOICE_FORMAT_PCM_RAW;
+   config->low_latency            = true;
+   return(true);
+   #endif
 }

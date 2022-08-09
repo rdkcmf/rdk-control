@@ -78,6 +78,7 @@ controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \
                        voice/ipc/ctrlm_voice_ipc_iarm_legacy.cpp           \
                        voice/ipc/ctrlm_voice_ipc_iarm_thunder.cpp          \
                        voice/ipc/ctrlm_voice_ipc_iarm_all.cpp              \
+                       voice/ipc/ctrlm_voice_ipc_request_type.c            \
                        voice/endpoints/ctrlm_voice_endpoint.cpp            \
                        voice/endpoints/ctrlm_voice_endpoint_http.cpp       \
                        voice/endpoints/ctrlm_voice_endpoint_ws.cpp         \
@@ -275,11 +276,15 @@ CTRLM_CONFIG_JSON_DEF    =ctrlm_config_default.json
 CTRLM_CONFIG_JSON_TMPL   =ctrlm_config.json.template
 CTRLM_CONFIG_H           =ctrlm_config_default.h
 CTRLM_VERSION_H          =ctrlm_version_build.h
+CTRLM_REQUEST_TYPE_C     =voice/ipc/ctrlm_voice_ipc_request_type.c
 
-BUILT_SOURCES = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON)
-CLEANFILES    = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON)
+BUILT_SOURCES = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON) $(CTRLM_REQUEST_TYPE_C)
+CLEANFILES    = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON) $(CTRLM_REQUEST_TYPE_C)
 
 dist_sysconf_DATA = $(CTRLM_CONFIG_JSON_TMPL)
+
+$(CTRLM_REQUEST_TYPE_C):
+	${STAGING_BINDIR_NATIVE}/gperf --output-file=$(srcdir)/voice/ipc/ctrlm_voice_ipc_request_type.c $(srcdir)/voice/ipc/ctrlm_voice_ipc_request_type.hash
 
 $(CTRLM_VERSION_H):
 	echo "#define CTRLM_MAIN_VER_MAJOR \"1\"" >$@

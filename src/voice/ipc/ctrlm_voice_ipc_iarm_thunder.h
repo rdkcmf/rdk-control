@@ -22,6 +22,7 @@
 #include "ctrlm_voice_ipc.h"
 #include "libIBus.h"
 #include "jansson.h"
+#include "ctrlm_voice_obj.h"
 
 class ctrlm_voice_ipc_iarm_thunder_t : public ctrlm_voice_ipc_t {
 public:
@@ -43,12 +44,12 @@ private:
     static IARM_Result_t configure_voice(void *data);
     static IARM_Result_t set_voice_init(void *data);
     static IARM_Result_t send_voice_message(void *data);
-    static IARM_Result_t start_session_with_transcription(void *data);
-
+    static IARM_Result_t voice_session_types(void *data);
+    static IARM_Result_t voice_session_request(void *data);
+    static IARM_Result_t voice_session_terminate(void *data);
 
     static void json_result_bool(bool result, char *result_str, size_t result_str_len);
     static void json_result(json_t *obj, char *result_str, size_t result_str_len);
 };
-
 
 #endif
