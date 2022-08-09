@@ -425,9 +425,9 @@ void ctrlm_obj_network_ble_t::req_process_voice_session_begin(void *data, int si
          ctrlm_voice_session_response_status_t voice_status;
          ctrlm_voice_format_t format = CTRLM_VOICE_FORMAT_ADPCM_SKY;
 
-         voice_status = ctrlm_get_voice_obj()->voice_session_req(network_id_get(), controller_id, device, format, NULL, 
-                                                                controllers_[controller_id]->getName().c_str(), 
-                                                                controllers_[controller_id]->getSwRevision().toString().c_str(), 
+         voice_status = ctrlm_get_voice_obj()->voice_session_req(network_id_get(), controller_id, device, format, NULL,
+                                                                controllers_[controller_id]->getModel().c_str(),
+                                                                controllers_[controller_id]->getSwRevision().toString().c_str(),
                                                                 controllers_[controller_id]->getHwRevision().toString().c_str(), 0.0,
                                                                 false, NULL, NULL, NULL, true);
          if (!controllers_[controller_id]->get_capabilities().has_capability(ctrlm_controller_capabilities_t::capability::PAR) && (VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE == voice_status)) {
