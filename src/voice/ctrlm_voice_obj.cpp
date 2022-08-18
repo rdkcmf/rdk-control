@@ -238,6 +238,22 @@ bool ctrlm_voice_t::vsdk_is_privacy_enabled(void) {
    return privacy;
 }
 
+double ctrlm_voice_t::vsdk_keyword_sensitivity_limit_check(double sensitivity) {
+    float sensitivity_min;
+    float sensitivity_max;
+
+    if(!xrsr_keyword_sensitivity_limits_get(&sensitivity_min, &sensitivity_max)) {
+        LOG_WARN("%s: Unable to get keyword detector sensitivity limits. Using default sensitivity <%f>.\n", __FUNCTION__, JSON_FLOAT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY);
+        return(JSON_FLOAT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY);
+    } else {
+        if(((float)(sensitivity) < sensitivity_min) || ((float)(sensitivity) > sensitivity_max)) {
+            LOG_WARN("%s: Keyword detector sensitivity <%f> outside of range <%f to %f>. Using default sensitivity <%f>.\n", __FUNCTION__, (float)(sensitivity), sensitivity_min, sensitivity_max, JSON_FLOAT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY);
+            return(JSON_FLOAT_VALUE_VOICE_KEYWORD_DETECT_SENSITIVITY);
+        }
+    }
+    return(sensitivity);
+}
+
 void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    if(this->xrsr_opened) {
       LOG_ERROR("%s: already open\n", __FUNCTION__);
@@ -434,6 +450,17 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
     bool privacy_enabled = this->voice_is_privacy_enabled();
     if(privacy_enabled != this->vsdk_is_privacy_enabled()) {
         privacy_enabled ? this->voice_privacy_enable(false) : this->voice_privacy_disable(false);
+    }
+    // Check keyword detector sensitivity value against limits; apply default if out of range.
+    double sensitivity_set = this->vsdk_keyword_sensitivity_limit_check(this->prefs.keyword_sensitivity);
+    if(sensitivity_set != this->prefs.keyword_sensitivity) {
+        xrsr_keyword_config_t kw_config;
+        kw_config.sensitivity = (float)sensitivity_set;
+        if(!xrsr_keyword_config_set(&kw_config)) {
+            LOG_ERROR("%s: error updating keyword config\n", __FUNCTION__);
+        } else {
+            this->prefs.keyword_sensitivity = sensitivity_set;
+        }
     }
     #endif
 

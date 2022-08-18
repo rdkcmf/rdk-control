@@ -653,7 +653,7 @@ public:
    void                 audio_state_set(bool session);
    bool                 vsdk_is_privacy_enabled(void);
    bool                 is_standby_microphone(void);
-
+   double               vsdk_keyword_sensitivity_limit_check(double sensitivity);
 };
 
 // Helper Functions
