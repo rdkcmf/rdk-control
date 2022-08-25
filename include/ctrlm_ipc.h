@@ -96,7 +96,7 @@
 /// these names to allow the client code to function correctly if the values change.
 
 #define CTRLM_MAIN_IARM_BUS_NAME                                 "Ctrlm"                                ///< Control Manager's IARM Bus Name
-#define CTRLM_MAIN_IARM_BUS_API_REVISION                         (15)                                   ///< Revision of the Control Manager Main IARM API
+#define CTRLM_MAIN_IARM_BUS_API_REVISION                         (16)                                   ///< Revision of the Control Manager Main IARM API
 
 #define CTRLM_MAIN_IARM_CALL_STATUS_GET                          "Main_StatusGet"                       ///< Retrieves Control Manager's Status information
 #define CTRLM_MAIN_IARM_CALL_NETWORK_STATUS_GET                  "Main_NetworkStatusGet"                ///< Retrieves the network's Status information

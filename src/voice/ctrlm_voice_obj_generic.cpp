@@ -106,9 +106,11 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
 }
 
 void ctrlm_voice_generic_t::voice_sdk_close() {
-    if(this->voice_state_src_get() != CTRLM_VOICE_STATE_SRC_READY) { // Need to terminate session before destroying endpoints
-        LOG_WARN("%s: Voice session in progress.. Terminating..\n", __FUNCTION__);
-        xrsr_session_terminate();
+    for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+        if(this->voice_state_src_get((ctrlm_voice_session_group_t)group) != CTRLM_VOICE_STATE_SRC_READY) { // Need to terminate session before destroying endpoints
+            LOG_WARN("%s: Voice session in progress.. Terminating..\n", __FUNCTION__);
+            xrsr_session_terminate(voice_device_to_xrsr(this->voice_session[group].voice_device));
+        }
     }
 
     ctrlm_voice_t::voice_sdk_close();
@@ -155,14 +157,22 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
         if(this->device_status[src_device] != CTRLM_VOICE_DEVICE_STATUS_DISABLED && this->device_status[src_device] != CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED) {
             switch(src_device) {
                 case CTRLM_VOICE_DEVICE_PTT: {
-                    url = &this->prefs.server_url_vrex_src_ptt;
+                    url = &this->prefs.server_url_src_ptt;
                     break;
                 }
-                case CTRLM_VOICE_DEVICE_FF:
-                case CTRLM_VOICE_DEVICE_MICROPHONE: {
-                    url = &this->prefs.server_url_vrex_src_ff;
+                #ifdef CTRLM_LOCAL_MIC
+                case CTRLM_VOICE_DEVICE_MICROPHONE:
+                #endif
+                case CTRLM_VOICE_DEVICE_FF: {
+                    url = &this->prefs.server_url_src_ff;
                     break;
                 }
+                #ifdef CTRLM_LOCAL_MIC_TAP
+                case CTRLM_VOICE_DEVICE_MICROPHONE_TAP: {
+                   url = &this->prefs.server_url_src_mic_tap;
+                   break;
+                }
+                #endif
                 default: {
                     break;
                 }
@@ -279,7 +289,7 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 routes[i].dsts[0].handlers        = handlers_xrsr;
                 routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM | XRSR_AUDIO_FORMAT_PCM_32_BIT | XRSR_AUDIO_FORMAT_PCM_32_BIT_MULTI | XRSR_AUDIO_FORMAT_PCM_RAW;
                 routes[i].dsts[0].stream_time_min = 0;
-                routes[i].dsts[0].stream_from     = XRSR_STREAM_FROM_BEGINNING;
+                routes[i].dsts[0].stream_from     = XRSR_STREAM_FROM_LIVE;
                 routes[i].dsts[0].stream_offset   = 0;
                 routes[i].dsts[0].stream_until    = XRSR_STREAM_UNTIL_END_OF_STREAM;
                 #ifdef ENABLE_DEEP_SLEEP

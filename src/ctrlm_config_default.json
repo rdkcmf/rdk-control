@@ -229,6 +229,7 @@
       "url_vrex"                         : "",
       "url_src_ptt"                      : "",
       "url_src_ff"                       : "",
+      "url_src_mic_tap"                  : "",
       "vrex_request_timeout"             :        30,
       "enable_sat"                       :      true,
       "sat_request_timeout"              :         5,

@@ -192,7 +192,10 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_begin_callback_sdt(void *data, in
     this->voice_message_available = false; // This is just for sanity
     this->voice_message_queue.clear();
 
-    this->voice_obj->voice_session_info(&info);
+    this->voice_obj->voice_session_info(dqm->src, &info);
+
+    // Source
+    config_in.src = dqm->src;
 
     // Handle stream parameters
     if(dqm->has_stream_params) {
@@ -247,6 +250,7 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_begin_callback_sdt(void *data, in
 
     ctrlm_voice_session_begin_cb_t session_begin;
     uuid_copy(session_begin.header.uuid, dqm->uuid);
+    uuid_copy(this->uuid, dqm->uuid);
     session_begin.header.timestamp     = dqm->timestamp;
     session_begin.src                  = dqm->src;
     session_begin.configuration        = dqm->configuration;
@@ -323,12 +327,12 @@ void ctrlm_voice_endpoint_sdt_t::voice_session_end_callback_sdt(void *data, int 
 }
 
 void ctrlm_voice_endpoint_sdt_t::voice_session_recv_msg_sdt(const char *transcription) {
-    this->voice_obj->voice_session_transcription_callback(transcription);
+    this->voice_obj->voice_session_transcription_callback(this->uuid, transcription);
 }
 
 void ctrlm_voice_endpoint_sdt_t::voice_session_server_return_code_sdt(long ret_code) {
     this->server_ret_code = ret_code;
-    this->voice_obj->voice_server_return_code_callback(ret_code);
+    this->voice_obj->voice_server_return_code_callback(this->uuid, ret_code);
 }
 
 void ctrlm_voice_endpoint_sdt_t::ctrlm_voice_handler_sdt_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, vmic_sdt_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
@@ -337,7 +341,7 @@ ctrlm_voice_endpoint_sdt_t *endpoint = (ctrlm_voice_endpoint_sdt_t *)user_data;
     ctrlm_voice_session_begin_cb_sdt_t msg;
     memset(&msg, 0, sizeof(msg));
 
-    if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+    if(!ctrlm_voice_xrsr_src_is_mic(src)) {
         // This is a controller, make sure session request / controller info is satisfied
         LOG_DEBUG("%s: Checking if VSR is done\n", __FUNCTION__);
         sem_wait(endpoint->voice_session_vsr_semaphore_get());

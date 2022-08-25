@@ -42,6 +42,16 @@
 
 #define VOICE_SESSION_REQ_DATA_LEN_MAX (33)
 
+typedef enum {
+   VOICE_SESSION_GROUP_DEFAULT = 0, // Session index for regular voice sessions (PTT, FFV)
+   #ifdef CTRLM_LOCAL_MIC_TAP
+   VOICE_SESSION_GROUP_MIC_TAP = 1, // Session index for microphone tap voice sessions
+   VOICE_SESSION_GROUP_QTY     = 2
+   #else
+   VOICE_SESSION_GROUP_QTY     = 1
+   #endif
+} ctrlm_voice_session_group_t;
+
 #ifdef VOICE_BUFFER_STATS
 #define VOICE_BUFFER_WARNING_THRESHOLD (4) // Number of packets in HW buffer before printing.  Set to zero to print all packets.
 #endif
@@ -263,8 +273,11 @@ typedef struct {
 // End Event Callback Structures
 
 typedef struct {
-   std::string                 server_url_vrex_src_ptt;
-   std::string                 server_url_vrex_src_ff;
+   std::string                 server_url_src_ptt;
+   std::string                 server_url_src_ff;
+   #ifdef CTRLM_LOCAL_MIC_TAP
+   std::string                 server_url_src_mic_tap;
+   #endif
    bool                        sat_enabled;
    std::string                 aspect_ratio;
    std::string                 guide_language;
@@ -361,6 +374,9 @@ typedef struct {
 typedef struct {
    std::string                       urlPtt;
    std::string                       urlHf;
+   #ifdef CTRLM_LOCAL_MIC_TAP
+   std::string                       urlMicTap;
+   #endif
    uint8_t                           status[CTRLM_VOICE_DEVICE_INVALID];
    bool                              prv_enabled;
    bool                              wwFeedback;
@@ -368,6 +384,55 @@ typedef struct {
 } ctrlm_voice_status_t;
 
 typedef void (*ctrlm_voice_session_rsp_confirm_t)(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp, void *user_data);
+
+typedef struct {
+   ctrlm_network_id_t               network_id;
+   ctrlm_network_type_t             network_type;
+   ctrlm_controller_id_t            controller_id;
+   std::string                      controller_name;
+   std::string                      controller_version_sw;
+   std::string                      controller_version_hw;
+   double                           controller_voltage;
+   bool                             controller_command_status;
+   ctrlm_voice_device_t             voice_device;
+   ctrlm_voice_format_t             format;
+   long                             server_ret_code;
+   std::string                      server_message;
+   bool                             has_stream_params;
+   voice_session_req_stream_params  stream_params;
+
+   bool                             session_active_server;
+   bool                             session_active_controller;
+   ctrlm_voice_state_src_t          state_src;
+   ctrlm_voice_state_dst_t          state_dst;
+   ctrlm_hal_input_object_t         hal_input_object;
+   uuid_t                           uuid;
+   std::string                      uuid_str;
+   int                              audio_pipe[2];
+   unsigned long                    audio_sent_bytes;
+   unsigned long                    audio_sent_samples;
+
+   // RF4CE specific fields (move to a separate struct?)
+   uint32_t                         packets_processed;
+   uint32_t                         packets_lost;
+   uint32_t                         lqi_total;
+
+   ctrlm_voice_session_end_reason_t end_reason;
+
+   bool                             is_session_by_text;
+   std::string                      transcription_in;
+   std::string                      transcription;
+
+   bool                             keyword_verified;
+
+   ctrlm_voice_endpoint_t *         endpoint_current;
+
+   ctrlm_voice_ipc_event_common_t   ipc_common_data;
+
+   unsigned long                    stats_session_id;
+   ctrlm_voice_stats_reboot_t       stats_reboot;
+   ctrlm_voice_stats_session_t      stats_session;
+} ctrlm_voice_session_t;
 
 class ctrlm_voice_t {
     public:
@@ -382,13 +447,18 @@ class ctrlm_voice_t {
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd);
     void                                  voice_session_data_post_processing(int bytes_sent, const char *action, ctrlm_timestamp_t *timestamp);
     void                                  voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_end_stats_t *stats=NULL);
+    void                                  voice_session_end(ctrlm_voice_session_t *session, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_end_stats_t *stats=NULL);
     void                                  voice_session_controller_stats_rxd_timeout();
     void                                  voice_session_stats(ctrlm_voice_stats_session_t session);
     void                                  voice_session_stats(ctrlm_voice_stats_reboot_t reboot);
     bool                                  voice_session_term(std::string &session_id);
-    void                                  voice_session_info(ctrlm_voice_session_info_t *data);
+    void                                  voice_session_info(xrsr_src_t src, ctrlm_voice_session_info_t *data);
+    void                                  voice_session_info(ctrlm_voice_session_t *session, ctrlm_voice_session_info_t *data);
     bool                                  voice_session_id_is_current(uuid_t uuid);
     unsigned long                         voice_session_id_get();
+    ctrlm_voice_session_t *               voice_session_from_uuid(const uuid_t uuid);
+    ctrlm_voice_session_t *               voice_session_from_uuid(std::string &uuid);
+    ctrlm_voice_session_t *               voice_session_from_controller(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id);
 
     virtual void                          voice_stb_data_stb_sw_version_set(std::string &sw_version);
     std::string                           voice_stb_data_stb_sw_version_get() const;
@@ -419,7 +489,7 @@ class ctrlm_voice_t {
     virtual bool                          voice_configure(json_t *settings, bool db_write);
     virtual bool                          voice_status(ctrlm_voice_status_t *status);
     virtual bool                          voice_init_set(const char *init, bool db_write = true);
-    virtual bool                          voice_message(const char *msg);
+    virtual bool                          voice_message(std::string &uuid, const char *msg);
     virtual bool                          server_message(const char *message, unsigned long length);
     void                                  voice_params_qos_get(voice_params_qos_t *params);
     void                                  voice_params_opus_encoder_get(voice_params_opus_encoder_t *params);
@@ -447,10 +517,10 @@ protected:
     void                                  voice_session_stats_print();
     void                                  voice_session_notify_stats();
 
-    ctrlm_voice_state_src_t               voice_state_src_get() const;
-    ctrlm_voice_state_dst_t               voice_state_dst_get() const;
+    ctrlm_voice_state_src_t               voice_state_src_get(ctrlm_voice_session_group_t index) const;
+    ctrlm_voice_state_dst_t               voice_state_dst_get(ctrlm_voice_session_group_t index) const;
 
-    void                                  voice_session_info_reset();
+    void                                  voice_session_info_reset(ctrlm_voice_session_t *session);
 
     void                                  voice_set_ipc(ctrlm_voice_ipc_t *ipc);
     // End Application Interface
@@ -478,9 +548,9 @@ public:
     virtual void                  voice_action_tv_mute_callback(bool mute);
     virtual void                  voice_action_tv_power_callback(bool power, bool toggle);
     virtual void                  voice_action_tv_volume_callback(bool up, uint32_t repeat_count);
-    virtual void                  voice_action_keyword_verification_callback(bool success, rdkx_timestamp_t timestamp);
-    virtual void                  voice_server_return_code_callback(long ret_code);
-    virtual void                  voice_session_transcription_callback(const char *transcription);
+    virtual void                  voice_action_keyword_verification_callback(const uuid_t uuid, bool success, rdkx_timestamp_t timestamp);
+    virtual void                  voice_server_return_code_callback(const uuid_t uuid, long ret_code);
+    virtual void                  voice_session_transcription_callback(const uuid_t uuid, const char *transcription);
     virtual void                  voice_power_state_change(ctrlm_power_state_t power_state);
     #ifdef ENABLE_DEEP_SLEEP
     virtual void                  voice_standby_session_request(void);
@@ -537,35 +607,16 @@ public:
     // End STB Data
 
     // Session Data
-    ctrlm_network_id_t       network_id;
-    ctrlm_network_type_t     network_type;
-    ctrlm_controller_id_t    controller_id;
-    std::string              controller_name;
-    std::string              controller_version_sw;
-    std::string              controller_version_hw;
-    double                   controller_voltage;
-    bool                     controller_command_status;
-    ctrlm_voice_device_t     voice_device;
-    ctrlm_voice_format_t     format;
-    long                     server_ret_code;
-    bool                     has_stream_params;
-    voice_session_req_stream_params stream_params;
-
-    unsigned long               stats_session_id;
-    ctrlm_voice_stats_reboot_t  stats_reboot;
-    ctrlm_voice_stats_session_t stats_session;
+    ctrlm_voice_session_t    voice_session[VOICE_SESSION_GROUP_QTY];
     // End Session Data
 
     protected:
     sem_t                                             device_status_semaphore;
     uint8_t                                           device_status[CTRLM_VOICE_DEVICE_INVALID];
     std::vector<ctrlm_voice_endpoint_t *>             endpoints;
-    ctrlm_voice_endpoint_t *                          endpoint_current;
     std::vector<std::pair<std::string, std::string> > query_strs_ptt;
 
     private:
-    ctrlm_voice_state_src_t  state_src;
-    ctrlm_voice_state_dst_t  state_dst;
     bool                     xrsr_opened;
     ctrlm_voice_ipc_t       *voice_ipc;
 
@@ -576,23 +627,12 @@ public:
     #endif
 
     // Current Session Data
-    ctrlm_hal_input_object_t hal_input_object;
-    int                      audio_pipe[2];
-    unsigned long            audio_sent_bytes;
-    unsigned long            audio_sent_samples;
     unsigned long            opus_samples_per_packet;
     unsigned long            session_id;
-    std::string              trx;
-    uuid_t                   uuid;
-    std::string              message;
-    std::string              transcription;
 
     ctrlm_main_queue_msg_voice_command_status_t status;
     uint8_t                  last_cmd_id; // Needed for ADPCM over RF4CE, since duplicate packets are possible
     uint8_t                  next_cmd_id;
-    uint32_t                 packets_processed;
-    uint32_t                 packets_lost;
-    uint32_t                 lqi_total;
     #ifdef VOICE_BUFFER_STATS
     ctrlm_timestamp_t       first_fragment;
     unsigned char           voice_buffer_warning_triggered;
@@ -609,14 +649,8 @@ public:
 
     double                   confidence;
     bool                     dual_sensitivity_immediate;
-    bool                     keyword_verified;
     ctrlm_power_state_t      power_state;
 
-    bool                     session_active_server;
-    bool                     session_active_controller;
-
-    bool                     is_session_by_text;
-    std::string              transcription_in;
     json_t                   *vsdk_config;
 
     ctrlm_voice_session_timing_t session_timing;
@@ -629,8 +663,6 @@ public:
     bool                                     audio_ducking_beep_enabled;
     bool                                     audio_ducking_beep_in_progress;
 
-    ctrlm_voice_ipc_event_common_t ipc_common_data;
-
     // End Current Session Data
     // Timeout tags
     unsigned int             timeout_packet_tag;
@@ -639,7 +671,6 @@ public:
     unsigned int             timeout_keyword_beep;
     // End Timeout tags
 
-    ctrlm_voice_session_end_reason_t end_reason;
     int packet_loss_threshold;
 
     sem_t            current_vsr_err_semaphore;
@@ -649,11 +680,11 @@ public:
     ctrlm_voice_telemetry_vsr_error_map_t vsr_errors;
 
    bool                 is_voice_assistant(ctrlm_voice_device_t device);
-   bool                 controller_supports_qos(void);
+   bool                 controller_supports_qos(ctrlm_voice_device_t device);
    void                 set_audio_mode(ctrlm_voice_audio_settings_t *settings);
    void                 audio_state_set(bool session);
    bool                 vsdk_is_privacy_enabled(void);
-   bool                 is_standby_microphone(void);
+   bool                 is_standby_microphone(ctrlm_voice_device_t device);
    double               vsdk_keyword_sensitivity_limit_check(double sensitivity);
 };
 
@@ -668,10 +699,37 @@ const char *ctrlm_voice_command_status_tv_avr_str(ctrlm_voice_tv_avr_cmd_t cmd);
 const char *ctrlm_voice_audio_mode_str(ctrlm_voice_audio_mode_t mode);
 const char *ctrlm_voice_audio_timing_str(ctrlm_voice_audio_timing_t timing);
 const char *ctrlm_voice_session_response_status_str(ctrlm_voice_session_response_status_t status);
+const char *ctrlm_voice_session_group_str(ctrlm_voice_session_group_t group);
 ctrlm_hal_input_device_t voice_device_to_hal(ctrlm_voice_device_t device);
 xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format);
 ctrlm_voice_device_t xrsr_to_voice_device(xrsr_src_t device);
 xrsr_src_t voice_device_to_xrsr(ctrlm_voice_device_t device);
+
+
+__inline bool ctrlm_voice_device_is_mic(ctrlm_voice_device_t device) {
+    #ifdef CTRLM_LOCAL_MIC
+    #ifdef CTRLM_LOCAL_MIC_TAP
+    return(device == CTRLM_VOICE_DEVICE_MICROPHONE || device == CTRLM_VOICE_DEVICE_MICROPHONE_TAP);
+    #else
+    return(device == CTRLM_VOICE_DEVICE_MICROPHONE);
+    #endif
+    #else
+    return(false);
+    #endif
+}
+
+__inline bool ctrlm_voice_xrsr_src_is_mic(xrsr_src_t src) {
+    #ifdef CTRLM_LOCAL_MIC
+    #ifdef CTRLM_LOCAL_MIC_TAP
+    return(src == XRSR_SRC_MICROPHONE || src == XRSR_SRC_MICROPHONE_TAP);
+    #else
+    return(src == XRSR_SRC_MICROPHONE);
+    #endif
+    #else
+    return(false);
+    #endif
+}
+
 void ctrlm_voice_xrsr_session_capture_start(ctrlm_main_queue_msg_audio_capture_start_t *capture_start);
 void ctrlm_voice_xrsr_session_capture_stop(void);
 

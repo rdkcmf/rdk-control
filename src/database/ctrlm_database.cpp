@@ -2893,6 +2893,22 @@ void ctrlm_db_voice_write_url_ff(std::string ff) {
    ctrlm_db_write_blob(CTRLM_DB_TABLE_VOICE, "url_ff", (const guchar*) ff.c_str(), ff.length());
 }
 
+void ctrlm_db_voice_read_url_mic_tap(std::string &mic_tap) {
+   guchar *data = NULL;
+   guint32 length = 0;
+   ctrlm_db_read_blob(CTRLM_DB_TABLE_VOICE, "url_mic_tap", &data, &length);
+   if(NULL != data) {
+      mic_tap.assign((char *)data, length);
+      ctrlm_db_free(data);
+   } else {
+      LOG_WARN("%s: Failed to load url_mic_tap from voice db\n", __FUNCTION__);
+   }
+}
+
+void ctrlm_db_voice_write_url_mic_tap(std::string mic_tap) {
+   ctrlm_db_write_blob(CTRLM_DB_TABLE_VOICE, "url_mic_tap", (const guchar*) mic_tap.c_str(), mic_tap.length());
+}
+
 void ctrlm_db_voice_read_sat_enable(bool &sat) {
    sqlite_uint64 data;
    if (0 > ctrlm_db_read_uint64(CTRLM_DB_TABLE_VOICE, "sat_enable", &data)) {

@@ -177,9 +177,12 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
 
     LOG_INFO("%s: session begin\n", __FUNCTION__);
 
-    this->voice_obj->voice_session_info(&info);
+    this->voice_obj->voice_session_info(dqm->src, &info);
     const char *sat = this->voice_obj->voice_stb_data_sat_get();
     user_agent << "rmtType=" << info.controller_name.c_str() << "; rmtSVer=" << info.controller_version_sw.c_str() << "; rmtHVer=" << info.controller_version_hw.c_str() << "; stbName=" << info.stb_name.c_str() << "; rmtVolt=" << std::setprecision(3) << info.controller_voltage << "V";
+
+    // Source
+    config_in.src = dqm->src;
 
     // User agent and SAT Token
     if(sat[0] != '\0') {
@@ -212,6 +215,7 @@ void ctrlm_voice_endpoint_http_t::voice_session_begin_callback_http(void *data, 
 
     ctrlm_voice_session_begin_cb_t session_begin;
     uuid_copy(session_begin.header.uuid, dqm->uuid);
+    uuid_copy(this->uuid, dqm->uuid);
     session_begin.header.timestamp     = dqm->timestamp;
     session_begin.src                  = dqm->src;
     session_begin.configuration        = dqm->configuration;
@@ -291,14 +295,15 @@ void ctrlm_voice_endpoint_http_t::voice_session_end_callback_http(void *data, in
 
     ctrlm_voice_session_end_cb_t session_end;
     uuid_copy(session_end.header.uuid, dqm->uuid);
+    uuid_clear(this->uuid);
     session_end.header.timestamp = dqm->timestamp;
     session_end.success          = success;
     session_end.stats            = dqm->stats;
     this->voice_obj->voice_session_end_callback(&session_end);
 }
 void ctrlm_voice_endpoint_http_t::voice_session_recv_msg_http(const char *transcription, long ret_code) {
-    this->voice_obj->voice_session_transcription_callback(transcription);
-    this->voice_obj->voice_server_return_code_callback(ret_code);
+    this->voice_obj->voice_session_transcription_callback(this->uuid, transcription);
+    this->voice_obj->voice_server_return_code_callback(this->uuid, ret_code);
     this->server_ret_code = ret_code;
 }
 // End Class Callbacks
@@ -308,7 +313,9 @@ void ctrlm_voice_endpoint_http_t::ctrlm_voice_handler_http_session_begin(const u
     ctrlm_voice_endpoint_http_t *endpoint = (ctrlm_voice_endpoint_http_t *)user_data;
     ctrlm_voice_session_begin_cb_http_t msg = {0};
 
-    if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+    bool is_mic = ctrlm_voice_xrsr_src_is_mic(src);
+
+    if(!is_mic) {
         // This is a controller, make sure session request / controller info is satisfied
         LOG_DEBUG("%s: Checking if VSR is done\n", __FUNCTION__);
         sem_wait(endpoint->voice_session_vsr_semaphore_get());

@@ -46,7 +46,8 @@ protected:
     static void ctrlm_voice_handler_ws_nsp_conn_close(const char *reason, long ret_code, void *user_data);
     
 private:
-    long server_ret_code;
+    uuid_t uuid;
+    long   server_ret_code;
 };
 
 #endif

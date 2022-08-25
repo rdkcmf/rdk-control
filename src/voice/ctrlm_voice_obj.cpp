@@ -58,6 +58,8 @@
 static void ctrlm_voice_session_response_confirm(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp, void *user_data);
 static void ctrlm_voice_data_post_processing_cb (ctrlm_hal_data_cb_params_t *param);
 
+static ctrlm_voice_session_group_t voice_device_to_session_group(ctrlm_voice_device_t device_type);
+
 #ifdef BEEP_ON_KWD_ENABLED
 static void ctrlm_voice_system_audio_player_event_handler(system_audio_player_event_t event, void *user_data);
 #endif
@@ -72,16 +74,42 @@ static unsigned long voice_packet_interval_get(ctrlm_voice_format_t format, uint
 ctrlm_voice_t::ctrlm_voice_t() {
     LOG_INFO("%s: Constructor\n", __FUNCTION__);
 
-    this->state_src                       = CTRLM_VOICE_STATE_SRC_INVALID;
-    this->state_dst                       = CTRLM_VOICE_STATE_DST_INVALID;
-    this->network_id                      = CTRLM_MAIN_NETWORK_ID_INVALID;
-    this->controller_id                   = CTRLM_MAIN_CONTROLLER_ID_INVALID;
-    this->hal_input_object                = NULL;
-    this->format                          = CTRLM_VOICE_FORMAT_INVALID;
-    this->audio_pipe[PIPE_READ]           = -1;
-    this->audio_pipe[PIPE_WRITE]          = -1;
-    this->audio_sent_bytes                =  0;
-    this->audio_sent_samples              =  0;
+    for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+        ctrlm_voice_session_t *session = &this->voice_session[group];
+        session->network_id         = CTRLM_MAIN_NETWORK_ID_INVALID;
+        session->network_type       = CTRLM_NETWORK_TYPE_INVALID;
+        session->controller_id      = CTRLM_MAIN_CONTROLLER_ID_INVALID;
+        session->voice_device       = CTRLM_VOICE_DEVICE_INVALID;
+        session->format             = CTRLM_VOICE_FORMAT_INVALID;
+        session->server_ret_code    = 0;
+
+        errno_t safec_rc = memset_s(&session->stream_params, sizeof(session->stream_params), 0, sizeof(session->stream_params));
+        ERR_CHK(safec_rc);
+
+        session->session_active_server     = false;
+        session->session_active_controller = false;
+        session->state_src                 = CTRLM_VOICE_STATE_SRC_INVALID;
+        session->state_dst                 = CTRLM_VOICE_STATE_DST_INVALID;
+        session->end_reason                = CTRLM_VOICE_SESSION_END_REASON_DONE;
+        session->hal_input_object          = NULL;
+
+        session->audio_pipe[PIPE_READ]     = -1;
+        session->audio_pipe[PIPE_WRITE]    = -1;
+        session->audio_sent_bytes          =  0;
+        session->audio_sent_samples        =  0;
+        session->packets_processed         = 0;
+        session->packets_lost              = 0;
+
+        session->is_session_by_text        = false;
+        session->transcription_in          = "";
+        session->transcription             = "";
+
+        session->keyword_verified          = false;
+
+        session->endpoint_current          = NULL;
+
+        voice_session_info_reset(session);
+    }
     this->timeout_packet_tag              =  0;
     this->timeout_ctrl_session_stats_rxd  =  0;
     this->timeout_ctrl_cmd_status_read    =  0;
@@ -89,8 +117,11 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->session_id                      =  0;
     this->software_version                = "N/A";
     this->mask_pii                        = ctrlm_is_production_build() ? JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_0 : JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_1;
-    this->prefs.server_url_vrex_src_ptt   = JSON_STR_VALUE_VOICE_URL_SRC_PTT;
-    this->prefs.server_url_vrex_src_ff    = JSON_STR_VALUE_VOICE_URL_SRC_FF;
+    this->prefs.server_url_src_ptt        = JSON_STR_VALUE_VOICE_URL_SRC_PTT;
+    this->prefs.server_url_src_ff         = JSON_STR_VALUE_VOICE_URL_SRC_FF;
+    #ifdef CTRLM_LOCAL_MIC_TAP
+    this->prefs.server_url_src_mic_tap    = JSON_STR_VALUE_VOICE_URL_SRC_MIC_TAP;
+    #endif
     this->prefs.sat_enabled               = JSON_BOOL_VALUE_VOICE_ENABLE_SAT;
     this->prefs.aspect_ratio              = JSON_STR_VALUE_VOICE_ASPECT_RATIO;
     this->prefs.guide_language            = JSON_STR_VALUE_VOICE_LANGUAGE;
@@ -119,11 +150,6 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->voice_params_opus_encoder_default();
     this->xrsr_opened                     = false;
     this->voice_ipc                       = NULL;
-    this->endpoint_current                = NULL;
-    this->end_reason                      = CTRLM_VOICE_SESSION_END_REASON_DONE;
-    this->keyword_verified                = false;
-    this->is_session_by_text              = false;
-    this->transcription_in                = "";
     this->packet_loss_threshold           = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD;
     this->vsdk_config                     = NULL;
 
@@ -153,39 +179,27 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->prefs.dst_params_low_latency.ipv4_fallback          = JSON_BOOL_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_IPV4_FALLBACK;
     this->prefs.dst_params_low_latency.backoff_delay          = JSON_INT_VALUE_VOICE_DST_PARAMS_LOW_LATENCY_BACKOFF_DELAY;
 
-    voice_session_info_reset();
-
     // Device Status initialization
     sem_init(&this->device_status_semaphore, 0, 1);
     this->device_status[CTRLM_VOICE_DEVICE_PTT] = CTRLM_VOICE_DEVICE_STATUS_NONE;
     this->device_status[CTRLM_VOICE_DEVICE_FF]  = CTRLM_VOICE_DEVICE_STATUS_NONE;
 #ifdef CTRLM_LOCAL_MIC
     this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] = CTRLM_VOICE_DEVICE_STATUS_NONE;
-#else
-    this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] = CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED;
+#endif
+#ifdef CTRLM_LOCAL_MIC_TAP
+    this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE_TAP] = CTRLM_VOICE_DEVICE_STATUS_NONE;
 #endif
 
     errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
     ERR_CHK(safec_rc);
     this->last_cmd_id               = 0;
     this->next_cmd_id               = 0;
-    this->packets_processed         = 0;
-    this->packets_lost              = 0;
     this->confidence                = .0;
-    this->session_active_server     = false;
-    this->session_active_controller = false;
     this->sat_token_required        = false;
-    this->network_type              = CTRLM_NETWORK_TYPE_INVALID;
-    this->controller_voltage        = .0;
-    this->voice_device              = CTRLM_VOICE_DEVICE_INVALID;
-    this->server_ret_code           = 0;
-    this->has_stream_params         = false;
 
     safec_rc = memset_s(this->sat_token, sizeof(this->sat_token), 0, sizeof(this->sat_token));
     ERR_CHK(safec_rc);
     safec_rc = memset_s(&this->session_timing, sizeof(this->session_timing), 0, sizeof(this->session_timing));
-    ERR_CHK(safec_rc);
-    safec_rc = memset_s(&this->stream_params, sizeof(this->stream_params), 0, sizeof(this->stream_params));
     ERR_CHK(safec_rc);
     // These semaphores are used to make sure we have all the data before calling the session begin callback
     sem_init(&this->vsr_semaphore, 0, 0);
@@ -223,13 +237,16 @@ ctrlm_voice_t::~ctrlm_voice_t() {
         json_decref(this->vsdk_config);
         this->vsdk_config = NULL;
     }
-    if(audio_pipe[PIPE_READ] >= 0) {
-        close(audio_pipe[PIPE_READ]);
-        audio_pipe[PIPE_READ] = -1;
-    }
-    if(audio_pipe[PIPE_WRITE] >= 0) {
-        close(audio_pipe[PIPE_WRITE]);
-        audio_pipe[PIPE_WRITE] = -1;
+    for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+        ctrlm_voice_session_t *session = &this->voice_session[group];
+        if(session->audio_pipe[PIPE_READ] >= 0) {
+            close(session->audio_pipe[PIPE_READ]);
+            session->audio_pipe[PIPE_READ] = -1;
+        }
+        if(session->audio_pipe[PIPE_WRITE] >= 0) {
+            close(session->audio_pipe[PIPE_WRITE]);
+            session->audio_pipe[PIPE_WRITE] = -1;
+        }
     }
 
     #ifdef BEEP_ON_KWD_ENABLED
@@ -320,8 +337,12 @@ void ctrlm_voice_t::voice_sdk_open(json_t *json_obj_vsdk) {
    }
 
    this->xrsr_opened = true;
-   this->state_src   = CTRLM_VOICE_STATE_SRC_READY;
-   this->state_dst   = CTRLM_VOICE_STATE_DST_READY;
+
+   for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+      ctrlm_voice_session_t *session = &this->voice_session[group];
+      session->state_src = CTRLM_VOICE_STATE_SRC_READY;
+      session->state_dst = CTRLM_VOICE_STATE_DST_READY;
+   }
 }
 
 void ctrlm_voice_t::voice_sdk_close() {
@@ -344,8 +365,11 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
         bool enabled = true;
 
         conf.config_value_get(JSON_BOOL_NAME_VOICE_ENABLE,                      enabled);
-        conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_vrex_src_ptt);
-        conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_FF,                   this->prefs.server_url_vrex_src_ff);
+        conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_src_ptt);
+        conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_FF,                   this->prefs.server_url_src_ff);
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        conf.config_value_get(JSON_STR_NAME_VOICE_URL_SRC_MIC_TAP,              this->prefs.server_url_src_mic_tap);
+        #endif
         conf.config_value_get(JSON_INT_NAME_VOICE_VREX_REQUEST_TIMEOUT,         this->prefs.timeout_vrex_connect,0);
         conf.config_value_get(JSON_INT_NAME_VOICE_VREX_RESPONSE_TIMEOUT,        this->prefs.timeout_vrex_session,0);
         conf.config_value_get(JSON_INT_NAME_VOICE_TIMEOUT_STATS,                this->prefs.timeout_stats);
@@ -414,9 +438,11 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
             for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
                 uint8_t voice_device_status = CTRLM_VOICE_DEVICE_STATUS_NONE;
                 ctrlm_db_voice_read_device_status(i, (int *)&voice_device_status);
+                #ifdef CTRLM_LOCAL_MIC
                 if((i == CTRLM_VOICE_DEVICE_MICROPHONE) && (voice_device_status & CTRLM_VOICE_DEVICE_STATUS_PRIVACY)) {
                     this->voice_privacy_enable(false);
                 }
+                #endif
                 if((voice_device_status & CTRLM_VOICE_DEVICE_STATUS_LEGACY) && (voice_device_status != CTRLM_VOICE_DEVICE_STATUS_DISABLED)) { // Convert from legacy to current (some value other than DISABLED set)
                     LOG_INFO("%s: Converting legacy device status value 0x%02X\n", __FUNCTION__, voice_device_status);
                     voice_device_status = CTRLM_VOICE_DEVICE_STATUS_NONE;
@@ -426,8 +452,11 @@ bool ctrlm_voice_t::voice_configure_config_file_json(json_t *obj_voice, json_t *
                    this->voice_device_disable((ctrlm_voice_device_t)i, false, NULL);
                 }
             }
-            ctrlm_db_voice_read_url_ptt(this->prefs.server_url_vrex_src_ptt);
-            ctrlm_db_voice_read_url_ff(this->prefs.server_url_vrex_src_ff);
+            ctrlm_db_voice_read_url_ptt(this->prefs.server_url_src_ptt);
+            ctrlm_db_voice_read_url_ff(this->prefs.server_url_src_ff);
+            #ifdef CTRLM_LOCAL_MIC_TAP
+            ctrlm_db_voice_read_url_mic_tap(this->prefs.server_url_src_mic_tap);
+            #endif
             ctrlm_db_voice_read_sat_enable(this->sat_token_required);
             ctrlm_db_voice_read_guide_language(this->prefs.guide_language);
             ctrlm_db_voice_read_aspect_ratio(this->prefs.aspect_ratio);
@@ -513,11 +542,6 @@ bool ctrlm_voice_t::voice_configure(ctrlm_voice_iarm_call_settings_t *settings, 
         return(true);
     }
 
-    if(this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING) {
-        LOG_WARN("%s: Ignoring vrex settings from XRE due to voice session in progress.\n", __FUNCTION__);
-        return(false);
-    }
-
     if(settings->available & CTRLM_VOICE_SETTINGS_VOICE_ENABLED) {
         LOG_INFO("%s: Voice Control is <%s> : %u\n", __FUNCTION__, settings->voice_control_enabled ? "ENABLED" : "DISABLED", settings->voice_control_enabled);
         for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
@@ -532,10 +556,10 @@ bool ctrlm_voice_t::voice_configure(ctrlm_voice_iarm_call_settings_t *settings, 
     if(settings->available & CTRLM_VOICE_SETTINGS_VREX_SERVER_URL) {
         settings->vrex_server_url[CTRLM_VOICE_SERVER_URL_MAX_LENGTH - 1] = '\0';
         LOG_INFO("%s: vrex URL <%s>\n", __FUNCTION__, settings->vrex_server_url);
-        this->prefs.server_url_vrex_src_ptt = settings->vrex_server_url;
+        this->prefs.server_url_src_ptt = settings->vrex_server_url;
         update_routes = true;
         if(db_write) {
-            ctrlm_db_voice_write_url_ptt(this->prefs.server_url_vrex_src_ptt);
+            ctrlm_db_voice_write_url_ptt(this->prefs.server_url_src_ptt);
         }
     }
 
@@ -608,12 +632,23 @@ bool ctrlm_voice_t::voice_configure(ctrlm_voice_iarm_call_settings_t *settings, 
     if(settings->available & CTRLM_VOICE_SETTINGS_FARFIELD_VREX_SERVER_URL) {
         settings->server_url_vrex_src_ff[CTRLM_VOICE_SERVER_URL_MAX_LENGTH - 1] = '\0';
         LOG_INFO("%s: Farfield vrex URL <%s>\n", __FUNCTION__, settings->server_url_vrex_src_ff);
-        this->prefs.server_url_vrex_src_ff = settings->server_url_vrex_src_ff;
+        this->prefs.server_url_src_ff = settings->server_url_vrex_src_ff;
         update_routes = true;
         if(db_write) {
-            ctrlm_db_voice_write_url_ff(this->prefs.server_url_vrex_src_ff);
+            ctrlm_db_voice_write_url_ff(this->prefs.server_url_src_ff);
         }
     }
+    #ifdef CTRLM_LOCAL_MIC_TAP
+    if(settings->available & CTRLM_VOICE_SETTINGS_MIC_TAP_SERVER_URL) {
+        settings->server_url_src_mic_tap[CTRLM_VOICE_SERVER_URL_MAX_LENGTH - 1] = '\0';
+        LOG_INFO("%s: Mic tap URL <%s>\n", __FUNCTION__, settings->server_url_src_mic_tap);
+        this->prefs.server_url_src_mic_tap = settings->server_url_src_mic_tap;
+        update_routes = true;
+        if(db_write) {
+            ctrlm_db_voice_write_url_mic_tap(this->prefs.server_url_src_mic_tap);
+        }
+    }
+    #endif
 
     if(update_routes && this->xrsr_opened) {
         this->voice_sdk_update_routes();
@@ -658,18 +693,27 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
             }
         }
         if(conf.config_value_get("urlAll", url)) {
-            this->prefs.server_url_vrex_src_ptt = url;
-            this->prefs.server_url_vrex_src_ff  = url;
+            this->prefs.server_url_src_ptt     = url;
+            this->prefs.server_url_src_ff      = url;
+            #ifdef CTRLM_LOCAL_MIC_TAP
+            this->prefs.server_url_src_mic_tap = url;
+            #endif
             update_routes = true;
         }
         if(conf.config_value_get("urlPtt", url)) {
-            this->prefs.server_url_vrex_src_ptt = url;
+            this->prefs.server_url_src_ptt = url;
             update_routes = true;
         }
         if(conf.config_value_get("urlHf", url)) {
-            this->prefs.server_url_vrex_src_ff  = url;
+            this->prefs.server_url_src_ff  = url;
             update_routes = true;
         }
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        if(conf.config_value_get("urlMicTap", url)) {
+            this->prefs.server_url_src_mic_tap  = url;
+            update_routes = true;
+        }
+        #endif
         if(conf.config_value_get("prv", prv_enabled)) {
             this->prefs.par_voice_enabled = prv_enabled;
             LOG_INFO("%s: Press and Release Voice is <%s>\n", __FUNCTION__, this->prefs.par_voice_enabled ? "ENABLED" : "DISABLED");
@@ -697,6 +741,7 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
                 }
             }
         }
+        #ifdef CTRLM_LOCAL_MIC
         if(conf.config_object_get("mic", device_config)) {
             if(device_config.config_value_get("enable", enable)) {
                 LOG_INFO("%s: Voice Control MIC is <%s>\n", __FUNCTION__, enable ? "ENABLED" : "DISABLED");
@@ -718,6 +763,7 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
                 #endif
             }
         }
+        #endif
         if(conf.config_value_get("wwFeedback", enable)) { // This option will enable / disable the Wake Word feedback (typically an audible beep).
            LOG_INFO("%s: Voice Control kwd feedback is <%s>\n", __FUNCTION__, enable ? "ENABLED" : "DISABLED");
            this->audio_ducking_beep_enabled = enable;
@@ -729,17 +775,32 @@ bool ctrlm_voice_t::voice_configure(json_t *settings, bool db_write) {
         if(update_routes && this->xrsr_opened) {
             this->voice_sdk_update_routes();
             if(db_write) {
-                ctrlm_db_voice_write_url_ptt(this->prefs.server_url_vrex_src_ptt);
-                ctrlm_db_voice_write_url_ff(this->prefs.server_url_vrex_src_ff);
+                ctrlm_db_voice_write_url_ptt(this->prefs.server_url_src_ptt);
+                ctrlm_db_voice_write_url_ff(this->prefs.server_url_src_ff);
+                #ifdef CTRLM_LOCAL_MIC_TAP
+                ctrlm_db_voice_write_url_mic_tap(this->prefs.server_url_src_mic_tap);
+                #endif
             }
         }
     }
     return(true);
 }
 
-bool ctrlm_voice_t::voice_message(const char *message) {
-    if(this->endpoint_current) {
-        return(this->endpoint_current->voice_message(message));
+bool ctrlm_voice_t::voice_message(std::string &uuid, const char *message) {
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];
+    if(uuid.empty()) { // uuid was not provided, assume
+       LOG_WARN("%s: using VOICE_SESSION_GROUP_DEFAULT until uuid requirement is enforced. message <%s>\n", __FUNCTION__, this->mask_pii ? "***" : message);
+    } else {
+       session = voice_session_from_uuid(uuid);
+    }
+
+    if(session == NULL) {
+        LOG_ERROR("%s: session not found for uuid <%s>\n", __FUNCTION__, uuid.c_str());
+        return(false);
+    }
+
+    if(session->endpoint_current) {
+        return(session->endpoint_current->voice_message(message));
     }
     return(false);
 }
@@ -765,8 +826,11 @@ bool ctrlm_voice_t::voice_status(ctrlm_voice_status_t *status) {
     } else if(NULL == status) {
         LOG_ERROR("%s: invalid params\n", __FUNCTION__);
     } else {
-        status->urlPtt = this->prefs.server_url_vrex_src_ptt;
-        status->urlHf  = this->prefs.server_url_vrex_src_ff;
+        status->urlPtt    = this->prefs.server_url_src_ptt;
+        status->urlHf     = this->prefs.server_url_src_ff;
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        status->urlMicTap = this->prefs.server_url_src_mic_tap;
+        #endif
         sem_wait(&this->device_status_semaphore);
         for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {
             status->status[i] = this->device_status[i];
@@ -1065,17 +1129,18 @@ void ctrlm_voice_t::voice_params_opus_encoder_validate(void) {
 }
 
 void ctrlm_voice_t::voice_status_set() {
-   if(this->network_id != CTRLM_MAIN_NETWORK_ID_INVALID && this->controller_id != CTRLM_MAIN_CONTROLLER_ID_INVALID) {
-      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::voice_command_status_set, &this->status, sizeof(this->status), NULL, this->network_id);
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT]; // voice status is for PTT only
+   if(session->network_id != CTRLM_MAIN_NETWORK_ID_INVALID && session->controller_id != CTRLM_MAIN_CONTROLLER_ID_INVALID) {
+      ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::voice_command_status_set, &this->status, sizeof(this->status), NULL, session->network_id);
 
       if(this->status.status != VOICE_COMMAND_STATUS_PENDING) {
          rdkx_timestamp_get_realtime(&this->session_timing.ctrl_cmd_status_wr);
 
-         if(this->controller_command_status && this->timeout_ctrl_cmd_status_read <= 0) { // Set a timeout to clean up in case controller does not read the status
+         if(session->controller_command_status && this->timeout_ctrl_cmd_status_read <= 0) { // Set a timeout to clean up in case controller does not read the status
             this->timeout_ctrl_cmd_status_read = g_timeout_add(CTRLM_CONTROLLER_CMD_STATUS_READ_TIMEOUT, ctrlm_voice_controller_command_status_read_timeout, NULL);
          } else {
-             if(!this->session_active_server) {
-                this->state_src   = CTRLM_VOICE_STATE_SRC_READY;
+             if(!session->session_active_server) {
+                session->state_src = CTRLM_VOICE_STATE_SRC_READY;
                 voice_session_stats_print();
                 voice_session_stats_clear();
              }
@@ -1085,9 +1150,12 @@ void ctrlm_voice_t::voice_status_set() {
 }
 
 bool ctrlm_voice_t::voice_device_streaming(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id) {
-    if(this->network_id == network_id && this->controller_id == controller_id) {
-        if(this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING && (this->state_dst >= CTRLM_VOICE_STATE_DST_REQUESTED && this->state_dst <= CTRLM_VOICE_STATE_DST_STREAMING)) {
-            return(true);
+    for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+        ctrlm_voice_session_t *session = &this->voice_session[group];
+        if(session->network_id == network_id && session->controller_id == controller_id) {
+            if(session->state_src == CTRLM_VOICE_STATE_SRC_STREAMING && (session->state_dst >= CTRLM_VOICE_STATE_DST_REQUESTED && session->state_dst <= CTRLM_VOICE_STATE_DST_STREAMING)) {
+                return(true);
+            }
         }
     }
     return(false);
@@ -1097,8 +1165,10 @@ void ctrlm_voice_t::voice_controller_command_status_read(ctrlm_network_id_t netw
 
    // TODO Access to the state variables in this function are not thread safe.  Need to make the entire voice object thread safe.
 
-   if(this->network_id == network_id && this->controller_id == controller_id) {
-       this->session_active_controller = false;
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT]; // voice status is for PTT only
+
+   if(session->network_id == network_id && session->controller_id == controller_id) {
+      session->session_active_controller = false;
        rdkx_timestamp_get_realtime(&this->session_timing.ctrl_cmd_status_rd);
 
        // Remove controller status read timeout
@@ -1107,18 +1177,18 @@ void ctrlm_voice_t::voice_controller_command_status_read(ctrlm_network_id_t netw
            this->timeout_ctrl_cmd_status_read = 0;
        }
 
-       if(!this->session_active_server) {
-          this->state_src   = CTRLM_VOICE_STATE_SRC_READY;
+       if(!session->session_active_server) {
+          session->state_src   = CTRLM_VOICE_STATE_SRC_READY;
           voice_session_stats_print();
           voice_session_stats_clear();
 
          // Send session stats only if they haven't already been sent
-         if(stats_session_id != 0 && this->voice_ipc) {
+         if(session->stats_session_id != 0 && this->voice_ipc) {
             ctrlm_voice_ipc_event_session_statistics_t stats;
 
-            stats.common  = this->ipc_common_data;
-            stats.session = this->stats_session;
-            stats.reboot  = this->stats_reboot;
+            stats.common  = session->ipc_common_data;
+            stats.session = session->stats_session;
+            stats.reboot  = session->stats_reboot;
 
             this->voice_ipc->session_statistics(stats);
          }
@@ -1127,26 +1197,28 @@ void ctrlm_voice_t::voice_controller_command_status_read(ctrlm_network_id_t netw
 }
 
 void ctrlm_voice_t::voice_session_controller_command_status_read_timeout(void) {
-   if(this->network_id == CTRLM_MAIN_NETWORK_ID_INVALID || this->controller_id == CTRLM_MAIN_CONTROLLER_ID_INVALID) {
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT]; // voice status is for PTT only
+
+   if(session->network_id == CTRLM_MAIN_NETWORK_ID_INVALID || session->controller_id == CTRLM_MAIN_CONTROLLER_ID_INVALID) {
       LOG_ERROR("%s: no active voice session\n", __FUNCTION__);
    } else if(this->timeout_ctrl_cmd_status_read > 0) {
-      this->session_active_controller    = false;
+      session->session_active_controller    = false;
       this->timeout_ctrl_cmd_status_read = 0;
       LOG_INFO("%s: controller failed to read command status\n", __FUNCTION__);
-      xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
+      xrsr_session_terminate(voice_device_to_xrsr(session->voice_device)); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
 
-      if(!this->session_active_server) {
-         this->state_src   = CTRLM_VOICE_STATE_SRC_READY;
+      if(!session->session_active_server) {
+         session->state_src   = CTRLM_VOICE_STATE_SRC_READY;
          voice_session_stats_print();
          voice_session_stats_clear();
 
          // Send session stats only if they haven't already been sent
-         if(stats_session_id != 0 && this->voice_ipc) {
+         if(session->stats_session_id != 0 && this->voice_ipc) {
             ctrlm_voice_ipc_event_session_statistics_t stats;
 
-            stats.common  = this->ipc_common_data;
-            stats.session = this->stats_session;
-            stats.reboot  = this->stats_reboot;
+            stats.common  = session->ipc_common_data;
+            stats.session = session->stats_session;
+            stats.reboot  = session->stats_reboot;
 
             this->voice_ipc->session_statistics(stats);
          }
@@ -1159,7 +1231,10 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
                                                                        voice_session_req_stream_params *stream_params,
                                                                        const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status,
                                                                        ctrlm_timestamp_t *timestamp, ctrlm_voice_session_rsp_confirm_t *cb_confirm, void **cb_confirm_param, bool use_external_data_pipe, const char *l_transcription_in, bool low_latency) {
-    if(CTRLM_VOICE_STATE_SRC_INVALID == this->state_src) {
+
+    ctrlm_voice_session_t *session = &this->voice_session[voice_device_to_session_group(device_type)];
+
+    if(CTRLM_VOICE_STATE_SRC_INVALID == session->state_src) {
         LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
         this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_SERVER_NOT_READY);
         return(VOICE_SESSION_RESPONSE_SERVER_NOT_READY);
@@ -1177,23 +1252,29 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         return(VOICE_SESSION_RESPONSE_FAILURE);
     }
 
-    if(CTRLM_VOICE_STATE_SRC_WAITING == this->state_src) {
+    if(CTRLM_VOICE_STATE_SRC_WAITING == session->state_src) {
         // Remove controller status read timeout
         if(this->timeout_ctrl_cmd_status_read > 0) {
             g_source_remove(this->timeout_ctrl_cmd_status_read);
             this->timeout_ctrl_cmd_status_read = 0;
         }
-        uuid_clear(this->uuid);
+        uuid_clear(session->uuid);
 
         // Cancel current speech router session
         LOG_INFO("%s: Waiting on the results from previous session, aborting this and continuing..\n", __FUNCTION__);
-        xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
-    } else if(this->controller_id == controller_id && (this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || this->state_dst != CTRLM_VOICE_STATE_DST_READY)) {
+        xrsr_session_terminate(voice_device_to_xrsr(session->voice_device)); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
+    } else if(session->controller_id == controller_id && (session->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || session->state_dst != CTRLM_VOICE_STATE_DST_READY)) {
         // Cancel current speech router session
-        LOG_WARN("%s: Session in progress with same controller - src <%s> dst <%s>, aborting this and continuing..\n", __FUNCTION__, ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
-        xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
+        LOG_WARN("%s: Session in progress with same controller - src <%s> dst <%s>, aborting this and continuing..\n", __FUNCTION__, ctrlm_voice_state_src_str(session->state_src), ctrlm_voice_state_dst_str(session->state_dst));
+        xrsr_session_terminate(voice_device_to_xrsr(session->voice_device)); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
     }
-    bool is_nsm = ((device_type == CTRLM_VOICE_DEVICE_MICROPHONE) && (network_id == CTRLM_MAIN_NETWORK_ID_DSP) );
+    #ifdef CTRLM_LOCAL_MIC
+    bool is_nsm = ((device_type == CTRLM_VOICE_DEVICE_MICROPHONE) && (network_id == CTRLM_MAIN_NETWORK_ID_DSP));
+    #else
+    bool is_nsm = false;
+    #endif
+    bool is_mic = ctrlm_voice_device_is_mic(device_type);
+
     bool l_session_by_text = (l_transcription_in != NULL);
     if (l_session_by_text) {
         LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, l_transcription_in);
@@ -1201,8 +1282,8 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
             LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
             return VOICE_SESSION_RESPONSE_BUSY;
         }
-    } else if(device_type == CTRLM_VOICE_DEVICE_MICROPHONE && stream_params == NULL && !is_nsm) {
-       LOG_INFO("%s: Requesting the speech router start a session with the microphone - format <%s> low latency <%s>\n", __FUNCTION__, ctrlm_voice_format_str(format), low_latency ? "YES" : "NO");
+    } else if(is_mic && stream_params == NULL && !is_nsm) {
+       LOG_INFO("%s: Requesting the speech router start a session with device <%s> format <%s> low latency <%s>\n", __FUNCTION__, ctrlm_voice_device_str(device_type), ctrlm_voice_format_str(format), low_latency ? "YES" : "NO");
        xrsr_audio_format_t xrsr_format = XRSR_AUDIO_FORMAT_PCM;
        if(format == CTRLM_VOICE_FORMAT_PCM_RAW) {
           xrsr_format = XRSR_AUDIO_FORMAT_PCM_RAW;
@@ -1225,34 +1306,31 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     hal_input_params.input_format.sample_rate = 16000;
     hal_input_params.input_format.sample_size = is_nsm ? 4 : 1;
     hal_input_params.input_format.channel_qty = 1;
-    hal_input_params.require_stream_params    = is_nsm? true : false;
+    hal_input_params.require_stream_params    = is_nsm ? true : false;
+    hal_input_params.begin_session            = ((device_type == CTRLM_VOICE_DEVICE_PTT && !use_external_data_pipe) || is_nsm) ? true : false;
 
     ctrlm_hal_input_object_t hal_input_object = NULL;
     int fds[2] = { -1, -1 };
 
-    if (!l_session_by_text) {
-        if (false == use_external_data_pipe) {
-            if(!is_standby_microphone()) {
-                errno = 0;
-                if(pipe(fds) < 0) {
-                    int errsv = errno;
-                    LOG_ERROR("%s: Failed to create pipe <%s>\n", __FUNCTION__, strerror(errsv));
-                    this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_FAILURE);
-                    return(VOICE_SESSION_RESPONSE_FAILURE);
-                } // set to non-blocking
-            }
-
-            hal_input_params.fd = fds[PIPE_READ];
-            // request the xraudio session and begin
-            hal_input_object = ctrlm_xraudio_hal_input_open(&hal_input_params);
-        } else {
-            // only request the xraudio session, need to begin it later manually
-            hal_input_object = ctrlm_xraudio_hal_input_session_req(&hal_input_params);
+    if(!l_session_by_text) {
+        bool create_pipe = (device_type == CTRLM_VOICE_DEVICE_PTT && !use_external_data_pipe);
+        if(create_pipe) {
+            errno = 0;
+            if(pipe(fds) < 0) {
+                int errsv = errno;
+                LOG_ERROR("%s: Failed to create pipe <%s>\n", __FUNCTION__, strerror(errsv));
+                this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_FAILURE);
+                return(VOICE_SESSION_RESPONSE_FAILURE);
+            } // set to non-blocking
         }
+
+        hal_input_params.fd = fds[PIPE_READ];
+        // request the xraudio session and begin as needed
+        hal_input_object = ctrlm_xraudio_hal_input_open(&hal_input_params);
         if(hal_input_object == NULL) {
             LOG_ERROR("%s: Failed to acquire voice session\n", __FUNCTION__);
             this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_BUSY);
-            if (false == use_external_data_pipe) {
+            if(create_pipe) {
                 close(fds[PIPE_WRITE]);
                 close(fds[PIPE_READ]);
             }
@@ -1260,66 +1338,67 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         }
     }
 
-    this->is_session_by_text        = l_session_by_text;
-    this->transcription_in          = l_session_by_text ? l_transcription_in : "";
-    this->hal_input_object          = hal_input_object;
-    this->state_src                 = CTRLM_VOICE_STATE_SRC_STREAMING;
-    this->state_dst                 = CTRLM_VOICE_STATE_DST_REQUESTED;
-    this->voice_device              = device_type;
-    this->format                    = format;
-    this->audio_pipe[PIPE_READ]     = fds[PIPE_READ];
-    this->audio_pipe[PIPE_WRITE]    = fds[PIPE_WRITE];
-    this->controller_id             = controller_id;
-    this->network_id                = network_id;
-    this->network_type              = ctrlm_network_type_get(network_id);
-    this->last_cmd_id               = 0;
-    this->session_active_server     = true;
-    this->session_active_controller = true;
-    this->controller_name           = controller_name;
-    this->controller_version_sw     = sw_version;
-    this->controller_version_hw     = hw_version;
-    this->controller_voltage        = voltage;
-    this->controller_command_status = command_status;
-    this->audio_sent_bytes          = 0;
-    this->audio_sent_samples        = 0;
-    this->packets_processed         = 0;
-    this->packets_lost              = 0;
+    session->is_session_by_text        = l_session_by_text;
+    session->transcription_in          = l_session_by_text ? l_transcription_in : "";
+    session->hal_input_object          = hal_input_object;
+    session->state_src                 = CTRLM_VOICE_STATE_SRC_STREAMING;
+    session->state_dst                 = CTRLM_VOICE_STATE_DST_REQUESTED;
+    session->voice_device              = device_type;
+    session->format                    = format;
+    session->audio_pipe[PIPE_READ]     = fds[PIPE_READ];
+    session->audio_pipe[PIPE_WRITE]    = fds[PIPE_WRITE];
+    session->controller_id             = controller_id;
+    session->network_id                = network_id;
+    session->network_type              = ctrlm_network_type_get(network_id);
+    session->session_active_server     = true;
+    session->session_active_controller = true;
+    session->controller_name           = controller_name;
+    session->controller_version_sw     = sw_version;
+    session->controller_version_hw     = hw_version;
+    session->controller_voltage        = voltage;
+    session->controller_command_status = command_status;
+    session->audio_sent_bytes          = 0;
+    session->audio_sent_samples        = 0;
+    session->packets_processed         = 0;
+    session->packets_lost              = 0;
     if(stream_params == NULL) {
-       this->has_stream_params  = false;
+        session->has_stream_params  = false;
     } else {
-       this->has_stream_params  = true;
-       this->stream_params      = *stream_params;
+        session->has_stream_params  = true;
+        session->stream_params      = *stream_params;
 
-       xrsr_session_keyword_info_set(XRSR_SRC_RCU_FF, stream_params->pre_keyword_sample_qty, stream_params->keyword_sample_qty);
+        xrsr_session_keyword_info_set(XRSR_SRC_RCU_FF, stream_params->pre_keyword_sample_qty, stream_params->keyword_sample_qty);
     }
 
-    errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
-    ERR_CHK(safec_rc);
-    this->status.controller_id  = this->controller_id;
-    this->voice_status_set();
-    this->last_cmd_id           = 0;
-    this->next_cmd_id           = 0;
-    this->lqi_total             = 0;
-    this->stats_session_id      = voice_session_id_get() + 1;
-    memset(&this->stats_reboot, 0, sizeof(this->stats_reboot));
-    memset(&this->stats_session, 0, sizeof(this->stats_session));
-    this->stats_session.dropped_retry = ULONG_MAX; // Used to indicate whether controller provides stats or not
+    if(CTRLM_VOICE_DEVICE_PTT == session->voice_device) {
+        errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
+        ERR_CHK(safec_rc);
+        this->status.controller_id     = session->controller_id;
+        this->voice_status_set();
+        this->last_cmd_id              = 0;
+        this->next_cmd_id              = 0;
+        session->lqi_total             = 0;
+        session->stats_session_id      = voice_session_id_get() + 1;
+        memset(&session->stats_reboot, 0, sizeof(session->stats_reboot));
+        memset(&session->stats_session, 0, sizeof(session->stats_session));
+        session->stats_session.dropped_retry = ULONG_MAX; // Used to indicate whether controller provides stats or not
 
-    #ifdef VOICE_BUFFER_STATS
-    voice_buffer_warning_triggered = 0;
-    voice_buffer_high_watermark    = 0;
-    voice_packet_interval          = voice_packet_interval_get(this->format, this->opus_samples_per_packet);
-    #ifdef TIMING_START_TO_FIRST_FRAGMENT
-    ctrlm_timestamp_get(&voice_session_begin_timestamp);
-    #endif
-    #endif
+        #ifdef VOICE_BUFFER_STATS
+        voice_buffer_warning_triggered = 0;
+        voice_buffer_high_watermark    = 0;
+        voice_packet_interval          = voice_packet_interval_get(session->format, this->opus_samples_per_packet);
+        #ifdef TIMING_START_TO_FIRST_FRAGMENT
+        ctrlm_timestamp_get(&voice_session_begin_timestamp);
+        #endif
+        #endif
 
-    // Start packet timeout, but not if this is a voice session by text or standby microphone
-    if (!this->is_session_by_text && device_type != CTRLM_VOICE_DEVICE_MICROPHONE) {
-        if(this->network_type == CTRLM_NETWORK_TYPE_IP) {
-            this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
-        } else {
-            this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_initial, ctrlm_voice_packet_timeout, NULL);
+        // Start packet timeout, but not if this is a voice session by text
+        if(!session->is_session_by_text) {
+            if(session->network_type == CTRLM_NETWORK_TYPE_IP) {
+                this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
+            } else {
+                this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_initial, ctrlm_voice_packet_timeout, NULL);
+            }
         }
     }
     if(timestamp != NULL) {
@@ -1337,29 +1416,42 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     // Post
     sem_post(&this->vsr_semaphore);
 
-    LOG_DEBUG("%s: Voice session acquired <%d, %d, %s> pipe wr <%d> rd <%d>\n", __FUNCTION__, network_id, controller_id, ctrlm_voice_format_str(format), this->audio_pipe[PIPE_WRITE], this->audio_pipe[PIPE_READ]);
+    LOG_DEBUG("%s: Voice session acquired <%d, %d, %s> pipe wr <%d> rd <%d>\n", __FUNCTION__, network_id, controller_id, ctrlm_voice_format_str(format), session->audio_pipe[PIPE_WRITE], session->audio_pipe[PIPE_READ]);
     return (this->prefs.par_voice_enabled) ? VOICE_SESSION_RESPONSE_AVAILABLE_PAR_VOICE : VOICE_SESSION_RESPONSE_AVAILABLE;
 }
 
 bool ctrlm_voice_t::voice_session_term(std::string &session_id) {
-   if(CTRLM_VOICE_STATE_SRC_INVALID == this->state_src) {
-       LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
-       return(false);
-   }
+   for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+      ctrlm_voice_session_t *session = &this->voice_session[group];
 
-   if(this->ipc_common_data.session_id_server == session_id && (this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || this->state_dst != CTRLM_VOICE_STATE_DST_READY)) {
-       // Cancel current speech router session
-       LOG_INFO("%s: session id svr <%s> req <%s> src <%s> dst <%s>\n", __FUNCTION__, this->ipc_common_data.session_id_server.c_str(), session_id.c_str(), ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
-       xrsr_session_terminate();
-       return(true);
-   } else {
-      LOG_WARN("%s: session id <%s> src <%s> dst <%s> invalid or not active\n", __FUNCTION__, session_id.c_str(), ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
+      if(CTRLM_VOICE_STATE_SRC_INVALID == session->state_src) {
+          LOG_ERROR("%s: Voice is not ready\n", __FUNCTION__);
+          return(false);
+      }
+
+      if(session->ipc_common_data.session_id_server == session_id) {
+          if(session->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || session->state_dst != CTRLM_VOICE_STATE_DST_READY) {
+             // Cancel current speech router session
+             LOG_INFO("%s: session id <%s> src <%s> dst <%s>\n", __FUNCTION__, session_id.c_str(), ctrlm_voice_state_src_str(session->state_src), ctrlm_voice_state_dst_str(session->state_dst));
+             xrsr_session_terminate(voice_device_to_xrsr(session->voice_device));
+             return(true);
+          } else {
+             LOG_WARN("%s: session id <%s> src <%s> dst <%s> not active\n", __FUNCTION__, session_id.c_str(), ctrlm_voice_state_src_str(session->state_src), ctrlm_voice_state_dst_str(session->state_dst));
+             return(false);
+          }
+      }
+   }
+   LOG_WARN("%s: session id <%s> not found\n", __FUNCTION__, session_id.c_str());
+   for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+      ctrlm_voice_session_t *session = &this->voice_session[group];
+      LOG_WARN("%s: session id <%s> src <%s> dst <%s>\n", __FUNCTION__, session->ipc_common_data.session_id_server.c_str(), ctrlm_voice_state_src_str(session->state_src), ctrlm_voice_state_dst_str(session->state_dst));
    }
    return(false);
 }
 
 void ctrlm_voice_t::voice_session_rsp_confirm(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp) {
-   if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT]; // this is for PTT only
+   if(session->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
        if(this->power_state == CTRLM_POWER_STATE_DEEP_SLEEP || this->power_state == CTRLM_POWER_STATE_STANDBY) {
            LOG_WARN("%s: missed voice session response window after waking from <%s>\n", __FUNCTION__, ctrlm_power_state_str(this->power_state));
        } else {
@@ -1393,11 +1485,13 @@ static void ctrlm_voice_data_post_processing_cb (ctrlm_hal_data_cb_params_t *par
 }
 
 void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const char *action, ctrlm_timestamp_t *timestamp) {
+    ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];  // This is for PTT only
+
     if(this->timeout_packet_tag > 0) {
         g_source_remove(this->timeout_packet_tag);
         // QOS timeout handled at end of this function as it depends on time stamps and samples transmitted
-        if(!this->controller_supports_qos()) {
-            if(this->network_type == CTRLM_NETWORK_TYPE_IP) {
+        if(!this->controller_supports_qos(session->voice_device)) {
+            if(session->network_type == CTRLM_NETWORK_TYPE_IP) {
                 this->timeout_packet_tag = g_timeout_add(3000, ctrlm_voice_packet_timeout, NULL);
             } else {
                  this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_subsequent, ctrlm_voice_packet_timeout, NULL);
@@ -1412,7 +1506,7 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
     voice_session_last_fragment_timestamp = before;
     #endif
 
-    if(this->audio_sent_bytes == 0) {
+    if(session->audio_sent_bytes == 0) {
         first_fragment = before; // timestamp for start of utterance voice data
         #ifdef TIMING_START_TO_FIRST_FRAGMENT
         LOG_INFO("Session Start to First Fragment: %8lld ms lag\n", ctrlm_timestamp_subtract_ms(voice_session_begin_timestamp, first_fragment));
@@ -1421,11 +1515,15 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
 
     unsigned long long session_time = this->voice_packet_interval + ctrlm_timestamp_subtract_us(first_fragment, before); // in microseconds
 
+    if(session->network_type == CTRLM_NETWORK_TYPE_BLUETOOTH_LE) { // BLE pipes data directly so this is the first point to increment packet counter.  Lost packet count not available (TODO)
+       session->packets_processed++;
+    }
+
     // The total packets (received + lost)
-    uint32_t packets_total = this->packets_processed + this->packets_lost;
-    unsigned long long session_delta = (session_time - ((packets_total - 1) * this->voice_packet_interval)); // in microseconds
+    uint32_t packets_total = session->packets_processed + session->packets_lost;
+    long long session_delta = (session_time - ((packets_total - 1) * this->voice_packet_interval)); // in microseconds
     unsigned long watermark = (session_delta / this->voice_packet_interval) + 1;
-    if(watermark > voice_buffer_high_watermark) {
+    if(session_delta > 0 && watermark > voice_buffer_high_watermark) {
         voice_buffer_high_watermark = watermark;
     }
     if(session_delta > (VOICE_BUFFER_WARNING_THRESHOLD * this->voice_packet_interval)) {
@@ -1434,7 +1532,7 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
     #endif
 
     if(timestamp != NULL) {
-        if(this->audio_sent_bytes == 0) {
+        if(session->audio_sent_bytes == 0) {
             this->session_timing.ctrl_audio_rxd_first = *timestamp;
             this->session_timing.ctrl_audio_rxd_final = *timestamp;
         } else {
@@ -1442,25 +1540,25 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
         }
     }
 
-    this->audio_sent_bytes += bytes_sent;
+    session->audio_sent_bytes += bytes_sent;
 
     // Handle input format
-    if(this->format == CTRLM_VOICE_FORMAT_OPUS_XVP) {
-       this->audio_sent_samples += this->opus_samples_per_packet; // From opus encoding parameters
-    } else if(this->format == CTRLM_VOICE_FORMAT_ADPCM || this->format == CTRLM_VOICE_FORMAT_ADPCM_SKY) {
-       this->audio_sent_samples += (bytes_sent - 4) * 2; // 4 byte header, one nibble per sample
+    if(session->format == CTRLM_VOICE_FORMAT_OPUS_XVP) {
+       session->audio_sent_samples += this->opus_samples_per_packet; // From opus encoding parameters
+    } else if(session->format == CTRLM_VOICE_FORMAT_ADPCM || session->format == CTRLM_VOICE_FORMAT_ADPCM_SKY) {
+       session->audio_sent_samples += (bytes_sent - 4) * 2; // 4 byte header, one nibble per sample
     } else { // PCM
-       this->audio_sent_samples += bytes_sent >> 1; // 16 bit samples
+       session->audio_sent_samples += bytes_sent >> 1; // 16 bit samples
     }
 
-    if(this->has_stream_params && !this->stream_params.push_to_talk && !this->session_timing.has_keyword) {
-       if(this->audio_sent_samples >= (this->stream_params.pre_keyword_sample_qty + this->stream_params.keyword_sample_qty) && timestamp != NULL) {
+    if(session->has_stream_params && !session->stream_params.push_to_talk && !this->session_timing.has_keyword) {
+       if(session->audio_sent_samples >= (session->stream_params.pre_keyword_sample_qty + session->stream_params.keyword_sample_qty) && timestamp != NULL) {
           this->session_timing.ctrl_audio_rxd_keyword = *timestamp;
           this->session_timing.has_keyword = true;
        }
     }
-    if(controller_supports_qos()) {
-       guint32 timeout = (this->audio_sent_samples * 2 * 8) / this->prefs.bitrate_minimum;
+    if(controller_supports_qos(session->voice_device)) {
+       guint32 timeout = (session->audio_sent_samples * 2 * 8) / this->prefs.bitrate_minimum;
        signed long long elapsed = rdkx_timestamp_subtract_ms(this->session_timing.ctrl_audio_rxd_first, this->session_timing.ctrl_audio_rxd_final);
 
        timeout -= elapsed;
@@ -1470,19 +1568,19 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
        } else if(timeout > 2000) { // Cap at 2 seconds - effectively interpacket timeout
           timeout = 2000;
        }
-       float rx_rate = (elapsed == 0) ? 0 : (this->audio_sent_samples * 2 * 8) / elapsed;
+       float rx_rate = (elapsed == 0) ? 0 : (session->audio_sent_samples * 2 * 8) / elapsed;
 
        this->timeout_packet_tag = g_timeout_add(timeout, ctrlm_voice_packet_timeout, NULL);
-       LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu> rate <%6.2f kbps> timeout <%lu ms>\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples, rx_rate, timeout);
+       LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu> rate <%6.2f kbps> timeout <%lu ms>\n", __FUNCTION__, action, session->audio_sent_bytes, session->audio_sent_samples, rx_rate, timeout);
     } else {
        #ifdef VOICE_BUFFER_STATS
        if(voice_buffer_warning_triggered) {
-          LOG_WARN("%s: Audio %s bytes <%lu> samples <%lu> pkt cnt <%3u> elapsed <%8llu ms> lag <%8llu ms> (%4.2f packets)\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples, packets_total, session_time / 1000, session_delta / 1000, (((float)session_delta) / this->voice_packet_interval));
+          LOG_WARN("%s: Audio %s bytes <%lu> samples <%lu> pkt cnt <%3u> elapsed <%8llu ms> lag <%8lld ms> (%4.2f packets)\n", __FUNCTION__, action, session->audio_sent_bytes, session->audio_sent_samples, packets_total, session_time / 1000, session_delta / 1000, (((float)session_delta) / this->voice_packet_interval));
        } else {
-          LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu>\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples);
+          LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu>\n", __FUNCTION__, action, session->audio_sent_bytes, session->audio_sent_samples);
        }
        #else
-       LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu>\n", __FUNCTION__, action, this->audio_sent_bytes, this->audio_sent_samples);
+       LOG_INFO("%s: Audio %s bytes <%lu> samples <%lu>\n", __FUNCTION__, action, session->audio_sent_bytes, session->audio_sent_samples);
        #endif
     }
 }
@@ -1490,43 +1588,45 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
 bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd) {
     bool ret = false;
 
-    if(network_id != this->network_id || controller_id != this->controller_id) {
+    ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT]; // This is for PTT only
+
+    if(network_id != session->network_id || controller_id != session->controller_id) {
         LOG_ERROR("%s: Data from wrong controller, ignoring\n", __FUNCTION__);
         return(false); 
     }
-    if(this->hal_input_object != NULL && !this->is_session_by_text) {
-        if (false == ctrlm_xraudio_hal_input_set_ctrlm_data_read_cb(this->hal_input_object, ctrlm_voice_data_post_processing_cb, (void*)this)) {
+    if(session->hal_input_object != NULL && !session->is_session_by_text) {
+        if (false == ctrlm_xraudio_hal_input_set_ctrlm_data_read_cb(session->hal_input_object, ctrlm_voice_data_post_processing_cb, (void*)this)) {
             LOG_ERROR("%s: Failed setting post data read callback to ctrlm\n", __FUNCTION__);
             return(false); 
         }
 
-        if (true == (ret = ctrlm_xraudio_hal_input_use_external_pipe(this->hal_input_object, fd))) {
-            if(this->audio_pipe[PIPE_READ] >= 0) {
-                LOG_INFO("%s: Closing previous pipe - READ fd <%d>\n", __FUNCTION__, this->audio_pipe[PIPE_READ]);
-                close(this->audio_pipe[PIPE_READ]);
-                this->audio_pipe[PIPE_READ] = -1;
+        if (true == (ret = ctrlm_xraudio_hal_input_use_external_pipe(session->hal_input_object, fd))) {
+            if(session->audio_pipe[PIPE_READ] >= 0) {
+                LOG_INFO("%s: Closing previous pipe - READ fd <%d>\n", __FUNCTION__, session->audio_pipe[PIPE_READ]);
+                close(session->audio_pipe[PIPE_READ]);
+                session->audio_pipe[PIPE_READ] = -1;
             }
-            if(this->audio_pipe[PIPE_WRITE] >= 0) {
-                LOG_INFO("%s: Closing previous pipe - WRITE fd <%d>\n", __FUNCTION__, this->audio_pipe[PIPE_WRITE]);
-                close(this->audio_pipe[PIPE_WRITE]);
-                this->audio_pipe[PIPE_WRITE] = -1;
+            if(session->audio_pipe[PIPE_WRITE] >= 0) {
+                LOG_INFO("%s: Closing previous pipe - WRITE fd <%d>\n", __FUNCTION__, session->audio_pipe[PIPE_WRITE]);
+                close(session->audio_pipe[PIPE_WRITE]);
+                session->audio_pipe[PIPE_WRITE] = -1;
             }
 
             LOG_INFO("%s: Setting read pipe to fd <%d> and beginning session...\n", __FUNCTION__, fd);
-            this->audio_pipe[PIPE_READ] = fd;
+            session->audio_pipe[PIPE_READ] = fd;
 
             ctrlm_hal_input_params_t hal_input_params;
-            hal_input_params.device = voice_device_to_hal(this->voice_device);
+            hal_input_params.device = voice_device_to_hal(session->voice_device);
             hal_input_params.fd     = fd;
 
             hal_input_params.input_format.container   = XRAUDIO_CONTAINER_NONE;
-            hal_input_params.input_format.encoding    = voice_format_to_xraudio(this->format);
+            hal_input_params.input_format.encoding    = voice_format_to_xraudio(session->format);
             hal_input_params.input_format.sample_rate = 16000;
-            hal_input_params.input_format.sample_size = 1;
+            hal_input_params.input_format.sample_size = 2;
             hal_input_params.input_format.channel_qty = 1;
             hal_input_params.require_stream_params    = false;
 
-            ret = ctrlm_xraudio_hal_input_session_begin(this->hal_input_object, &hal_input_params);
+            ret = ctrlm_xraudio_hal_input_session_begin(session->hal_input_object, &hal_input_params);
         }
     }
     return ret;
@@ -1535,13 +1635,14 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
 bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp, uint8_t *lqi) {
     char              local_buf[length + 1];
     long unsigned int bytes_written = 0;
-    if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
+    ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT]; // This is for PTT only
+    if(session->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
         LOG_ERROR("%s: No voice session in progress\n", __FUNCTION__);
         return(false);
-    } else if(network_id != this->network_id || controller_id != this->controller_id) {
+    } else if(network_id != session->network_id || controller_id != session->controller_id) {
         LOG_ERROR("%s: Data from wrong controller, ignoring\n", __FUNCTION__);
         return(false); 
-    } else if(this->audio_pipe[PIPE_WRITE] < 0) {
+    } else if(session->audio_pipe[PIPE_WRITE] < 0) {
         LOG_ERROR("%s: Pipe doesn't exist\n", __FUNCTION__);
         return(false);
     } else if(length <= 0) {
@@ -1551,10 +1652,10 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
 
     uint8_t cmd_id = buffer[0];
 
-    if(this->network_type == CTRLM_NETWORK_TYPE_RF4CE) {
+    if(session->network_type == CTRLM_NETWORK_TYPE_RF4CE) {
         if(this->last_cmd_id == cmd_id) {
             LOG_INFO("%s: RF4CE Duplicate Voice Packet\n", __FUNCTION__);
-            if(this->timeout_packet_tag > 0 && !controller_supports_qos()) {
+            if(this->timeout_packet_tag > 0 && !controller_supports_qos(session->voice_device)) {
                g_source_remove(this->timeout_packet_tag);
                this->timeout_packet_tag = g_timeout_add(this->prefs.timeout_packet_subsequent, ctrlm_voice_packet_timeout, NULL);
             }
@@ -1562,9 +1663,9 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
         }
 
         // Maintain a running packet received and lost count (which is overwritten by post session stats)
-        this->packets_processed++;
+        session->packets_processed++;
         if(this->next_cmd_id != 0 && this->next_cmd_id != cmd_id) {
-            this->packets_lost += (cmd_id > this->next_cmd_id) ? (cmd_id - this->next_cmd_id) : (ADPCM_COMMAND_ID_MAX + 1 - this->next_cmd_id) + (cmd_id - ADPCM_COMMAND_ID_MIN);
+           session->packets_lost += (cmd_id > this->next_cmd_id) ? (cmd_id - this->next_cmd_id) : (ADPCM_COMMAND_ID_MAX + 1 - this->next_cmd_id) + (cmd_id - ADPCM_COMMAND_ID_MIN);
         }
 
         this->last_cmd_id = cmd_id;
@@ -1575,9 +1676,9 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
     }
 
     const char *action = "dumped";
-    if(this->state_dst != CTRLM_VOICE_STATE_DST_READY) { // destination is accepting more data
+    if(session->state_dst != CTRLM_VOICE_STATE_DST_READY) { // destination is accepting more data
        action = "sent";
-       if(this->format == CTRLM_VOICE_FORMAT_OPUS || this->format == CTRLM_VOICE_FORMAT_OPUS_XVP) {
+       if(session->format == CTRLM_VOICE_FORMAT_OPUS || session->format == CTRLM_VOICE_FORMAT_OPUS_XVP) {
            // Copy to local buffer to perform a single write to the pipe.  TODO: have the caller reserve 1 bytes at the beginning
            // of the buffer to eliminate this copy
            local_buf[0] = length;
@@ -1587,7 +1688,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
            length++;
        }
 
-       bytes_written = write(this->audio_pipe[PIPE_WRITE], buffer, length);
+       bytes_written = write(session->audio_pipe[PIPE_WRITE], buffer, length);
        if(bytes_written != length) {
            LOG_ERROR("%s: Failed to write data to pipe: %s\n", __FUNCTION__, strerror(errno));
            return(false);
@@ -1595,7 +1696,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
     }
 
     if(lqi != NULL) {
-        lqi_total += *lqi;
+        session->lqi_total += *lqi;
     }
 
     voice_session_data_post_processing(length, action, timestamp);
@@ -1604,16 +1705,23 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
 }
 
 void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp, ctrlm_voice_session_end_stats_t *stats) {
+   ctrlm_voice_session_t *session = voice_session_from_controller(network_id, controller_id);
+
+   if(session == NULL) {
+      LOG_ERROR("%s: session not found\n");
+      return;
+   }
+   this->voice_session_end(session, reason, timestamp, stats);
+}
+
+void ctrlm_voice_t::voice_session_end(ctrlm_voice_session_t *session, ctrlm_voice_session_end_reason_t reason, ctrlm_timestamp_t *timestamp, ctrlm_voice_session_end_stats_t *stats) {
     LOG_INFO("%s: voice session end < %s >\n", __FUNCTION__, ctrlm_voice_session_end_reason_str(reason));
-    if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
+    if(session->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
         LOG_ERROR("%s: No voice session in progress\n", __FUNCTION__);
         return;
-    } else if(network_id != this->network_id || controller_id != this->controller_id) {
-        LOG_ERROR("%s: session end from wrong controller, ignoring\n", __FUNCTION__);
-        return; 
     }
 
-    this->end_reason = reason;
+    session->end_reason = reason;
 
     if(timestamp != NULL) {
        this->session_timing.ctrl_stop = *timestamp;
@@ -1627,25 +1735,25 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
         this->timeout_packet_tag = 0;
     }
 
-    if(this->audio_pipe[PIPE_WRITE] >= 0) {
-        LOG_INFO("%s: Close write pipe - fd <%d>\n", __FUNCTION__, this->audio_pipe[PIPE_WRITE]);
-        close(this->audio_pipe[PIPE_WRITE]);
-        this->audio_pipe[PIPE_WRITE] = -1;
+    if(session->audio_pipe[PIPE_WRITE] >= 0) {
+        LOG_INFO("%s: Close write pipe - fd <%d>\n", __FUNCTION__, session->audio_pipe[PIPE_WRITE]);
+        close(session->audio_pipe[PIPE_WRITE]);
+        session->audio_pipe[PIPE_WRITE] = -1;
     }
-    if(this->hal_input_object != NULL) {
-        ctrlm_xraudio_hal_input_close(this->hal_input_object);
-        this->hal_input_object = NULL;
+    if(session->hal_input_object != NULL) {
+        ctrlm_xraudio_hal_input_close(session->hal_input_object);
+        session->hal_input_object = NULL;
     }
 
     // Send main queue message
     ctrlm_main_queue_msg_voice_session_end_t end = {0};
 
-    end.controller_id       = this->controller_id;
+    end.controller_id       = session->controller_id;
     end.reason              = reason;
-    end.utterance_too_short = (this->audio_sent_bytes == 0 ? 1 : 0);
+    end.utterance_too_short = (session->audio_sent_bytes == 0 ? 1 : 0);
     // Don't need to fill out other info
     if(stats != NULL) {
-        stats_session.rf_channel       = stats->rf_channel;
+       session->stats_session.rf_channel       = stats->rf_channel;
         #ifdef VOICE_BUFFER_STATS
         #ifdef TIMING_LAST_FRAGMENT_TO_STOP
         ctrlm_timestamp_t after;
@@ -1653,35 +1761,35 @@ void ctrlm_voice_t::voice_session_end(ctrlm_network_id_t network_id, ctrlm_contr
         unsigned long long lag_time = ctrlm_timestamp_subtract_ns(voice_session_last_fragment_timestamp, after);
         LOG_INFO("Last Fragment to Session Stop: %8llu ms lag\n", lag_time / 1000000);
         #endif
-        stats_session.buffer_watermark  = voice_buffer_high_watermark;
+        session->stats_session.buffer_watermark  = voice_buffer_high_watermark;
         #else
-        stats_session.buffer_watermark  = ULONG_MAX;
+        session->stats_session.buffer_watermark  = ULONG_MAX;
         #endif
     }
-    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_end, &end, sizeof(end), NULL, this->network_id);
+    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_end, &end, sizeof(end), NULL, session->network_id);
 
     // clear session_active_controller for controllers that don't support voice command status
-    if(!this->controller_command_status) {
-       this->session_active_controller = false;
+    if(!session->controller_command_status) {
+       session->session_active_controller = false;
     }
 
     // Set a timeout for receiving voice session stats from the controller
     this->timeout_ctrl_session_stats_rxd = g_timeout_add(this->prefs.timeout_stats, ctrlm_voice_controller_session_stats_rxd_timeout, NULL);
 
-    LOG_DEBUG("%s,%d: session_active_server = <%d>, session_active_controller = <%d>\n", __FUNCTION__, __LINE__, session_active_server, session_active_controller);
+    LOG_DEBUG("%s,%d: session_active_server = <%d>, session_active_controller = <%d>\n", __FUNCTION__, __LINE__, session->session_active_server, session->session_active_controller);
 
     // Update source state
-    if(this->session_active_controller) {
-       this->state_src = CTRLM_VOICE_STATE_SRC_WAITING;
+    if(session->session_active_controller) {
+       session->state_src = CTRLM_VOICE_STATE_SRC_WAITING;
     } else {
-       this->state_src = CTRLM_VOICE_STATE_SRC_READY;
-       if(!this->session_active_server) {
+       session->state_src = CTRLM_VOICE_STATE_SRC_READY;
+       if(!session->session_active_server) {
           voice_session_stats_print();
           voice_session_stats_clear();
        }
     }
 
-    if(is_standby_microphone()) {
+    if(is_standby_microphone(session->voice_device)) {
         if(!ctrlm_power_state_change(CTRLM_POWER_STATE_ON, false)) {
             LOG_ERROR("%s: failed to set power state!\n");
         }
@@ -1694,30 +1802,33 @@ void ctrlm_voice_t::voice_session_controller_stats_rxd_timeout() {
 }
 
 void ctrlm_voice_t::voice_session_stats(ctrlm_voice_stats_session_t session) {
-   stats_session.available      = session.available;
-   stats_session.packets_total  = session.packets_total;
-   stats_session.dropped_retry  = session.dropped_retry;
-   stats_session.dropped_buffer = session.dropped_buffer;
-   stats_session.retry_mac      = session.retry_mac;
-   stats_session.retry_network  = session.retry_network;
-   stats_session.cca_sense      = session.cca_sense;
+   ctrlm_voice_session_t *voice_session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];  //
+   voice_session->stats_session.available      = session.available;
+   voice_session->stats_session.packets_total  = session.packets_total;
+   voice_session->stats_session.dropped_retry  = session.dropped_retry;
+   voice_session->stats_session.dropped_buffer = session.dropped_buffer;
+   voice_session->stats_session.retry_mac      = session.retry_mac;
+   voice_session->stats_session.retry_network  = session.retry_network;
+   voice_session->stats_session.cca_sense      = session.cca_sense;
 
    voice_session_notify_stats();
 }
 
 void ctrlm_voice_t::voice_session_stats(ctrlm_voice_stats_reboot_t reboot) {
-   stats_reboot = reboot;
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];
+   session->stats_reboot = reboot;
 
    // Send the notification
    voice_session_notify_stats();
 }
 
 void ctrlm_voice_t::voice_session_notify_stats() {
-   if(stats_session_id == 0) {
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];
+   if(session->stats_session_id == 0) {
       LOG_INFO("%s: already sent, ignoring.\n", __FUNCTION__);
       return;
    }
-   if(stats_session_id != this->ipc_common_data.session_id_ctrlm) {
+   if(session->stats_session_id != session->ipc_common_data.session_id_ctrlm) {
       LOG_INFO("%s: stale session, ignoring.\n", __FUNCTION__);
       return;
    }
@@ -1729,36 +1840,37 @@ void ctrlm_voice_t::voice_session_notify_stats() {
    }
 
    // Send session stats only if the server voice session has ended
-   if(!this->session_active_server && this->voice_ipc) {
+   if(!session->session_active_server && this->voice_ipc) {
       ctrlm_voice_ipc_event_session_statistics_t stats;
 
-      stats.common  = this->ipc_common_data;
-      stats.session = this->stats_session;
-      stats.reboot  = this->stats_reboot;
+      stats.common  = session->ipc_common_data;
+      stats.session = session->stats_session;
+      stats.reboot  = session->stats_reboot;
 
       this->voice_ipc->session_statistics(stats);
-      stats_session_id = 0;
+      session->stats_session_id = 0;
    }
 }
 
 void ctrlm_voice_t::voice_session_timeout() {
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];
    this->timeout_packet_tag = 0;
    ctrlm_voice_session_end_reason_t reason = CTRLM_VOICE_SESSION_END_REASON_TIMEOUT_INTERPACKET;
-   if(this->audio_sent_bytes == 0) {
+   if(session->audio_sent_bytes == 0) {
       reason = CTRLM_VOICE_SESSION_END_REASON_TIMEOUT_FIRST_PACKET;
-   } else if(controller_supports_qos()) {
+   } else if(controller_supports_qos(session->voice_device)) {
       // Bitrate = transmitted PCM data size / elapsed time
 
       ctrlm_timestamp_t timestamp;
       rdkx_timestamp_get_realtime(&timestamp);
       signed long long elapsed = rdkx_timestamp_subtract_ms(this->session_timing.ctrl_audio_rxd_first, timestamp);
-      float rx_rate = (elapsed == 0) ? 0 : (this->audio_sent_samples * 2 * 8) / elapsed;
+      float rx_rate = (elapsed == 0) ? 0 : (session->audio_sent_samples * 2 * 8) / elapsed;
 
-      LOG_INFO("%s: elapsed time <%llu> ms rx samples <%u> rate <%6.1f> kbps\n", __FUNCTION__, elapsed, this->audio_sent_samples, rx_rate);
+      LOG_INFO("%s: elapsed time <%llu> ms rx samples <%u> rate <%6.1f> kbps\n", __FUNCTION__, elapsed, session->audio_sent_samples, rx_rate);
       reason = CTRLM_VOICE_SESSION_END_REASON_MINIMUM_QOS;
    }
    LOG_INFO("%s: %s\n", __FUNCTION__, ctrlm_voice_session_end_reason_str(reason));
-   this->voice_session_end(this->network_id, this->controller_id, reason);
+   this->voice_session_end(session, reason);
 }
 
 void ctrlm_voice_t::voice_session_stats_clear() {
@@ -1862,35 +1974,48 @@ void ctrlm_voice_t::voice_session_stats_print() {
    }
 }
 
-void ctrlm_voice_t::voice_session_info(ctrlm_voice_session_info_t *data) {
+void ctrlm_voice_t::voice_session_info(xrsr_src_t src, ctrlm_voice_session_info_t *data) {
+   ctrlm_voice_session_t *session = &this->voice_session[voice_device_to_session_group(xrsr_to_voice_device(src))];
+   this->voice_session_info(session, data);
+}
+
+void ctrlm_voice_t::voice_session_info(ctrlm_voice_session_t *session, ctrlm_voice_session_info_t *data) {
     if(data) {
-        data->controller_name       = this->controller_name;
-        data->controller_version_sw = this->controller_version_sw;
-        data->controller_version_hw = this->controller_version_hw;
-        data->controller_voltage    = this->controller_voltage;
+        data->controller_name       = session->controller_name;
+        data->controller_version_sw = session->controller_version_sw;
+        data->controller_version_hw = session->controller_version_hw;
+        data->controller_voltage    = session->controller_voltage;
         data->stb_name              = this->stb_name;
         data->ffv_leading_samples   = this->prefs.ffv_leading_samples;
-        data->has_stream_params     = this->has_stream_params;
+        data->has_stream_params     = session->has_stream_params;
         if(data->has_stream_params) {
-            data->stream_params = this->stream_params;
+            data->stream_params = session->stream_params;
         }
     }
 }
 
-void ctrlm_voice_t::voice_session_info_reset() {
-    this->controller_name        = "";
-    this->controller_version_sw  = "";
-    this->controller_version_hw  = "";
-    this->controller_voltage     = 0.0;
-    this->has_stream_params      = false;
+void ctrlm_voice_t::voice_session_info_reset(ctrlm_voice_session_t *session) {
+    session->controller_name        = "";
+    session->controller_version_sw  = "";
+    session->controller_version_hw  = "";
+    session->controller_voltage     = 0.0;
+    session->has_stream_params      = false;
 }
 
-ctrlm_voice_state_src_t ctrlm_voice_t::voice_state_src_get() const {
-    return(this->state_src);
+ctrlm_voice_state_src_t ctrlm_voice_t::voice_state_src_get(ctrlm_voice_session_group_t group) const {
+    if(group >= VOICE_SESSION_GROUP_QTY) {
+        LOG_ERROR("%s: session index out of range <%u>\n", __FUNCTION__, group);
+        return(this->voice_session[0].state_src);
+    }
+    return(this->voice_session[group].state_src);
 }
 
-ctrlm_voice_state_dst_t ctrlm_voice_t::voice_state_dst_get() const {
-    return(this->state_dst);
+ctrlm_voice_state_dst_t ctrlm_voice_t::voice_state_dst_get(ctrlm_voice_session_group_t group) const {
+    if(group >= VOICE_SESSION_GROUP_QTY) {
+        LOG_ERROR("%s: session index out of range <%u>\n", __FUNCTION__, group);
+        return(this->voice_session[0].state_dst);
+    }
+    return(this->voice_session[group].state_dst);
 }
 
 void ctrlm_voice_t::voice_stb_data_stb_sw_version_set(std::string &sw_version) {
@@ -2094,63 +2219,66 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
         return;
     }
 
+    // Fetch session based on xrsr source
+    ctrlm_voice_session_group_t group = voice_device_to_session_group(xrsr_to_voice_device(session_begin->src));
+    ctrlm_voice_session_t *session = &this->voice_session[group];
+
     if(!uuid_is_null(session_begin->header.uuid)) {
         char uuid_str[37] = {'\0'};
         uuid_unparse_lower(session_begin->header.uuid, uuid_str);
-        this->trx  = uuid_str;
-        uuid_copy(this->uuid, session_begin->header.uuid);
+        session->uuid_str  = uuid_str;
+        uuid_copy(session->uuid, session_begin->header.uuid);
     }
 
-    uuid_copy(this->uuid, session_begin->header.uuid);
+    uuid_copy(session->uuid, session_begin->header.uuid);
     this->confidence                        = 0;
     this->dual_sensitivity_immediate        = false;
-    this->transcription                     = "";
-    this->message                           = "";
-    this->server_ret_code                   = 0;
-    this->voice_device                      = xrsr_to_voice_device(session_begin->src);
-    if( CTRLM_VOICE_DEVICE_MICROPHONE == this->voice_device )
-    {
-       this->network_id = CTRLM_MAIN_NETWORK_ID_DSP;
-       this->controller_id = CTRLM_MAIN_CONTROLLER_ID_DSP;
-       this->network_type = CTRLM_NETWORK_TYPE_DSP;
-       this->keyword_verified = false;
-       LOG_INFO("%s setting network and controller to DSP from device type\n",__FUNCTION__);
+    session->transcription                  = "";
+    session->server_message                 = "";
+    session->server_ret_code                = 0;
+    session->voice_device                   = xrsr_to_voice_device(session_begin->src);
+    if(ctrlm_voice_device_is_mic(session->voice_device)) {
+       session->network_id       = CTRLM_MAIN_NETWORK_ID_DSP;
+       session->controller_id    = CTRLM_MAIN_CONTROLLER_ID_DSP;
+       session->network_type     = CTRLM_NETWORK_TYPE_DSP;
+       session->keyword_verified = false;
+       LOG_INFO("%s: src <%s> setting network and controller to DSP\n",__FUNCTION__, ctrlm_voice_device_str(session->voice_device));
     }
-    this->ipc_common_data.network_id        = this->network_id;
-    this->ipc_common_data.network_type      = ctrlm_network_type_get(this->network_id);
-    this->ipc_common_data.controller_id     = this->controller_id;
-    this->ipc_common_data.session_id_ctrlm  = this->voice_session_id_next();
-    this->ipc_common_data.session_id_server = this->trx;
-    this->ipc_common_data.voice_assistant   = is_voice_assistant(this->voice_device);
-    this->ipc_common_data.device_type       = this->voice_device;
-    this->endpoint_current                  = session_begin->endpoint;
-    this->end_reason                        = CTRLM_VOICE_SESSION_END_REASON_DONE;
+    session->ipc_common_data.network_id        = session->network_id;
+    session->ipc_common_data.network_type      = ctrlm_network_type_get(session->network_id);
+    session->ipc_common_data.controller_id     = session->controller_id;
+    session->ipc_common_data.session_id_ctrlm  = this->voice_session_id_next();
+    session->ipc_common_data.session_id_server = session->uuid_str;
+    session->ipc_common_data.voice_assistant   = is_voice_assistant(session->voice_device);
+    session->ipc_common_data.device_type       = session->voice_device;
+    session->endpoint_current               = session_begin->endpoint;
+    session->end_reason                     = CTRLM_VOICE_SESSION_END_REASON_DONE;
 
     errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0 , sizeof(this->status));
     ERR_CHK(safec_rc);
-    this->status.controller_id  = this->controller_id;
+    this->status.controller_id  = session->controller_id;
     this->voice_status_set();
 
     this->session_timing.srvr_request = session_begin->header.timestamp;
     this->session_timing.connect_attempt = true;
 
     // Parse the stream params
-    if(this->has_stream_params) {
-        this->dual_sensitivity_immediate = (!this->stream_params.high_search_pt_support || (this->stream_params.high_search_pt_support && this->stream_params.standard_search_pt_triggered));
+    if(session->has_stream_params) {
+        this->dual_sensitivity_immediate = (!session->stream_params.high_search_pt_support || (session->stream_params.high_search_pt_support && session->stream_params.standard_search_pt_triggered));
         for(int i = 0; i < CTRLM_FAR_FIELD_BEAMS_MAX; i++) {
-            if(this->stream_params.beams[i].selected) {
-                if(this->stream_params.beams[i].confidence_normalized) {
-                    this->confidence                       = this->stream_params.beams[i].confidence;
+            if(session->stream_params.beams[i].selected) {
+                if(session->stream_params.beams[i].confidence_normalized) {
+                    this->confidence = session->stream_params.beams[i].confidence;
                 }
             }
         }
     }
 
-    LOG_INFO("%s: session begin\n", __FUNCTION__);
+    LOG_INFO("%s: src <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device));
 
     // Check if we should change audio states
     bool kw_verification_required = false;
-    if(is_voice_assistant(this->voice_device)) {
+    if(is_voice_assistant(session->voice_device)) {
         if(this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_VSR || 
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_CONFIDENCE && this->confidence >= this->audio_confidence_threshold) ||
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_DUAL_SENSITIVITY && this->dual_sensitivity_immediate)) {
@@ -2161,12 +2289,12 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
     }
 
     // Update device status
-    this->voice_session_set_active(this->voice_device);
+    this->voice_session_set_active(session->voice_device);
 
     // IARM Begin Event
     if(this->voice_ipc) {
         ctrlm_voice_ipc_event_session_begin_t begin;
-        begin.common                        = this->ipc_common_data;
+        begin.common                        = session->ipc_common_data;
         begin.mime_type                     = CTRLM_VOICE_MIMETYPE_ADPCM;
         begin.sub_type                      = CTRLM_VOICE_SUBTYPE_ADPCM;
         begin.language                      = this->prefs.guide_language;
@@ -2175,15 +2303,15 @@ void ctrlm_voice_t::voice_session_begin_callback(ctrlm_voice_session_begin_cb_t 
         this->voice_ipc->session_begin(begin);
     }
 
-    if(this->state_dst != CTRLM_VOICE_STATE_DST_REQUESTED) {
-        LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
+    if(session->state_dst != CTRLM_VOICE_STATE_DST_REQUESTED && !(ctrlm_voice_device_is_mic(session->voice_device) && session->state_dst == CTRLM_VOICE_STATE_DST_READY)) {
+        LOG_WARN("%s: src <%s> unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), ctrlm_voice_state_dst_str(session->state_dst));
     }
-    this->state_dst = CTRLM_VOICE_STATE_DST_OPENED;
+    session->state_dst = CTRLM_VOICE_STATE_DST_OPENED;
 
 
-    if (this->is_session_by_text) {
-        LOG_WARN("%s: Ending voice session immediately because this is a text-only session\n", __FUNCTION__);
-        this->voice_session_end(this->network_id, this->controller_id, CTRLM_VOICE_SESSION_END_REASON_DONE);
+    if (session->is_session_by_text) {
+        LOG_WARN("%s: src <%s> Ending voice session immediately because this is a text-only session\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device));
+        this->voice_session_end(session, CTRLM_VOICE_SESSION_END_REASON_DONE);
     }
 }
 
@@ -2194,66 +2322,78 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
     }
     errno_t safec_rc = -1;
 
+    // Get session based on uuid
+    ctrlm_voice_session_t *session = voice_session_from_uuid(session_end->header.uuid);
+
+    if(session == NULL) {
+       LOG_ERROR("%s: session not found\n", __FUNCTION__);
+       return;
+    }
+
     //If this is a voice assistant, unmute the audio
-    if(is_voice_assistant(this->voice_device)) {
+    if(is_voice_assistant(session->voice_device)) {
         this->audio_state_set(false);
     }
 
     xrsr_session_stats_t *stats = &session_end->stats;
 
     if(stats == NULL) {
-        LOG_ERROR("%s: stats are NULL\n", __FUNCTION__);
+        LOG_ERROR("%s: src <%s> stats are NULL\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device));
         return;
     }
 
+    ctrlm_voice_command_status_t command_status = VOICE_COMMAND_STATUS_FAILURE;
     if(this->status.status == VOICE_COMMAND_STATUS_PENDING) {
-        switch(this->voice_device) {
+        switch(session->voice_device) {
             case CTRLM_VOICE_DEVICE_FF: {
                 this->status.status = (stats->reason == XRSR_SESSION_END_REASON_EOS) ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE;
+                command_status = this->status.status;
                 this->voice_status_set();
                 break;
             }
+            #ifdef CTRLM_LOCAL_MIC
             case CTRLM_VOICE_DEVICE_MICROPHONE: {
-                this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
+                command_status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
                 // No need to set, as it's not a controller
                 break;
             }
+            #endif
             default: {
                 break;
             }
         }
     }
 
-    LOG_INFO("%s: audio sent bytes <%u> samples <%u> reason <%s> voice command status <%s>\n", __FUNCTION__, this->audio_sent_bytes, this->audio_sent_samples, xrsr_session_end_reason_str(stats->reason), ctrlm_voice_command_status_str(this->status.status));
+    LOG_INFO("%s: src <%s> audio sent bytes <%u> samples <%u> reason <%s> voice command status <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), session->audio_sent_bytes, session->audio_sent_samples, xrsr_session_end_reason_str(stats->reason), ctrlm_voice_command_status_str(command_status));
 
     // Update device status
-    this->voice_session_set_inactive(this->voice_device);
+    this->voice_session_set_inactive(session->voice_device);
 
-    if (this->is_session_by_text) {
+    if (session->is_session_by_text) {
         // if this is a text only session, we don't get an ASR message from vrex with the transcription so copy it here.
-        this->transcription = this->transcription_in;
+        session->transcription = session->transcription_in;
     }
 
     // Send Results IARM Event
     if(this->voice_ipc) {
         if(stats->reason == XRSR_SESSION_END_REASON_ERROR_AUDIO_DURATION) {
             ctrlm_voice_ipc_event_session_end_t end;
-            end.common = this->ipc_common_data;
+            end.common = session->ipc_common_data;
             end.result = SESSION_END_SHORT_UTTERANCE;
-            end.reason = (int)this->end_reason;
+            end.reason = (int)session->end_reason;
             this->voice_ipc->session_end(end);
         } else {
             ctrlm_voice_ipc_event_session_end_server_stats_t server_stats;
             ctrlm_voice_ipc_event_session_end_t end;
-            end.common                       = this->ipc_common_data;
+            end.common                       = session->ipc_common_data;
             end.result                       = (session_end->success ? SESSION_END_SUCCESS : SESSION_END_FAILURE);
             end.reason                       = stats->reason;
             end.return_code_protocol         = stats->ret_code_protocol;
             end.return_code_protocol_library = stats->ret_code_library;
-            end.return_code_server           = this->server_ret_code;
-            end.return_code_server_str       = this->message;
+            end.return_code_server           = session->server_ret_code;
+            end.return_code_server_str       = session->server_message;
             end.return_code_internal         = stats->ret_code_internal;
-            end.transcription                = this->transcription;
+            end.transcription                = session->transcription;
             
             if(stats->server_ip[0] != 0) {
                 server_stats.server_ip = stats->server_ip;
@@ -2268,24 +2408,24 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
 
     // Update controller metrics
     ctrlm_main_queue_msg_controller_voice_metrics_t metrics = {0};
-    metrics.controller_id       = this->controller_id;
+    metrics.controller_id       = session->controller_id;
     metrics.short_utterance     = (stats->reason == XRSR_SESSION_END_REASON_ERROR_AUDIO_DURATION ? 1 : 0);
-    metrics.packets_total       = this->packets_processed + this->packets_lost;
-    metrics.packets_lost        = this->packets_lost;
-    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::process_voice_controller_metrics, &metrics, sizeof(metrics), NULL, this->network_id);
+    metrics.packets_total       = session->packets_processed + session->packets_lost;
+    metrics.packets_lost        = session->packets_lost;
+    ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::process_voice_controller_metrics, &metrics, sizeof(metrics), NULL, session->network_id);
 
     // Send results internally to controlMgr
-    if(this->network_id != CTRLM_MAIN_NETWORK_ID_INVALID && this->controller_id != CTRLM_MAIN_CONTROLLER_ID_INVALID) {
+    if(session->network_id != CTRLM_MAIN_NETWORK_ID_INVALID && session->controller_id != CTRLM_MAIN_CONTROLLER_ID_INVALID) {
         ctrlm_main_queue_msg_voice_session_result_t msg = {0};
-        msg.controller_id     = this->controller_id;
-        safec_rc = strncpy_s(msg.transcription, sizeof(msg.transcription), this->transcription.c_str(), sizeof(msg.transcription)-1);
+        msg.controller_id     = session->controller_id;
+        safec_rc = strncpy_s(msg.transcription, sizeof(msg.transcription), session->transcription.c_str(), sizeof(msg.transcription)-1);
         ERR_CHK(safec_rc);
         msg.transcription[CTRLM_VOICE_SESSION_TEXT_MAX_LENGTH - 1] = '\0';
         msg.success           =  (session_end->success == true ? 1 : 0);
-        ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_result, &msg, sizeof(msg), NULL, this->network_id);
+        ctrlm_main_queue_handler_push(CTRLM_HANDLER_NETWORK, (ctrlm_msg_handler_network_t)&ctrlm_obj_network_t::ind_process_voice_session_result, &msg, sizeof(msg), NULL, session->network_id);
     }
 
-    if(this->voice_device == CTRLM_VOICE_DEVICE_FF && this->status.status == VOICE_COMMAND_STATUS_PENDING) {
+    if(session->voice_device == CTRLM_VOICE_DEVICE_FF && this->status.status == VOICE_COMMAND_STATUS_PENDING) {
         this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
     }
 
@@ -2294,7 +2434,7 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
     if(telemetry) {
         ctrlm_telemetry_event_t<int> vs_marker(MARKER_VOICE_SESSION_TOTAL, 1);
         ctrlm_telemetry_event_t<int> vs_status_marker(session_end->success ? MARKER_VOICE_SESSION_SUCCESS : MARKER_VOICE_SESSION_FAILURE, 1);
-        ctrlm_telemetry_event_t<int> vs_end_reason_marker(MARKER_VOICE_END_REASON_PREFIX + std::string(ctrlm_voice_session_end_reason_str(this->end_reason)), 1);
+        ctrlm_telemetry_event_t<int> vs_end_reason_marker(MARKER_VOICE_END_REASON_PREFIX + std::string(ctrlm_voice_session_end_reason_str(session->end_reason)), 1);
         ctrlm_telemetry_event_t<int> vs_xrsr_end_reason_marker(MARKER_VOICE_XRSR_END_REASON_PREFIX + std::string(xrsr_session_end_reason_str(stats->reason)), 1);
 
         // Handle all VSRsp error telemetry
@@ -2302,12 +2442,12 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
             sem_wait(&this->current_vsr_err_semaphore);
             ctrlm_voice_telemetry_vsr_error_t *vsr_error = this->vsr_errors[this->current_vsr_err_string];
             if(vsr_error) {
-                vsr_error->update(this->packets_processed > 0, this->current_vsr_err_rsp_window, this->current_vsr_err_rsp_time);
+                vsr_error->update(session->packets_processed > 0, this->current_vsr_err_rsp_window, this->current_vsr_err_rsp_time);
                 telemetry->event(ctrlm_telemetry_report_t::VOICE, *vsr_error);
             }
             vsr_error = this->vsr_errors[MARKER_VOICE_VSR_FAIL_TOTAL];
             if(vsr_error) {
-                vsr_error->update(this->packets_processed > 0, this->current_vsr_err_rsp_window, this->current_vsr_err_rsp_time);
+                vsr_error->update(session->packets_processed > 0, this->current_vsr_err_rsp_window, this->current_vsr_err_rsp_time);
                 telemetry->event(ctrlm_telemetry_report_t::VOICE, *vsr_error);
             }
             sem_post(&this->current_vsr_err_semaphore);
@@ -2324,36 +2464,36 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
     this->current_vsr_err_string     = "";
 
 
-    if(this->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
-        LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
+    if(session->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
+        LOG_WARN("%s: src <%s> unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), ctrlm_voice_state_dst_str(session->state_dst));
     }
 
-    this->session_active_server = false;
-    if(this->state_src == CTRLM_VOICE_STATE_SRC_STREAMING) {
-        voice_session_end(this->network_id, this->controller_id, CTRLM_VOICE_SESSION_END_REASON_OTHER_ERROR);
-    } else if(!this->session_active_controller) {
-        this->state_src = CTRLM_VOICE_STATE_SRC_READY;
+    session->session_active_server = false;
+    if(session->state_src == CTRLM_VOICE_STATE_SRC_STREAMING) {
+        voice_session_end(session, CTRLM_VOICE_SESSION_END_REASON_OTHER_ERROR);
+    } else if(!session->session_active_controller) {
+        session->state_src = CTRLM_VOICE_STATE_SRC_READY;
 
         // Send session stats only if the session stats have been received from the controller (or it has timed out)
-        if(stats_session_id != 0 && this->voice_ipc) {
+        if(session->stats_session_id != 0 && this->voice_ipc) {
             ctrlm_voice_ipc_event_session_statistics_t stats;
-            stats.common  = this->ipc_common_data;
-            stats.session = this->stats_session;
-            stats.reboot  = this->stats_reboot;
+            stats.common  = session->ipc_common_data;
+            stats.session = session->stats_session;
+            stats.reboot  = session->stats_reboot;
 
             this->voice_ipc->session_statistics(stats);
         }
     }
 
-    this->state_dst = CTRLM_VOICE_STATE_DST_READY;
-    this->endpoint_current = NULL;
-    voice_session_info_reset();
+    session->state_dst        = CTRLM_VOICE_STATE_DST_READY;
+    session->endpoint_current = NULL;
+    voice_session_info_reset(session);
 
     // Check for incorrect semaphore values
     int val;
     sem_getvalue(&this->vsr_semaphore, &val);
     if(val > 0) {
-        LOG_ERROR("%s: VSR semaphore has invalid value... resetting..\n", __FUNCTION__);
+        LOG_ERROR("%s: src <%s> VSR semaphore has invalid value... resetting..\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device));
         for(int i = 0; i < val; i++) {
             sem_wait(&this->vsr_semaphore);
         }
@@ -2392,20 +2532,28 @@ void ctrlm_voice_t::voice_stream_begin_callback(ctrlm_voice_stream_begin_cb_t *s
         return;
     }
 
+    // Get session based on uuid
+    ctrlm_voice_session_t *session = voice_session_from_uuid(stream_begin->header.uuid);
+
+    if(session == NULL) {
+       LOG_ERROR("%s: session not found\n", __FUNCTION__);
+       return;
+    }
+
    this->session_timing.srvr_audio_txd_first   = stream_begin->header.timestamp;
 
    this->session_timing.srvr_audio_txd_keyword = this->session_timing.srvr_audio_txd_first;
    this->session_timing.srvr_audio_txd_final   = this->session_timing.srvr_audio_txd_first;
 
-   if(this->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
-      LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
+   if(session->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
+      LOG_WARN("%s: src <%s> unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), ctrlm_voice_state_dst_str(session->state_dst));
    }
-   this->state_dst = CTRLM_VOICE_STATE_DST_STREAMING;
+   session->state_dst = CTRLM_VOICE_STATE_DST_STREAMING;
 
    if(this->voice_ipc) {
        // call the ipc's stream begin event handler
        ctrlm_voice_ipc_event_stream_begin_t begin;
-       begin.common = this->ipc_common_data;
+       begin.common = session->ipc_common_data;
        this->voice_ipc->stream_begin(begin);
    }
 }
@@ -2427,63 +2575,71 @@ void ctrlm_voice_t::voice_stream_end_callback(ctrlm_voice_stream_end_cb_t *strea
         return;
     }
 
+    // Get session based on uuid
+    ctrlm_voice_session_t *session = voice_session_from_uuid(stream_end->header.uuid);
+
+    if(session == NULL) {
+       LOG_ERROR("%s: session not found\n", __FUNCTION__);
+       return;
+    }
+
     xrsr_stream_stats_t *stats = &stream_end->stats;
     if(!stats->audio_stats.valid) {
-        LOG_INFO("%s: end of stream <%s> audio stats not present\n", __FUNCTION__, (stats->result) ? "SUCCESS" : "FAILURE");
-        this->packets_processed           = 0;
-        this->packets_lost                = 0;
-        this->stats_session.packets_total = 0;
-        this->stats_session.packets_lost  = 0;
-        this->stats_session.link_quality  = 0;
+        LOG_INFO("%s: src <%s> end of stream <%s> audio stats not present\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), (stats->result) ? "SUCCESS" : "FAILURE");
+        session->packets_processed           = 0;
+        session->packets_lost                = 0;
+        session->stats_session.packets_total = 0;
+        session->stats_session.packets_lost  = 0;
+        session->stats_session.link_quality  = 0;
 
     } else {
-        this->packets_processed           = stats->audio_stats.packets_processed;
-        this->packets_lost                = stats->audio_stats.packets_lost;
-        this->stats_session.available     = 1;
-        this->stats_session.packets_total = this->packets_lost + this->packets_processed;
-        this->stats_session.packets_lost  = this->packets_lost;
-        this->stats_session.link_quality  = (this->packets_processed > 0) ? (this->lqi_total / this->packets_processed) : 0;
+        session->packets_processed           = stats->audio_stats.packets_processed;
+        session->packets_lost                = stats->audio_stats.packets_lost;
+        session->stats_session.available     = 1;
+        session->stats_session.packets_total = session->packets_lost + session->packets_processed;
+        session->stats_session.packets_lost  = session->packets_lost;
+        session->stats_session.link_quality  = (session->packets_processed > 0) ? (session->lqi_total / session->packets_processed) : 0;
 
         uint32_t samples_processed    = stats->audio_stats.samples_processed;
         uint32_t samples_lost         = stats->audio_stats.samples_lost;
         uint32_t decoder_failures     = stats->audio_stats.decoder_failures;
         uint32_t samples_buffered_max = stats->audio_stats.samples_buffered_max;
 
-        LOG_INFO("%s: end of stream <%s>\n", __FUNCTION__, (stats->result) ? "SUCCESS" : "FAILURE");
+        LOG_INFO("%s: src <%s> end of stream <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), (stats->result) ? "SUCCESS" : "FAILURE");
 
-        if(this->packets_processed > 0) {
-            LOG_INFO("%s: Packets Lost/Total <%u/%u> %.02f%%\n", __FUNCTION__, this->packets_lost, this->packets_lost + this->packets_processed, 100.0 * ((double)this->packets_lost / (double)(this->packets_lost + this->packets_processed)));
+        if(session->packets_processed > 0) {
+            LOG_INFO("%s: src <%s> Packets Lost/Total <%u/%u> %.02f%%\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), session->packets_lost, session->packets_lost + session->packets_processed, 100.0 * ((double)session->packets_lost / (double)(session->packets_lost + session->packets_processed)));
         }
         if(samples_processed > 0) {
-            LOG_INFO("%s: Samples Lost/Total <%u/%u> %.02f%% buffered max <%u>\n", __FUNCTION__, samples_lost, samples_lost + samples_processed, 100.0 * ((double)samples_lost / (double)(samples_lost + samples_processed)), samples_buffered_max);
+            LOG_INFO("%s: src <%s> Samples Lost/Total <%u/%u> %.02f%% buffered max <%u>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), samples_lost, samples_lost + samples_processed, 100.0 * ((double)samples_lost / (double)(samples_lost + samples_processed)), samples_buffered_max);
         }
         if(decoder_failures > 0) {
-            LOG_WARN("%s: decoder failures <%u>\n", __FUNCTION__, decoder_failures);
+            LOG_WARN("%s: src <%s> decoder failures <%u>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), decoder_failures);
         }
     }
 
-    if(CTRLM_VOICE_DEVICE_PTT == this->voice_device && this->status.status == VOICE_COMMAND_STATUS_PENDING) { // Set voice command status
+    if(CTRLM_VOICE_DEVICE_PTT == session->voice_device && this->status.status == VOICE_COMMAND_STATUS_PENDING) { // Set voice command status
         this->status.status = (stats->result) ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE;
         this->voice_status_set();
     }
 
     //If this is a voice assistant, unmute the audio
-    if(is_voice_assistant(this->voice_device)) {
+    if(is_voice_assistant(session->voice_device)) {
         this->audio_state_set(false);
     }
 
     if(this->voice_ipc) {
         // This is a STREAM end..
         ctrlm_voice_ipc_event_stream_end_t end;
-        end.common = this->ipc_common_data;
-        end.reason = (int)this->end_reason;
+        end.common = session->ipc_common_data;
+        end.reason = (int)session->end_reason;
         this->voice_ipc->stream_end(end);
     }
 
-    if(this->state_dst != CTRLM_VOICE_STATE_DST_STREAMING) {
-       LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
+    if(session->state_dst != CTRLM_VOICE_STATE_DST_STREAMING) {
+       LOG_WARN("%s: src <%s> unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), ctrlm_voice_state_dst_str(session->state_dst));
     }
-    this->state_dst = CTRLM_VOICE_STATE_DST_OPENED;
+    session->state_dst = CTRLM_VOICE_STATE_DST_OPENED;
 
     this->session_timing.srvr_audio_txd_final = stream_end->header.timestamp;
 }
@@ -2504,17 +2660,25 @@ void ctrlm_voice_t::voice_action_tv_volume_callback(bool up, uint32_t repeat_cou
     this->status.data.tv_avr.cmd             = up ? CTRLM_VOICE_TV_AVR_CMD_VOLUME_UP : CTRLM_VOICE_TV_AVR_CMD_VOLUME_DOWN;
     this->status.data.tv_avr.ir_repeats      = repeat_count;
 }
-void ctrlm_voice_t::voice_action_keyword_verification_callback(bool success, rdkx_timestamp_t timestamp) {
+void ctrlm_voice_t::voice_action_keyword_verification_callback(const uuid_t uuid, bool success, rdkx_timestamp_t timestamp) {
+    // Get session based on uuid
+    ctrlm_voice_session_t *session = voice_session_from_uuid(uuid);
+
+    if(session == NULL) {
+        LOG_ERROR("%s: session not found\n", __FUNCTION__);
+        return;
+    }
+
     this->session_timing.srvr_rsp_keyword = timestamp;
     if(this->voice_ipc) {
         ctrlm_voice_ipc_event_keyword_verification_t kw_verification;
-        kw_verification.common = this->ipc_common_data;
+        kw_verification.common = session->ipc_common_data;
         kw_verification.verified = success;
         this->voice_ipc->keyword_verification(kw_verification);
     }
 
     //If the keyword was detected and this is a voice assistant, mute the audio
-    if(success && is_voice_assistant(this->voice_device)) {
+    if(success && is_voice_assistant(session->voice_device)) {
         if(this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_CLOUD || 
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_CONFIDENCE && this->confidence < this->audio_confidence_threshold) ||
           (this->audio_timing == CTRLM_VOICE_AUDIO_TIMING_DUAL_SENSITIVITY && !this->dual_sensitivity_immediate)) {
@@ -2522,7 +2686,7 @@ void ctrlm_voice_t::voice_action_keyword_verification_callback(bool success, rdk
         }
     }
 
-    this->keyword_verified = success;
+    session->keyword_verified = success;
 }
 
 void ctrlm_voice_t::voice_keyword_verified_action(void) {
@@ -2584,6 +2748,8 @@ void ctrlm_voice_t::voice_keyword_beep_completed_callback(bool timeout, bool pla
    if(!this->audio_ducking_beep_in_progress) {
       return;
    }
+   ctrlm_voice_session_t *session = &this->voice_session[VOICE_SESSION_GROUP_DEFAULT];
+
    if(!timeout) { // remove timeout
       if(this->timeout_keyword_beep > 0) {
          g_source_remove(this->timeout_keyword_beep);
@@ -2598,25 +2764,40 @@ void ctrlm_voice_t::voice_keyword_beep_completed_callback(bool timeout, bool pla
 
    this->audio_ducking_beep_in_progress = false;
 
-   LOG_WARN("%s: duration <%llu> ms dst <%s>\n", __FUNCTION__, rdkx_timestamp_since_ms(this->sap_play_timestamp), ctrlm_voice_state_dst_str(this->state_dst));
+   LOG_WARN("%s: duration <%llu> ms dst <%s>\n", __FUNCTION__, rdkx_timestamp_since_ms(this->sap_play_timestamp), ctrlm_voice_state_dst_str(session->state_dst));
 
-   if(this->state_dst >= CTRLM_VOICE_STATE_DST_REQUESTED && this->state_dst <= CTRLM_VOICE_STATE_DST_STREAMING) {
+   if(session->state_dst >= CTRLM_VOICE_STATE_DST_REQUESTED && session->state_dst <= CTRLM_VOICE_STATE_DST_STREAMING) {
       this->audio_state_set(true);
    }
 }
 #endif
 
-void ctrlm_voice_t::voice_session_transcription_callback(const char *transcription) {
-    if(transcription) {
-        this->transcription = transcription;
-    } else {
-        this->transcription = "";
+void ctrlm_voice_t::voice_session_transcription_callback(const uuid_t uuid, const char *transcription) {
+    // Get session based on uuid
+    ctrlm_voice_session_t *session = voice_session_from_uuid(uuid);
+
+    if(session == NULL) {
+        LOG_ERROR("%s: session not found\n", __FUNCTION__);
+        return;
     }
-    LOG_INFO("%s: Voice Session Transcription: \"%s\"\n", __FUNCTION__, this->mask_pii ? "***" : this->transcription.c_str());
+
+    if(transcription) {
+        session->transcription = transcription;
+    } else {
+        session->transcription = "";
+    }
+    LOG_INFO("%s: src <%s> Voice Session Transcription: \"%s\"\n", __FUNCTION__, ctrlm_voice_device_str(session->voice_device), this->mask_pii ? "***" : session->transcription.c_str());
 }
 
-void ctrlm_voice_t::voice_server_return_code_callback(long ret_code) {
-    this->server_ret_code = ret_code;
+void ctrlm_voice_t::voice_server_return_code_callback(const uuid_t uuid, long ret_code) {
+    // Get session based on uuid
+    ctrlm_voice_session_t *session = voice_session_from_uuid(uuid);
+
+    if(session == NULL) {
+        LOG_ERROR("%s: session not found\n", __FUNCTION__);
+        return;
+    }
+    session->server_ret_code = ret_code;
 }
 // Callback Interface Implementation End
 
@@ -2659,10 +2840,15 @@ const char *ctrlm_voice_state_dst_str(ctrlm_voice_state_dst_t state) {
 
 const char *ctrlm_voice_device_str(ctrlm_voice_device_t device) {
    switch(device) {
-       case CTRLM_VOICE_DEVICE_PTT:        return("PTT");
-       case CTRLM_VOICE_DEVICE_FF:         return("FF");
-       case CTRLM_VOICE_DEVICE_MICROPHONE: return("MICROPHONE");
-       case CTRLM_VOICE_DEVICE_INVALID:    return("INVALID");
+       case CTRLM_VOICE_DEVICE_PTT:            return("PTT");
+       case CTRLM_VOICE_DEVICE_FF:             return("FF");
+       #ifdef CTRLM_LOCAL_MIC
+       case CTRLM_VOICE_DEVICE_MICROPHONE:     return("MICROPHONE");
+       #endif
+       #ifdef CTRLM_LOCAL_MIC_TAP
+       case CTRLM_VOICE_DEVICE_MICROPHONE_TAP: return("MICROPHONE_TAP");
+       #endif
+       case CTRLM_VOICE_DEVICE_INVALID:        return("INVALID");
    }
    return("UNKNOWN");
 }
@@ -2719,10 +2905,18 @@ ctrlm_hal_input_device_t voice_device_to_hal(ctrlm_voice_device_t device) {
             ret = CTRLM_HAL_INPUT_FF;
             break;
         }
+        #ifdef CTRLM_LOCAL_MIC
         case CTRLM_VOICE_DEVICE_MICROPHONE: {
             ret = CTRLM_HAL_INPUT_MICS;
             break;
         }
+        #endif
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        case CTRLM_VOICE_DEVICE_MICROPHONE_TAP: {
+            ret = CTRLM_HAL_INPUT_MIC_TAP;
+            break;
+        }
+        #endif
         default: {
             break;
         }
@@ -2741,10 +2935,18 @@ ctrlm_voice_device_t xrsr_to_voice_device(xrsr_src_t device) {
             ret = CTRLM_VOICE_DEVICE_FF;
             break;
         }
+        #ifdef CTRLM_LOCAL_MIC
         case XRSR_SRC_MICROPHONE: {
             ret = CTRLM_VOICE_DEVICE_MICROPHONE;
             break;
         }
+        #endif
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        case XRSR_SRC_MICROPHONE_TAP: {
+            ret = CTRLM_VOICE_DEVICE_MICROPHONE_TAP;
+            break;
+        }
+        #endif
         default: {
             LOG_ERROR("%s: unrecognized device type %d\n", __FUNCTION__, device);
             break;
@@ -2764,16 +2966,33 @@ xrsr_src_t voice_device_to_xrsr(ctrlm_voice_device_t device) {
             ret = XRSR_SRC_RCU_FF;
             break;
         }
+        #ifdef CTRLM_LOCAL_MIC
         case CTRLM_VOICE_DEVICE_MICROPHONE: {
             ret = XRSR_SRC_MICROPHONE;
             break;
         }
+        #endif
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        case CTRLM_VOICE_DEVICE_MICROPHONE_TAP: {
+            ret = XRSR_SRC_MICROPHONE_TAP;
+            break;
+        }
+        #endif
         default: {
             LOG_ERROR("%s: unrecognized device type %d\n", __FUNCTION__, device);
             break;
         }
     }
     return(ret);
+}
+
+ctrlm_voice_session_group_t voice_device_to_session_group(ctrlm_voice_device_t device_type) {
+   #ifdef CTRLM_LOCAL_MIC_TAP
+   if(device_type == CTRLM_VOICE_DEVICE_MICROPHONE_TAP) {
+      return(VOICE_SESSION_GROUP_MIC_TAP);
+   }
+   #endif
+   return(VOICE_SESSION_GROUP_DEFAULT);
 }
 
 xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format) {
@@ -2817,11 +3036,16 @@ xraudio_encoding_t voice_format_to_xraudio(ctrlm_voice_format_t format) {
 bool ctrlm_voice_t::is_voice_assistant(ctrlm_voice_device_t device) {
     bool voice_assistant = false;
     switch(device) {
-        case CTRLM_VOICE_DEVICE_FF: 
-        case CTRLM_VOICE_DEVICE_MICROPHONE: {
+        #ifdef CTRLM_LOCAL_MIC
+        case CTRLM_VOICE_DEVICE_MICROPHONE:
+        #endif
+        case CTRLM_VOICE_DEVICE_FF:  {
             voice_assistant = true;
             break;
         }
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        case CTRLM_VOICE_DEVICE_MICROPHONE_TAP:
+        #endif
         case CTRLM_VOICE_DEVICE_PTT: 
         case CTRLM_VOICE_DEVICE_INVALID:
         default: {
@@ -2832,8 +3056,8 @@ bool ctrlm_voice_t::is_voice_assistant(ctrlm_voice_device_t device) {
     return(voice_assistant);
 }
 
-bool ctrlm_voice_t::controller_supports_qos(void) {
-   if(this->voice_device == CTRLM_VOICE_DEVICE_FF) {
+bool ctrlm_voice_t::controller_supports_qos(ctrlm_voice_device_t device) {
+   if(device == CTRLM_VOICE_DEVICE_FF) {
       return(true);
    }
    return(false);
@@ -2988,6 +3212,17 @@ const char *ctrlm_voice_session_response_status_str(ctrlm_voice_session_response
    return(ctrlm_invalid_return(status));
 }
 
+const char *ctrlm_voice_session_group_str(ctrlm_voice_session_group_t group) {
+   switch(group) {
+      case VOICE_SESSION_GROUP_DEFAULT: return("DEFAULT");
+      #ifdef CTRLM_LOCAL_MIC_TAP
+      case VOICE_SESSION_GROUP_MIC_TAP: return("MIC_TAP");
+      #endif
+      case VOICE_SESSION_GROUP_QTY: break; // fall thru to return an invalid group
+   }
+   return(ctrlm_invalid_return(group));
+}
+
 void ctrlm_voice_xrsr_session_capture_start(ctrlm_main_queue_msg_audio_capture_start_t *capture_start) {
    xrsr_audio_container_t xrsr_container;
 
@@ -3028,16 +3263,61 @@ void ctrlm_voice_t::audio_state_set(bool session) {
 }
 
 bool ctrlm_voice_t::voice_session_id_is_current(uuid_t uuid) {
-    if(0 != uuid_compare(uuid, this->uuid)) {
-       char uuid_str_exp[37] = {'\0'};
+    bool found = false;
+
+    for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+        ctrlm_voice_session_t *session = &this->voice_session[group];
+
+        if(0 == uuid_compare(uuid, session->uuid)) {
+           found = true;
+           break;
+        }
+    }
+    if(!found) {
        char uuid_str_rxd[37] = {'\0'};
-       uuid_unparse_lower(this->uuid, uuid_str_exp);
        uuid_unparse_lower(uuid, uuid_str_rxd);
 
-       LOG_WARN("%s: uuid mismatch exp <%s> rxd <%s> (ignoring)\n", __FUNCTION__, uuid_str_exp, uuid_str_rxd);
-       return(false);
+       for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+           ctrlm_voice_session_t *session = &this->voice_session[group];
+
+           char uuid_str_exp[37] = {'\0'};
+           uuid_unparse_lower(session->uuid, uuid_str_exp);
+
+           LOG_WARN("%s: uuid mismatch group <%s> exp <%s> rxd <%s> (ignoring)\n", __FUNCTION__, ctrlm_voice_session_group_str((ctrlm_voice_session_group_t)group), uuid_str_exp, uuid_str_rxd);
+       }
     }
-    return(true);
+
+    return(found);
+}
+
+ctrlm_voice_session_t *ctrlm_voice_t::voice_session_from_uuid(const uuid_t uuid) {
+   for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+      ctrlm_voice_session_t *session = &this->voice_session[group];
+      if(0 == uuid_compare(uuid, session->uuid)) {
+         return(session);
+      }
+   }
+   return(NULL);
+}
+
+ctrlm_voice_session_t *ctrlm_voice_t::voice_session_from_uuid(std::string &uuid) {
+   for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+      ctrlm_voice_session_t *session = &this->voice_session[group];
+      if(session->uuid_str == uuid) {
+         return(session);
+      }
+   }
+   return(NULL);
+}
+
+ctrlm_voice_session_t *ctrlm_voice_t::voice_session_from_controller(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id) {
+   for(uint32_t group = VOICE_SESSION_GROUP_DEFAULT; group < VOICE_SESSION_GROUP_QTY; group++) {
+      ctrlm_voice_session_t *session = &this->voice_session[group];
+      if(session->network_id == network_id && session->controller_id == controller_id) {
+         return(session);
+      }
+   }
+   return(NULL);
 }
 
 unsigned long ctrlm_voice_t::voice_session_id_get() {
@@ -3091,10 +3371,10 @@ void ctrlm_voice_t::voice_session_set_active(ctrlm_voice_device_t device) {
     sem_wait(&this->device_status_semaphore);
     if(this->device_status[device] & CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE) {
         sem_post(&this->device_status_semaphore);
-        LOG_WARN("%s: \n", __FUNCTION__);
+        LOG_WARN("%s: device <%s> already active\n", __FUNCTION__, ctrlm_voice_device_str(device));
         return;
     }
-    this->device_status[device] &= CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE;
+    this->device_status[device] |= CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE;
     sem_post(&this->device_status_semaphore);
 }
 
@@ -3102,21 +3382,26 @@ void ctrlm_voice_t::voice_session_set_inactive(ctrlm_voice_device_t device) {
     sem_wait(&this->device_status_semaphore);
     if(!(this->device_status[device] & CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE)) {
         sem_post(&this->device_status_semaphore);
-        LOG_WARN("%s: \n", __FUNCTION__);
+        LOG_WARN("%s: device <%s> already inactive\n", __FUNCTION__, ctrlm_voice_device_str(device));
         return;
     }
-    this->device_status[device] |= ~CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE;
+    this->device_status[device] &= ~CTRLM_VOICE_DEVICE_STATUS_SESSION_ACTIVE;
     sem_post(&this->device_status_semaphore);
 }
 
 bool ctrlm_voice_t::voice_is_privacy_enabled(void) {
+   #ifdef CTRLM_LOCAL_MIC
    sem_wait(&this->device_status_semaphore);
    bool value = (this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] & CTRLM_VOICE_DEVICE_STATUS_PRIVACY) ? true : false;
    sem_post(&this->device_status_semaphore);
    return(value);
+   #else
+   return(false);
+   #endif
 }
 
 void ctrlm_voice_t::voice_privacy_enable(bool update_vsdk) {
+   #ifdef CTRLM_LOCAL_MIC
     sem_wait(&this->device_status_semaphore);
     if(this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] & CTRLM_VOICE_DEVICE_STATUS_PRIVACY) {
         sem_post(&this->device_status_semaphore);
@@ -3134,9 +3419,11 @@ void ctrlm_voice_t::voice_privacy_enable(bool update_vsdk) {
     #endif
 
     sem_post(&this->device_status_semaphore);
+    #endif
 }
 
 void ctrlm_voice_t::voice_privacy_disable(bool update_vsdk) {
+    #ifdef CTRLM_LOCAL_MIC
     sem_wait(&this->device_status_semaphore);
     if(!(this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] & CTRLM_VOICE_DEVICE_STATUS_PRIVACY)) {
         sem_post(&this->device_status_semaphore);
@@ -3153,6 +3440,7 @@ void ctrlm_voice_t::voice_privacy_disable(bool update_vsdk) {
     }
     #endif
     sem_post(&this->device_status_semaphore);
+    #endif
 }
 
 void ctrlm_voice_t::voice_device_enable(ctrlm_voice_device_t device, bool db_write, bool *update_routes) {
@@ -3252,9 +3540,12 @@ void ctrlm_voice_t::voice_standby_session_request(void) {
 }
 #endif
 
-bool ctrlm_voice_t::is_standby_microphone(void) {
-   return ((this->voice_device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
-
+bool ctrlm_voice_t::is_standby_microphone(ctrlm_voice_device_t device) {
+   #ifdef CTRLM_LOCAL_MIC
+   return ((device == CTRLM_VOICE_DEVICE_MICROPHONE) && (ctrlm_main_get_power_state() == CTRLM_POWER_STATE_STANDBY_VOICE_SESSION));
+   #else
+   return(false);
+   #endif
 }
 
 int ctrlm_voice_t::packet_loss_threshold_get() const {
@@ -3356,8 +3647,11 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
     attr.get_rfc_value(JSON_BOOL_NAME_VOICE_FORCE_VOICE_SETTINGS,        this->prefs.force_voice_settings);
     if(attr.get_rfc_value(JSON_BOOL_NAME_VOICE_FORCE_VOICE_SETTINGS, this->prefs.force_voice_settings) && this->prefs.force_voice_settings) {
         attr.get_rfc_value(JSON_BOOL_NAME_VOICE_ENABLE,                      enabled);
-        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_vrex_src_ptt);
-        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_FF,                   this->prefs.server_url_vrex_src_ff);
+        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_PTT,                  this->prefs.server_url_src_ptt);
+        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_FF,                   this->prefs.server_url_src_ff);
+        #ifdef CTRLM_LOCAL_MIC_TAP
+        attr.get_rfc_value(JSON_STR_NAME_VOICE_URL_SRC_MIC_TAP,              this->prefs.server_url_src_mic_tap);
+        #endif
         // Check if enabled
         if(!enabled) {
             for(int i = CTRLM_VOICE_DEVICE_PTT; i < CTRLM_VOICE_DEVICE_INVALID; i++) {

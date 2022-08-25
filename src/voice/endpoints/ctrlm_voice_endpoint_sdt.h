@@ -53,6 +53,7 @@ protected:
 protected:
     void       *vmic_obj_sdt;
 private:
+    uuid_t      uuid;
     long        server_ret_code;
     // Voice Message Synchronization.. All accesses of these variables MUST be on main thread
     bool                     voice_message_available;

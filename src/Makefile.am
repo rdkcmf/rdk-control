@@ -280,20 +280,25 @@ if DUNFELL_BUILD_ENABLED
 AM_CPPFLAGS += -DDUNFELL_BUILD_SUPPORT
 endif
 
+if MICROPHONE_TAP_ENABLED
+AM_CPPFLAGS += -DCTRLM_LOCAL_MIC_TAP
+endif
+
 CTRLM_CONFIG_JSON        =ctrlm_config.json
 CTRLM_CONFIG_JSON_DEF    =ctrlm_config_default.json
 CTRLM_CONFIG_JSON_TMPL   =ctrlm_config.json.template
 CTRLM_CONFIG_H           =ctrlm_config_default.h
 CTRLM_VERSION_H          =ctrlm_version_build.h
 CTRLM_REQUEST_TYPE_C     =voice/ipc/ctrlm_voice_ipc_request_type.c
+CTRLM_REQUEST_TYPE_HASH  =voice/ipc/ctrlm_voice_ipc_request_type.hash
 
 BUILT_SOURCES = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON) $(CTRLM_REQUEST_TYPE_C)
 CLEANFILES    = $(CTRLM_VERSION_H) $(CTRLM_CONFIG_H) $(CTRLM_CONFIG_JSON_TMPL) $(CTRLM_CONFIG_JSON) $(CTRLM_REQUEST_TYPE_C)
 
 dist_sysconf_DATA = $(CTRLM_CONFIG_JSON_TMPL)
 
-$(CTRLM_REQUEST_TYPE_C):
-	${STAGING_BINDIR_NATIVE}/gperf --output-file=$(srcdir)/voice/ipc/ctrlm_voice_ipc_request_type.c $(srcdir)/voice/ipc/ctrlm_voice_ipc_request_type.hash
+$(CTRLM_REQUEST_TYPE_C): ${CTRLM_REQUEST_TYPE_HASH}
+	${STAGING_BINDIR_NATIVE}/gperf --output-file=$(srcdir)/${CTRLM_REQUEST_TYPE_C} $(srcdir)/${CTRLM_REQUEST_TYPE_HASH}
 
 $(CTRLM_VERSION_H):
 	echo "#define CTRLM_MAIN_VER_MAJOR \"1\"" >$@

@@ -62,7 +62,7 @@ protected:
     static void ctrlm_voice_handler_ws_nextgen_asr(const char *str_transcription, bool final, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_conn_close(const char *reason, long ret_code, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_response_vrex(long ret_code, void *user_data);
-    static void ctrlm_voice_handler_ws_nextgen_wuw_verification(bool passed, long confidence, void *user_data);
+    static void ctrlm_voice_handler_ws_nextgen_wuw_verification(const uuid_t uuid, bool passed, long confidence, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_server_message(const char *msg, unsigned long length, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_source_error(xrsr_src_t src, void *user_data);
     static void ctrlm_voice_handler_ws_nextgen_tv_mute(bool mute, void *user_data);
@@ -73,6 +73,7 @@ protected:
     void       *xrsv_obj_ws_nextgen;
 
 private:
+    uuid_t      uuid;
     long        server_ret_code;
     // Voice Message Synchronization.. All accesses of these variables MUST be on main thread
     bool                     voice_message_available;

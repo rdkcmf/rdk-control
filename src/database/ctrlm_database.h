@@ -214,6 +214,7 @@ void ctrlm_db_ble_write_ota_failure_type_z_count(ctrlm_network_id_t network_id, 
 bool ctrlm_db_voice_valid();
 void ctrlm_db_voice_read_url_ptt(std::string &ptt);
 void ctrlm_db_voice_read_url_ff(std::string &ff);
+void ctrlm_db_voice_read_url_mic_tap(std::string &mic_tap);
 void ctrlm_db_voice_read_sat_enable(bool &sat);
 void ctrlm_db_voice_read_guide_language(std::string &lang);
 void ctrlm_db_voice_read_aspect_ratio(std::string &ratio);
@@ -227,6 +228,7 @@ void ctrlm_db_voice_read_par_voice_status(bool &status);
 
 void ctrlm_db_voice_write_url_ptt(std::string ptt);
 void ctrlm_db_voice_write_url_ff(std::string ff);
+void ctrlm_db_voice_write_url_mic_tap(std::string mic_tap);
 void ctrlm_db_voice_write_sat_enable(bool sat);
 void ctrlm_db_voice_write_guide_language(std::string lang);
 void ctrlm_db_voice_write_aspect_ratio(std::string ratio);

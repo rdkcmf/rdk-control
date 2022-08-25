@@ -69,14 +69,15 @@
 #define CTRLM_VOICE_MIN_UTTERANCE_DURATION_MAXIMUM  (600) ///< Maximum value of the utterance duration minimum setting (in milliseconds)
 
 // Bitmask defines for setting the available value in vrex_mgr_iarm_bus_event_voice_settings_t
-#define CTRLM_VOICE_SETTINGS_VOICE_ENABLED         (0x01) ///< Setting to enable/disable voice control
-#define CTRLM_VOICE_SETTINGS_VREX_SERVER_URL       (0x02) ///< Setting to update the vrex server url string
-#define CTRLM_VOICE_SETTINGS_GUIDE_LANGUAGE        (0x04) ///< Setting to update the guide language string
-#define CTRLM_VOICE_SETTINGS_ASPECT_RATIO          (0x08) ///< Setting to update the aspect ratio string
-#define CTRLM_VOICE_SETTINGS_UTTERANCE_DURATION    (0x10) ///< Setting to update the minimum utterance duration value
-#define CTRLM_VOICE_SETTINGS_VREX_SAT_ENABLED      (0x20) ///< Setting to enable/disable Service Access Token (SAT)
-#define CTRLM_VOICE_SETTINGS_QUERY_STRINGS         (0x40) ///< Setting to update the request query strings
-#define CTRLM_VOICE_SETTINGS_FARFIELD_VREX_SERVER_URL   (0x80) ///< Setting to update the farfield vrex server url string
+#define CTRLM_VOICE_SETTINGS_VOICE_ENABLED            (0x0001) ///< Setting to enable/disable voice control
+#define CTRLM_VOICE_SETTINGS_VREX_SERVER_URL          (0x0002) ///< Setting to update the vrex server url string
+#define CTRLM_VOICE_SETTINGS_GUIDE_LANGUAGE           (0x0004) ///< Setting to update the guide language string
+#define CTRLM_VOICE_SETTINGS_ASPECT_RATIO             (0x0008) ///< Setting to update the aspect ratio string
+#define CTRLM_VOICE_SETTINGS_UTTERANCE_DURATION       (0x0010) ///< Setting to update the minimum utterance duration value
+#define CTRLM_VOICE_SETTINGS_VREX_SAT_ENABLED         (0x0020) ///< Setting to enable/disable Service Access Token (SAT)
+#define CTRLM_VOICE_SETTINGS_QUERY_STRINGS            (0x0040) ///< Setting to update the request query strings
+#define CTRLM_VOICE_SETTINGS_FARFIELD_VREX_SERVER_URL (0x0080) ///< Setting to update the farfield vrex server url string
+#define CTRLM_VOICE_SETTINGS_MIC_TAP_SERVER_URL       (0x0100) ///< Setting to update the microphone tap server url string
 
 /// @}
 
@@ -163,17 +164,18 @@ typedef struct {
 } ctrlm_voice_query_strings_t;
 
 typedef struct {
-   unsigned char                api_revision;                                          ///< The revision of this API.
-   ctrlm_iarm_call_result_t     result;                                                ///< Result of the IARM call
-   unsigned long                available;                                             ///< Bitmask indicating the settings that are available in this event
-   unsigned char                voice_control_enabled;                                 ///< Boolean value to enable (non-zero) or disable (zero) voice control
-   unsigned char                vrex_sat_enabled;                                      ///< Boolean value to enable (non-zero) or disable (zero) Service Access Token in requests to vrex server
-   char                         vrex_server_url[CTRLM_VOICE_SERVER_URL_MAX_LENGTH];    ///< The url for the vrex server (null terminated string)
-   char                         guide_language[CTRLM_VOICE_GUIDE_LANGUAGE_MAX_LENGTH]; ///< The guide's language [pass-thru] (null terminated string)
-   char                         aspect_ratio[CTRLM_VOICE_ASPECT_RATIO_MAX_LENGTH];     ///< The guide's aspect ratio [pass-thru] (null terminated string)
-   unsigned long                utterance_duration_minimum;                            ///< The minimum duration of an utterance (in milliseconds).  A value of zero disables utterance duration checking.
-   ctrlm_voice_query_strings_t  query_strings;                                         ///< Query string name/value pairs, for inclusion in the VREX request
-   char                         server_url_vrex_src_ff[CTRLM_VOICE_SERVER_URL_MAX_LENGTH];    ///< The url for the farfield vrex server (null terminated string)
+   unsigned char                api_revision;                                              ///< The revision of this API.
+   ctrlm_iarm_call_result_t     result;                                                    ///< Result of the IARM call
+   unsigned long                available;                                                 ///< Bitmask indicating the settings that are available in this event
+   unsigned char                voice_control_enabled;                                     ///< Boolean value to enable (non-zero) or disable (zero) voice control
+   unsigned char                vrex_sat_enabled;                                          ///< Boolean value to enable (non-zero) or disable (zero) Service Access Token in requests to vrex server
+   char                         vrex_server_url[CTRLM_VOICE_SERVER_URL_MAX_LENGTH];        ///< The url for the vrex server (null terminated string)
+   char                         guide_language[CTRLM_VOICE_GUIDE_LANGUAGE_MAX_LENGTH];     ///< The guide's language [pass-thru] (null terminated string)
+   char                         aspect_ratio[CTRLM_VOICE_ASPECT_RATIO_MAX_LENGTH];         ///< The guide's aspect ratio [pass-thru] (null terminated string)
+   unsigned long                utterance_duration_minimum;                                ///< The minimum duration of an utterance (in milliseconds).  A value of zero disables utterance duration checking.
+   ctrlm_voice_query_strings_t  query_strings;                                             ///< Query string name/value pairs, for inclusion in the VREX request
+   char                         server_url_vrex_src_ff[CTRLM_VOICE_SERVER_URL_MAX_LENGTH]; ///< The url for the farfield vrex server (null terminated string)
+   char                         server_url_src_mic_tap[CTRLM_VOICE_SERVER_URL_MAX_LENGTH]; ///< The url for the microphone tap server (null terminated string)
 } ctrlm_voice_iarm_call_settings_t;
 
 typedef struct {

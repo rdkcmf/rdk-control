@@ -58,6 +58,7 @@ protected:
     char        user_agent[XRSR_USER_AGENT_LEN_MAX];
 
 private:
+    uuid_t      uuid;
     long        server_ret_code;
 };
 

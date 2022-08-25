@@ -56,7 +56,7 @@ protected:
     static void ctrlm_voice_handler_ws_connected(const uuid_t uuid, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_disconnected(const uuid_t uuid, bool retry, rdkx_timestamp_t *timestamp, void *user_data);
     static void ctrlm_voice_handler_ws_sent_init(const uuid_t uuid, rdkx_timestamp_t *timestamp, void *user_data);
-    static void ctrlm_voice_handler_ws_listening(void *user_data);
+    static void ctrlm_voice_handler_ws_listening(const uuid_t uuid, void *user_data);
     static void ctrlm_voice_handler_ws_processing(const char *str_transcription, void *user_data);
     static void ctrlm_voice_handler_ws_countdown(void *user_data);
     static void ctrlm_voice_handler_ws_mic_close(json_t *obj_reason, void *user_data);
@@ -66,7 +66,9 @@ protected:
     static void ctrlm_voice_handler_ws_tv_volume(bool up, uint32_t repeat_count, void *user_data);
 
 protected:
-    void       *xrsv_obj_ws;
+    void  *xrsv_obj_ws;
+private:
+    uuid_t uuid;
 };
 
 #endif

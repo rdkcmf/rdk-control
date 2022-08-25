@@ -221,8 +221,11 @@ void ctrlm_voice_endpoint_ws_t::voice_session_begin_callback_ws(void *data, int 
     xrsr_session_config_in_t config_in;
     memset(&config_in, 0, sizeof(config_in));
 
-    this->voice_obj->voice_session_info(&info);
+    this->voice_obj->voice_session_info(dqm->src, &info);
     const char *sat = this->voice_obj->voice_stb_data_sat_get();
+
+    // Source
+    config_in.src = dqm->src;
 
     if(sat[0] != '\0') {
         LOG_INFO("%s: SAT Header sent to VREX.\n", __FUNCTION__);
@@ -232,6 +235,9 @@ void ctrlm_voice_endpoint_ws_t::voice_session_begin_callback_ws(void *data, int 
     xrsv_ws_update_device_name(this->xrsv_obj_ws, controller_name_to_vrex_name(info.controller_name.c_str()));
     xrsv_ws_update_device_type(this->xrsv_obj_ws, controller_name_to_vrex_type(info.controller_name.c_str()));
     xrsv_ws_update_device_software(this->xrsv_obj_ws, info.controller_version_sw.c_str());
+
+
+    bool is_mic = ctrlm_voice_xrsr_src_is_mic(dqm->src);
 
     // Handle stream parameters
     if(dqm->has_stream_params) {
@@ -290,7 +296,7 @@ void ctrlm_voice_endpoint_ws_t::voice_session_begin_callback_ws(void *data, int 
        config_in.ws.app_config = stream_params_out;
 
        LOG_INFO("%s: session begin - ptt <%s> keyword begin <%u> end <%u> doa <%u> gain <%4.1f> db\n", __FUNCTION__, (stream_params->push_to_talk ? "TRUE" : "FALSE"), stream_params->keyword_sample_begin, stream_params->keyword_sample_end, stream_params->keyword_doa, stream_params->dynamic_gain);
-    } else if(xrsr_to_voice_device(dqm->src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+    } else if(!is_mic) {
        xrsv_ws_stream_params_t *stream_params = (xrsv_ws_stream_params_t *)malloc(sizeof(xrsv_ws_stream_params_t));
 
        if(stream_params != NULL) {
@@ -309,6 +315,7 @@ void ctrlm_voice_endpoint_ws_t::voice_session_begin_callback_ws(void *data, int 
 
     ctrlm_voice_session_begin_cb_t session_begin;
     uuid_copy(session_begin.header.uuid, dqm->uuid);
+    uuid_copy(this->uuid, dqm->uuid);
     session_begin.header.timestamp     = dqm->timestamp;
     session_begin.src                  = dqm->src;
     session_begin.configuration        = dqm->configuration;
@@ -380,6 +387,7 @@ void ctrlm_voice_endpoint_ws_t::voice_session_end_callback_ws(void *data, int si
 
     ctrlm_voice_session_end_cb_t session_end;
     uuid_copy(session_end.header.uuid, dqm->uuid);
+    uuid_clear(this->uuid);
     session_end.header.timestamp = dqm->timestamp;
     session_end.success          = success;
     session_end.stats            = dqm->stats;
@@ -387,14 +395,14 @@ void ctrlm_voice_endpoint_ws_t::voice_session_end_callback_ws(void *data, int si
 }
 
 void ctrlm_voice_endpoint_ws_t::voice_session_recv_msg_ws(const char *transcription) {
-    this->voice_obj->voice_session_transcription_callback(transcription);
+    this->voice_obj->voice_session_transcription_callback(this->uuid, transcription);
 }
 
 void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_session_begin(const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_session_config_out_t *configuration, xrsv_ws_stream_params_t *stream_params, rdkx_timestamp_t *timestamp, void *user_data) {
     ctrlm_voice_endpoint_ws_t *endpoint = (ctrlm_voice_endpoint_ws_t *)user_data;
     ctrlm_voice_session_begin_cb_ws_t msg = {0};
 
-    if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+    if(!ctrlm_voice_xrsr_src_is_mic(src)) {
         // This is a controller, make sure session request / controller info is satisfied
         LOG_DEBUG("%s: Checking if VSR is done\n", __FUNCTION__);
         sem_wait(endpoint->voice_session_vsr_semaphore_get());
@@ -477,11 +485,11 @@ void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_sent_init(const uuid_t uu
     endpoint->voice_obj->voice_server_sent_init_callback(&data);
 }
 
-void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_listening(void *user_data) {
+void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_listening(const uuid_t uuid, void *user_data) {
     ctrlm_voice_endpoint_ws_t *endpoint = (ctrlm_voice_endpoint_ws_t *)user_data;
     rdkx_timestamp_t timestamp;
     rdkx_timestamp_get_realtime(&timestamp);
-    endpoint->voice_obj->voice_action_keyword_verification_callback(true, timestamp);
+    endpoint->voice_obj->voice_action_keyword_verification_callback(uuid, true, timestamp);
 }
 
 void ctrlm_voice_endpoint_ws_t::ctrlm_voice_handler_ws_processing(const char *str_transcription, void *user_data) {

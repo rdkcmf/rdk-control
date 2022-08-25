@@ -115,10 +115,12 @@ void ctrlm_voice_endpoint_ws_nsp_t::voice_session_begin_callback_ws_nsp(void *da
 
     this->server_ret_code = 0;
 
-    //if(xrsr_to_voice_device(dqm->src) == CTRLM_VOICE_DEVICE_MICROPHONE) {
+    // Source
+    config_in.src = dqm->src;
 
     ctrlm_voice_session_begin_cb_t session_begin;
     uuid_copy(session_begin.header.uuid, dqm->uuid);
+    uuid_copy(this->uuid, dqm->uuid);
     session_begin.header.timestamp     = dqm->timestamp;
     session_begin.src                  = dqm->src;
     session_begin.configuration        = dqm->configuration;
@@ -190,6 +192,7 @@ void ctrlm_voice_endpoint_ws_nsp_t::voice_session_end_callback_ws_nsp(void *data
 
     ctrlm_voice_session_end_cb_t session_end;
     uuid_copy(session_end.header.uuid, dqm->uuid);
+    uuid_clear(this->uuid);
     session_end.header.timestamp = dqm->timestamp;
     session_end.success          = success;
     session_end.stats            = dqm->stats;
@@ -198,14 +201,14 @@ void ctrlm_voice_endpoint_ws_nsp_t::voice_session_end_callback_ws_nsp(void *data
 
 void ctrlm_voice_endpoint_ws_nsp_t::voice_session_server_return_code_ws_nsp(long ret_code) {
     this->server_ret_code = ret_code;
-    this->voice_obj->voice_server_return_code_callback(ret_code);
+    this->voice_obj->voice_server_return_code_callback(this->uuid, ret_code);
 }
 
 void ctrlm_voice_endpoint_ws_nsp_t::ctrlm_voice_handler_ws_nsp_session_begin(void *data, const uuid_t uuid, xrsr_src_t src, uint32_t dst_index, xrsr_keyword_detector_result_t *detector_result, xrsr_session_config_out_t *config_out, xrsr_session_config_in_t *config_in, rdkx_timestamp_t *timestamp, const char *transcription_in) {
     ctrlm_voice_endpoint_ws_nsp_t *endpoint = (ctrlm_voice_endpoint_ws_nsp_t *)data;
     ctrlm_voice_session_begin_cb_ws_nsp_t msg = {0};
 
-    if(xrsr_to_voice_device(src) != CTRLM_VOICE_DEVICE_MICROPHONE) {
+    if(!ctrlm_voice_xrsr_src_is_mic(src)) {
         // This is a controller, make sure session request / controller info is satisfied
         LOG_DEBUG("%s: Checking if VSR is done\n", __FUNCTION__);
         sem_wait(endpoint->voice_session_vsr_semaphore_get());
