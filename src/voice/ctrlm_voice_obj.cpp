@@ -1472,7 +1472,7 @@ bool ctrlm_voice_t::voice_session_data(ctrlm_network_id_t network_id, ctrlm_cont
             hal_input_params.input_format.container   = XRAUDIO_CONTAINER_NONE;
             hal_input_params.input_format.encoding    = voice_format_to_xraudio(this->format);
             hal_input_params.input_format.sample_rate = 16000;
-            hal_input_params.input_format.sample_size = 1;
+            hal_input_params.input_format.sample_size = 2;
             hal_input_params.input_format.channel_qty = 1;
             hal_input_params.require_stream_params    = false;
 
