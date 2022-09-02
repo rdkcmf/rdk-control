@@ -343,6 +343,7 @@ void ctrlm_voice_endpoint_ws_nextgen_t::voice_session_begin_callback_ws_nextgen(
           ERR_CHK(safec_rc);
 
           stream_params->push_to_talk = true;
+          stream_params->par_eos_timeout = params.par_voice_enabled ? params.par_voice_eos_timeout : 0;
        }
        config_in.ws.app_config = stream_params;
 
