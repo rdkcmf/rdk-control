@@ -593,12 +593,6 @@ int main(int argc, char *argv[]) {
 
    g_ctrlm.mask_pii = ctrlm_is_production_build() ? JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_0 : JSON_ARRAY_VAL_BOOL_CTRLM_GLOBAL_MASK_PII_1;
 
-   LOG_INFO("ctrlm_main: load device mac\n");
-   if(!ctrlm_load_device_mac()) {
-      LOG_ERROR("ctrlm_main: failed to load device mac\n");
-      // Do not crash the program here
-   }
-
 #ifdef TELEMETRY_SUPPORT
    LOG_INFO("ctrlm_main: create Telemetry object\n");
    g_ctrlm.telemetry = ctrlm_telemetry_t::get_instance();
@@ -606,9 +600,6 @@ int main(int argc, char *argv[]) {
 
    LOG_INFO("ctrlm_main: create Voice object\n");
    g_ctrlm.voice_session = new ctrlm_voice_generic_t();
-
-   LOG_INFO("ctrlm_main: create IRDB object\n");
-   g_ctrlm.irdb = ctrlm_irdb_create();
 
    LOG_INFO("ctrlm_main: ctrlm_rfc init\n");
    // This tells the RFC component to go fetch all the enabled attributes once
@@ -651,6 +642,15 @@ int main(int argc, char *argv[]) {
    // set telemetry duration after config parsing
    g_ctrlm.telemetry->set_duration(g_ctrlm.telemetry_report_interval);
 #endif
+
+   LOG_INFO("ctrlm_main: load device mac\n");
+   if(!ctrlm_load_device_mac()) {
+      LOG_ERROR("ctrlm_main: failed to load device mac\n");
+      // Do not crash the program here
+   }
+
+   LOG_INFO("ctrlm_main: create IRDB object\n");
+   g_ctrlm.irdb = ctrlm_irdb_create();
 
 #ifdef AUTH_ENABLED
    LOG_INFO("ctrlm_main: ctrlm_auth init\n");
