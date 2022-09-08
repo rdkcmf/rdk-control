@@ -50,6 +50,7 @@ class ctrlm_voice_t;
 class ctrlm_voice_endpoint_t;
 class ctrlm_irdb_t;
 class ctrlm_auth_t;
+class ctrlm_telemetry_t;
 typedef enum {
    CTRLM_THREAD_MONITOR_RESPONSE_DEAD  = 0,
    CTRLM_THREAD_MONITOR_RESPONSE_ALIVE = 1
@@ -480,6 +481,7 @@ std::string ctrlm_device_mac_get();
 ctrlm_controller_id_t ctrlm_last_used_controller_get(ctrlm_network_type_t network_type);
 
 ctrlm_voice_t *ctrlm_get_voice_obj();
+ctrlm_telemetry_t *ctrlm_get_telemetry_obj();
 
 template <typename T>
 void ctrlm_main_queue_handler_push(ctrlm_handler_type_t type, T handler, void *data, int size, void *obj = NULL, ctrlm_network_id_t network_id = CTRLM_MAIN_NETWORK_ID_INVALID) {

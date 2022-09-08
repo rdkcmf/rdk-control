@@ -55,7 +55,7 @@
 #define ADPCM_COMMAND_ID_MIN             (0x20)    ///< Minimum bound of command id as defined by XVP Spec.
 #define ADPCM_COMMAND_ID_MAX             (0x3F)    ///< Maximum bound of command id as defined by XVP Spec.
 
-static void ctrlm_voice_session_response_confirm(bool result, ctrlm_timestamp_t *timestamp, void *user_data);
+static void ctrlm_voice_session_response_confirm(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp, void *user_data);
 static void ctrlm_voice_data_post_processing_cb (ctrlm_hal_data_cb_params_t *param);
 
 #ifdef BEEP_ON_KWD_ENABLED
@@ -126,6 +126,16 @@ ctrlm_voice_t::ctrlm_voice_t() {
     this->transcription_in                = "";
     this->packet_loss_threshold           = JSON_INT_VALUE_VOICE_PACKET_LOSS_THRESHOLD;
     this->vsdk_config                     = NULL;
+
+    // VSRsp Error Tracking
+    this->current_vsr_err_rsp_time        = 0;
+    this->current_vsr_err_rsp_window      = 0;
+    this->current_vsr_err_string          = "";
+    sem_init(&this->current_vsr_err_semaphore, 0, 1);
+    ctrlm_telemetry_t *telemetry = ctrlm_get_telemetry_obj();
+    if(telemetry) {
+        telemetry->add_listener(ctrlm_telemetry_report_t::VOICE, std::bind(&ctrlm_voice_t::telemetry_report_handler, this));
+    }
 
     #ifdef ENABLE_DEEP_SLEEP
     this->prefs.dst_params_standby.connect_check_interval = JSON_INT_VALUE_VOICE_DST_PARAMS_STANDBY_CONNECT_CHECK_INTERVAL;
@@ -232,6 +242,8 @@ ctrlm_voice_t::~ctrlm_voice_t() {
     #endif
 
     /* Close Voice SDK */
+
+    sem_destroy(&this->current_vsr_err_semaphore);
 }
 
 bool ctrlm_voice_t::vsdk_is_privacy_enabled(void) {
@@ -1346,7 +1358,7 @@ bool ctrlm_voice_t::voice_session_term(std::string &session_id) {
    return(false);
 }
 
-void ctrlm_voice_t::voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp) {
+void ctrlm_voice_t::voice_session_rsp_confirm(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp) {
    if(this->state_src != CTRLM_VOICE_STATE_SRC_STREAMING) {
        if(this->power_state == CTRLM_POWER_STATE_DEEP_SLEEP || this->power_state == CTRLM_POWER_STATE_STANDBY) {
            LOG_WARN("%s: missed voice session response window after waking from <%s>\n", __FUNCTION__, ctrlm_power_state_str(this->power_state));
@@ -1357,6 +1369,9 @@ void ctrlm_voice_t::voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *ti
    }
    if(!result) {
        LOG_ERROR("%s: failed to send voice session response\n", __FUNCTION__);
+       this->current_vsr_err_rsp_time   = rsp_time;
+       this->current_vsr_err_rsp_window = rsp_window;
+       this->current_vsr_err_string     = err_str;
        return;
    }
 
@@ -2274,6 +2289,41 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         this->status.status = (session_end->success ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE);
     }
 
+    // Report voice session telemetry
+    ctrlm_telemetry_t *telemetry = ctrlm_get_telemetry_obj();
+    if(telemetry) {
+        ctrlm_telemetry_event_t<int> vs_marker(MARKER_VOICE_SESSION_TOTAL, 1);
+        ctrlm_telemetry_event_t<int> vs_status_marker(session_end->success ? MARKER_VOICE_SESSION_SUCCESS : MARKER_VOICE_SESSION_FAILURE, 1);
+        ctrlm_telemetry_event_t<int> vs_end_reason_marker(MARKER_VOICE_END_REASON_PREFIX + std::string(ctrlm_voice_session_end_reason_str(this->end_reason)), 1);
+        ctrlm_telemetry_event_t<int> vs_xrsr_end_reason_marker(MARKER_VOICE_XRSR_END_REASON_PREFIX + std::string(xrsr_session_end_reason_str(stats->reason)), 1);
+
+        // Handle all VSRsp error telemetry
+        if(this->current_vsr_err_string != "") {
+            sem_wait(&this->current_vsr_err_semaphore);
+            ctrlm_voice_telemetry_vsr_error_t *vsr_error = this->vsr_errors[this->current_vsr_err_string];
+            if(vsr_error) {
+                vsr_error->update(this->packets_processed > 0, this->current_vsr_err_rsp_window, this->current_vsr_err_rsp_time);
+                telemetry->event(ctrlm_telemetry_report_t::VOICE, *vsr_error);
+            }
+            vsr_error = this->vsr_errors[MARKER_VOICE_VSR_FAIL_TOTAL];
+            if(vsr_error) {
+                vsr_error->update(this->packets_processed > 0, this->current_vsr_err_rsp_window, this->current_vsr_err_rsp_time);
+                telemetry->event(ctrlm_telemetry_report_t::VOICE, *vsr_error);
+            }
+            sem_post(&this->current_vsr_err_semaphore);
+        }
+        // End VSRsp telemetry
+
+        telemetry->event(ctrlm_telemetry_report_t::VOICE, vs_marker);
+        telemetry->event(ctrlm_telemetry_report_t::VOICE, vs_status_marker);
+        telemetry->event(ctrlm_telemetry_report_t::VOICE, vs_end_reason_marker);
+        telemetry->event(ctrlm_telemetry_report_t::VOICE, vs_xrsr_end_reason_marker);
+    }
+    this->current_vsr_err_rsp_time   = 0;
+    this->current_vsr_err_rsp_window = 0;
+    this->current_vsr_err_string     = "";
+
+
     if(this->state_dst != CTRLM_VOICE_STATE_DST_OPENED) {
         LOG_WARN("%s: unexpected dst state <%s>\n", __FUNCTION__, ctrlm_voice_state_dst_str(this->state_dst));
     }
@@ -2869,8 +2919,8 @@ void ctrlm_voice_t::set_audio_mode(ctrlm_voice_audio_settings_t *settings) {
 
 // RF4CE HAL callbacks
 
-void ctrlm_voice_session_response_confirm(bool result, ctrlm_timestamp_t *timestamp, void *user_data) {
-   ctrlm_get_voice_obj()->voice_session_rsp_confirm(result, timestamp);
+void ctrlm_voice_session_response_confirm(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp, void *user_data) {
+   ctrlm_get_voice_obj()->voice_session_rsp_confirm(result, rsp_time, rsp_window, err_str, timestamp);
 }
 
 // Timeouts
@@ -3331,4 +3381,11 @@ void ctrlm_voice_t::vsdk_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
         this->voice_sdk_update_routes();
         json_decref(obj_voice);
     }
+}
+
+void ctrlm_voice_t::telemetry_report_handler() {
+    LOG_INFO("%s: clearing vsr_errs\n", __FUNCTION__);
+    sem_wait(&this->current_vsr_err_semaphore);
+    this->vsr_errors.clear();
+    sem_post(&this->current_vsr_err_semaphore);
 }

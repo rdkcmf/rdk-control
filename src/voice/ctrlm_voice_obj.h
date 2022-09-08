@@ -21,6 +21,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <map>
 #include <uuid/uuid.h>
 #include "include/ctrlm_ipc.h"
 #include "include/ctrlm_ipc_voice.h"
@@ -33,6 +34,7 @@
 #include "ctrlm_voice_ipc.h"
 #include "ctrlm_rfc.h"
 #include "xrsr.h"
+#include "telemetry/ctrlm_voice_telemetry_events.h"
 
 #ifdef BEEP_ON_KWD_ENABLED
 #include "ctrlm_thunder_plugin_system_audio_player.h"
@@ -365,7 +367,7 @@ typedef struct {
    ctrlm_voice_status_capabilities_t capabilities;
 } ctrlm_voice_status_t;
 
-typedef void (*ctrlm_voice_session_rsp_confirm_t)(bool result, ctrlm_timestamp_t *timestamp, void *user_data);
+typedef void (*ctrlm_voice_session_rsp_confirm_t)(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp, void *user_data);
 
 class ctrlm_voice_t {
     public:
@@ -375,7 +377,7 @@ class ctrlm_voice_t {
     virtual ~ctrlm_voice_t();
 
     ctrlm_voice_session_response_status_t voice_session_req(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, ctrlm_voice_device_t device_type, ctrlm_voice_format_t format, voice_session_req_stream_params *stream_params, const char *controller_name, const char *sw_version, const char *hw_version, double voltage, bool command_status=false, ctrlm_timestamp_t *timestamp=NULL, ctrlm_voice_session_rsp_confirm_t *cb_confirm=NULL, void **cb_confirm_param=NULL, bool use_external_data_pipe=false, const char *transcription_in=NULL, bool low_latency=false);
-    void                                  voice_session_rsp_confirm(bool result, ctrlm_timestamp_t *timestamp);
+    void                                  voice_session_rsp_confirm(bool result, signed long long rsp_time, unsigned int rsp_window, std::string err_str, ctrlm_timestamp_t *timestamp);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, const char *buffer, long unsigned int length, ctrlm_timestamp_t *timestamp=NULL, uint8_t *lqi=NULL);
     bool                                  voice_session_data(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, int fd);
     void                                  voice_session_data_post_processing(int bytes_sent, const char *action, ctrlm_timestamp_t *timestamp);
@@ -433,6 +435,7 @@ class ctrlm_voice_t {
 
     void                                  voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
     void                                  vsdk_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr);
+    void                                  telemetry_report_handler();
 
     // Helper semaphores for synchronization
     sem_t                    vsr_semaphore;
@@ -638,6 +641,12 @@ public:
 
     ctrlm_voice_session_end_reason_t end_reason;
     int packet_loss_threshold;
+
+    sem_t            current_vsr_err_semaphore;
+    std::string      current_vsr_err_string;
+    signed long long current_vsr_err_rsp_time;
+    unsigned int     current_vsr_err_rsp_window;
+    ctrlm_voice_telemetry_vsr_error_map_t vsr_errors;
 
    bool                 is_voice_assistant(ctrlm_voice_device_t device);
    bool                 controller_supports_qos(void);

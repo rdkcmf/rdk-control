@@ -20,6 +20,7 @@
       "mask_pii"                         : [true, false],
       "crash_recovery_threshold"         :         2,
       "device_id"                        : "",
+      "telemetry_report_interval"        :    900000,
       "validation_config" : {
          "app_based_validation"          :     false,
          "timeout_config_complete"       :      5000,

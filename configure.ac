@@ -199,6 +199,12 @@ AM_CONDITIONAL([IRDB_MODE_HYBRID],  [test x$irdb_mode = xhybrid])
 AM_CONDITIONAL([IRDB_MODE_OFFLINE], [test x$irdb_mode = xoffline])
 AM_CONDITIONAL([IRDB_MODE_ONLINE],  [test x$irdb_mode = xonline])
 
+AC_ARG_ENABLE([telemetry-support],
+[  --enable-telemetry-support    Enable telemetry support],
+[telemetry_support=true],
+[telemetry_support=false])
+AM_CONDITIONAL([TELEMETRY_SUPPORT], [test x$telemetry_support = xtrue])
+
 AC_ARG_ENABLE([platform],
 [  --enable-platform    Turn on platform support],
 [case "${enableval}" in

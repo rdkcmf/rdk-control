@@ -58,6 +58,11 @@
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_LEVEL         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioDuckingLevel"
 #define CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.VSDKConfiguration"
 #define CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.KeywordSensitivity"
+#define CTRLM_TR181_TELEMETRY_REPORT_GLOBAL                  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.global"
+#define CTRLM_TR181_TELEMETRY_REPORT_RF4CE                   "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.rf4ce"
+#define CTRLM_TR181_TELEMETRY_REPORT_BLE                     "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.ble"
+#define CTRLM_TR181_TELEMETRY_REPORT_IP                      "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.ip"
+#define CTRLM_TR181_TELEMETRY_REPORT_VOICE                   "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.voice"
 
 typedef enum {
    CTRLM_TR181_RESULT_FAILURE = 0,
@@ -80,4 +85,5 @@ ctrlm_tr181_result_t ctrlm_tr181_int_get(const char *parameter, T *i, int min = 
    }
    return(ret);
 }
+ctrlm_tr181_result_t ctrlm_tr181_string_set(const char *parameter, char *s, size_t len);
 #endif

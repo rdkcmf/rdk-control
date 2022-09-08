@@ -113,6 +113,15 @@ ctrlm_tr181_result_t ctrlm_tr181_real_get(const char *parameter, double *d, doub
    return result;
 }
 
+ctrlm_tr181_result_t ctrlm_tr181_string_set(const char *parameter, char *s, size_t len) {
+   if(parameter == NULL || s == NULL) {
+      LOG_ERROR("%s: invalid parameters\n", __FUNCTION__);
+      return CTRLM_TR181_RESULT_FAILURE;
+   }
+
+   return((setRFCParameter((char *)RFC_CALLER_ID, parameter, s, WDMP_STRING) == WDMP_SUCCESS) ? CTRLM_TR181_RESULT_SUCCESS : CTRLM_TR181_RESULT_FAILURE);
+}
+
 // Calls the TR181 get API
 ctrlm_tr181_result_t ctrlm_tr181_call_get(const char *parameter, RFC_ParamData_t *param) {
    if(NULL == param || NULL == parameter) {

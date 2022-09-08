@@ -3854,6 +3854,7 @@ void ctrlm_obj_network_rf4ce_t::cfm_voice_session_rsp(void *data, int size) {
    g_assert(size == sizeof(ctrlm_main_queue_msg_voice_session_response_confirm_t));
 
    bool b_result = true;
+   signed long long rsp_time = ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, voice_session_rsp_params_.timestamp_rsp_req);
    if(dqm->result != CTRLM_HAL_RF4CE_RESULT_SUCCESS) {
        if(ctrlm_timestamp_until_ms(voice_session_rsp_params_.timestamp_end) > 0) { // Still within transmission window.  Retransmit the packet.
           voice_session_rsp_params_.retries++;
@@ -3880,13 +3881,13 @@ void ctrlm_obj_network_rf4ce_t::cfm_voice_session_rsp(void *data, int size) {
        }
        unsigned long session_id = ctrlm_get_voice_obj()->voice_session_id_get();
        LOG_ERROR("%s: result <%s> session response transmission failure\n", __FUNCTION__, ctrlm_hal_rf4ce_result_str(dqm->result));
-       LOG_ERROR("%s: packet recv to data_req <%lldms>, packet recv to now <%lldms>, retries <%u> load avg <%5.2f, %5.2f, %5.2f> type <%s> voltage <%4.2f, %4.2f> uptime <%lu> session id <%u>\n", __FUNCTION__, ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, voice_session_rsp_params_.timestamp_rsp_req), ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, now), voice_session_rsp_params_.retries, loadavg[0], loadavg[1], loadavg[2], ctrlm_rf4ce_controller_type_str(controller_type_get(controller_id)), voltage_loaded, voltage_unloaded, s_info.uptime, session_id);
+       LOG_ERROR("%s: packet recv to data_req <%ums>, packet recv to now <%lldms>, retries <%u> load avg <%5.2f, %5.2f, %5.2f> type <%s> voltage <%4.2f, %4.2f> uptime <%lu> session id <%u>\n", __FUNCTION__, rsp_time, ctrlm_timestamp_subtract_ms(voice_session_rsp_params_.timestamp_hal, now), voice_session_rsp_params_.retries, loadavg[0], loadavg[1], loadavg[2], ctrlm_rf4ce_controller_type_str(controller_type_get(controller_id)), voltage_loaded, voltage_unloaded, s_info.uptime, session_id);
        b_result = false;
    }
 
    // Session response transmission is confirmed
    if(voice_session_rsp_confirm_ != NULL) {
-      (*voice_session_rsp_confirm_)(b_result, &dqm->timestamp, voice_session_rsp_confirm_param_);
+      (*voice_session_rsp_confirm_)(b_result, rsp_time, this->rsp_time_.get_ms((uint8_t)CTRLM_RF4CE_PROFILE_ID_VOICE), std::string(ctrlm_hal_rf4ce_result_str(dqm->result)),&dqm->timestamp, voice_session_rsp_confirm_param_);
       voice_session_rsp_confirm_       = NULL;
       voice_session_rsp_confirm_param_ = NULL;
    }

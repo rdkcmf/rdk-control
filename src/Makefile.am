@@ -31,7 +31,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/                     \
               -I$(top_srcdir)/src/voice/ipc/       \
               -I$(top_srcdir)/src/thunder/         \
               -I$(top_srcdir)/src/thunder/helpers  \
-              -I$(top_srcdir)/src/thunder/plugins
+              -I$(top_srcdir)/src/thunder/plugins  \
+              -I$(top_srcdir)/src/telemetry
 
 AM_LDFLAGS = -larchive
 
@@ -63,7 +64,7 @@ controlMgr_SOURCES = ctrlm_main.cpp                           \
                      json_config.cpp                          \
                      irdb/ctrlm_irdb.cpp                      \
                      irdb/ctrlm_irdb_stub.cpp                 \
-                     irdb/ipc/ctrlm_irdb_ipc_iarm_thunder.cpp 
+                     irdb/ipc/ctrlm_irdb_ipc_iarm_thunder.cpp
 
 if PLATFORM_STB
 AM_CPPFLAGS += -DPLATFORM_STB
@@ -71,6 +72,14 @@ endif
 
 if PLATFORM_TV
 AM_CPPFLAGS += -DPLATFORM_TV
+endif
+
+if TELEMETRY_SUPPORT
+AM_CPPFLAGS += -DTELEMETRY_SUPPORT
+controlMgr_SOURCES  += telemetry/ctrlm_telemetry.cpp                       \
+                       telemetry/ctrlm_telemetry_event.cpp                 \
+                       voice/telemetry/ctrlm_voice_telemetry_events.cpp
+
 endif
 
 controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \

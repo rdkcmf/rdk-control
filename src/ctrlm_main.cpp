@@ -58,6 +58,7 @@
 #endif
 #endif
 #include "ctrlm_rfc.h"
+#include "ctrlm_telemetry.h"
 #include "ctrlm_config.h"
 #include "ctrlm_tr181.h"
 #include "rf4ce/ctrlm_rf4ce_network.h"
@@ -257,6 +258,7 @@ typedef struct {
    int                                return_code;
    ctrlm_voice_t                     *voice_session;
    ctrlm_irdb_t                      *irdb;
+   ctrlm_telemetry_t                 *telemetry;
    ctrlm_cs_values_t                  cs_values;
 #ifdef AUTH_ENABLED
    ctrlm_auth_t                      *authservice;
@@ -264,6 +266,7 @@ typedef struct {
    ctrlm_power_state_t                power_state;
    gboolean                           auto_ack;
    gboolean                           local_conf;
+   guint                              telemetry_report_interval;
 } ctrlm_global_t;
 
 static ctrlm_global_t g_ctrlm;
@@ -553,6 +556,8 @@ int main(int argc, char *argv[]) {
    g_ctrlm.power_state                    = ctrlm_main_iarm_call_get_power_state();
    g_ctrlm.auto_ack                       = true;
    g_ctrlm.local_conf                     = false;
+   g_ctrlm.telemetry                      = NULL;
+   g_ctrlm.telemetry_report_interval      = JSON_INT_VALUE_CTRLM_GLOBAL_TELEMETRY_REPORT_INTERVAL;
 
    g_ctrlm.service_access_token.clear();
    g_ctrlm.has_receiver_id                = false;
@@ -593,6 +598,11 @@ int main(int argc, char *argv[]) {
       LOG_ERROR("ctrlm_main: failed to load device mac\n");
       // Do not crash the program here
    }
+
+#ifdef TELEMETRY_SUPPORT
+   LOG_INFO("ctrlm_main: create Telemetry object\n");
+   g_ctrlm.telemetry = ctrlm_telemetry_t::get_instance();
+#endif
 
    LOG_INFO("ctrlm_main: create Voice object\n");
    g_ctrlm.voice_session = new ctrlm_voice_generic_t();
@@ -636,6 +646,11 @@ int main(int argc, char *argv[]) {
    json_obj_validation    = NULL;
    json_obj_vsdk          = NULL;
    ctrlm_load_config(&json_obj_root, &json_obj_net_rf4ce, &json_obj_voice, &json_obj_device_update, &json_obj_validation, &json_obj_vsdk);
+
+#ifdef TELEMETRY_SUPPORT
+   // set telemetry duration after config parsing
+   g_ctrlm.telemetry->set_duration(g_ctrlm.telemetry_report_interval);
+#endif
 
 #ifdef AUTH_ENABLED
    LOG_INFO("ctrlm_main: ctrlm_auth init\n");
@@ -826,6 +841,7 @@ int main(int argc, char *argv[]) {
 
    ctrlm_config_t::destroy_instance();
    ctrlm_rfc_t::destroy_instance();
+   ctrlm_telemetry_t::destroy_instance();
 
    LOG_INFO("ctrlm_main: exit program\n");
    return (g_ctrlm.return_code);
@@ -1894,6 +1910,20 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
          LOG_INFO("%s: %-28s - ABSENT\n", __FUNCTION__, text);
       }
 
+      json_obj = json_object_get(json_obj_ctrlm, JSON_INT_NAME_CTRLM_GLOBAL_TELEMETRY_REPORT_INTERVAL);
+      text     = "Telemetry Report Interval";
+      if(json_obj != NULL && json_is_integer(json_obj)) {
+         json_int_t value = json_integer_value(json_obj);
+         LOG_INFO("%s: %-24s - PRESENT <%lld>\n", __FUNCTION__, text, value);
+         if(value <= 0) {
+            LOG_INFO("%s: %-24s - OUT OF RANGE %lld\n", __FUNCTION__, text, value);
+         } else {
+            g_ctrlm.telemetry_report_interval = value;
+         }
+      } else {
+         LOG_INFO("%s: %-28s - ABSENT\n", __FUNCTION__, text);
+      }
+
 #if defined(AUTH_ENABLED) && defined(AUTH_DEVICE_ID)
       json_obj = json_object_get(json_obj_ctrlm, JSON_STR_NAME_CTRLM_GLOBAL_DEVICE_ID);
       text = "Device ID";
@@ -1922,6 +1952,7 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
    LOG_INFO("%s: Mask PII                     <%s>\n",  __FUNCTION__, g_ctrlm.mask_pii ? "YES" : "NO");
    LOG_INFO("%s: Crash Recovery Threshold     <%u>\n",  __FUNCTION__, g_ctrlm.crash_recovery_threshold);
    LOG_INFO("%s: Auth Service URL             <%s>\n",  __FUNCTION__, g_ctrlm.server_url_authservice.c_str());
+   LOG_INFO("%s: Telemetry Report Interval    %u ms\n", __FUNCTION__, g_ctrlm.telemetry_report_interval);
 
    g_ctrlm.local_conf = local_conf;
 
@@ -5922,6 +5953,10 @@ void control_service_values_read_from_db() {
 
 ctrlm_voice_t *ctrlm_get_voice_obj() {
    return(g_ctrlm.voice_session);
+}
+
+ctrlm_telemetry_t *ctrlm_get_telemetry_obj() {
+   return(g_ctrlm.telemetry);
 }
 
 gboolean ctrlm_start_iarm(gpointer user_data) {
