@@ -1181,7 +1181,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         LOG_WARN("%s: Session in progress with same controller - src <%s> dst <%s>, aborting this and continuing..\n", __FUNCTION__, ctrlm_voice_state_src_str(this->state_src), ctrlm_voice_state_dst_str(this->state_dst));
         xrsr_session_terminate(); // Synchronous - this will take a bit of time.  Might need to revisit this down the road.
     }
-
+    bool is_nsm = ((device_type == CTRLM_VOICE_DEVICE_MICROPHONE) && (network_id == CTRLM_MAIN_NETWORK_ID_DSP) );
     bool l_session_by_text = (l_transcription_in != NULL);
     if (l_session_by_text) {
         LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, l_transcription_in);
@@ -1189,7 +1189,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
             LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
             return VOICE_SESSION_RESPONSE_BUSY;
         }
-    } else if(device_type == CTRLM_VOICE_DEVICE_MICROPHONE && stream_params == NULL) {
+    } else if(device_type == CTRLM_VOICE_DEVICE_MICROPHONE && stream_params == NULL && !is_nsm) {
        LOG_INFO("%s: Requesting the speech router start a session with the microphone - format <%s> low latency <%s>\n", __FUNCTION__, ctrlm_voice_format_str(format), low_latency ? "YES" : "NO");
        xrsr_audio_format_t xrsr_format = XRSR_AUDIO_FORMAT_PCM;
        if(format == CTRLM_VOICE_FORMAT_PCM_RAW) {
@@ -1211,9 +1211,9 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     hal_input_params.input_format.container   = XRAUDIO_CONTAINER_NONE;
     hal_input_params.input_format.encoding    = voice_format_to_xraudio(format);
     hal_input_params.input_format.sample_rate = 16000;
-    hal_input_params.input_format.sample_size = is_standby_microphone() ? 4 : 1;
+    hal_input_params.input_format.sample_size = is_nsm ? 4 : 1;
     hal_input_params.input_format.channel_qty = 1;
-    hal_input_params.require_stream_params    = (stream_params == NULL) ? false : true;
+    hal_input_params.require_stream_params    = is_nsm? true : false;
 
     ctrlm_hal_input_object_t hal_input_object = NULL;
     int fds[2] = { -1, -1 };
