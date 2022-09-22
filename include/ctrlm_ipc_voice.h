@@ -52,7 +52,7 @@
 
 #define CTRLM_VOICE_IARM_CALL_RESULT_LEN_MAX       (2048) ///< IARM Call result length
 
-#define CTRLM_VOICE_IARM_BUS_API_REVISION             (8) ///< Revision of the Voice IARM API
+#define CTRLM_VOICE_IARM_BUS_API_REVISION             (9) ///< Revision of the Voice IARM API
 #define CTRLM_VOICE_MIME_MAX_LENGTH                  (64) ///< Audio mime string maximum length
 #define CTRLM_VOICE_SUBTYPE_MAX_LENGTH               (64) ///< Audio subtype string maximum length
 #define CTRLM_VOICE_LANG_MAX_LENGTH                  (16) ///< Audio language string maximum length

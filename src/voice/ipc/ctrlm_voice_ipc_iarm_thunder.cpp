@@ -49,6 +49,7 @@
 #define JSON_CAPABILITIES                             "capabilities"
 #define JSON_TYPES                                    "types"
 #define JSON_MESSAGE                                  "message"
+#define JSON_MASK_PII                                 "maskPii"
 #define JSON_STREAM_END_REASON                        "reason"
 #define JSON_SESSION_END_RESULT                       "result"
 #define JSON_SESSION_END_RESULT_SUCCESS               "success"
@@ -436,6 +437,7 @@ IARM_Result_t ctrlm_voice_ipc_iarm_thunder_t::status(void *data) {
             rc |= json_object_set_new_nocheck(obj, JSON_WW_FEEDBACK, status.wwFeedback ? json_true() : json_false());
             rc |= json_object_set_new_nocheck(obj, JSON_PRV, status.prv_enabled ? json_true() : json_false());
             rc |= json_object_set_new_nocheck(obj, JSON_THUNDER_RESULT, json_true());
+            rc |= json_object_set_new_nocheck(obj, JSON_MASK_PII, (ctrlm_get_voice_obj()->voice_stb_data_pii_mask_get() ? json_true() : json_false()) );
 
             if (status.capabilities.prv) {
                rc |= json_array_append_new(obj_capabilities, json_string("PRV"));
