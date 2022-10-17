@@ -1278,6 +1278,10 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
     bool l_session_by_text = (l_transcription_in != NULL);
     if (l_session_by_text) {
         LOG_INFO("%s: Requesting the speech router start a text-only session with transcription = <%s>\n", __FUNCTION__, l_transcription_in);
+        if(session->state_src == CTRLM_VOICE_STATE_SRC_STREAMING || session->state_dst != CTRLM_VOICE_STATE_DST_READY) {
+            LOG_ERROR("%s: unable to accept a text-only session due to current session - state src <%s> dst <%s>.\n", __FUNCTION__, ctrlm_voice_state_src_str(session->state_src), ctrlm_voice_state_dst_str(session->state_dst));
+            return VOICE_SESSION_RESPONSE_BUSY;
+        }
         if (false == xrsr_session_request(voice_device_to_xrsr(device_type), XRSR_AUDIO_FORMAT_NONE, l_transcription_in, false)) {
             LOG_ERROR("%s: Failed to acquire the text-only session from the speech router.\n", __FUNCTION__);
             return VOICE_SESSION_RESPONSE_BUSY;
