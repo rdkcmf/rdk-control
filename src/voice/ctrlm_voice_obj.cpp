@@ -2346,8 +2346,8 @@ void ctrlm_voice_t::voice_session_end_callback(ctrlm_voice_session_end_cb_t *ses
         return;
     }
 
-    ctrlm_voice_command_status_t command_status = VOICE_COMMAND_STATUS_FAILURE;
-    if(this->status.status == VOICE_COMMAND_STATUS_PENDING) {
+    ctrlm_voice_command_status_t command_status = this->status.status;
+    if(command_status == VOICE_COMMAND_STATUS_PENDING) {
         switch(session->voice_device) {
             case CTRLM_VOICE_DEVICE_FF: {
                 this->status.status = (stats->reason == XRSR_SESSION_END_REASON_EOS) ? VOICE_COMMAND_STATUS_SUCCESS : VOICE_COMMAND_STATUS_FAILURE;
