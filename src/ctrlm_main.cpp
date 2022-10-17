@@ -1658,7 +1658,7 @@ gboolean ctrlm_load_config(json_t **json_obj_root, json_t **json_obj_net_rf4ce, 
       LOG_WARN("%s: control manger object not found\n", __FUNCTION__);
    } else {
       json_config conf_global;
-      if(conf_global.config_object_set(json_obj_ctrlm)) {
+      if(!conf_global.config_object_set(json_obj_ctrlm)) {
          LOG_ERROR("%s: unable to set config object\n", __FUNCTION__);
       }
 
