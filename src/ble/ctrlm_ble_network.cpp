@@ -1756,8 +1756,8 @@ void ctrlm_obj_network_ble_t::ind_process_keypress(void *data, int size) {
 
    ctrlm_controller_id_t controller_id;
    if (true == getControllerId(dqm->ieee_address, &controller_id)) {
-      LOG_INFO("%s: %s - MAC Address <%s>, code = <0x%X>, status = <%s>\n", __FUNCTION__, ctrlm_ble_controller_type_str(controllers_[controller_id]->getControllerType()), 
-         ctrlm_convert_mac_long_to_string(dqm->ieee_address).c_str(), mask_key_codes_get() ? 0xFF : dqm->event.code, ctrlm_key_status_str(key_status));
+      LOG_INFO("%s: %s - MAC Address <%s>, code = <%d> (%s key), status = <%s>\n", __FUNCTION__, ctrlm_ble_controller_type_str(controllers_[controller_id]->getControllerType()), 
+         ctrlm_convert_mac_long_to_string(dqm->ieee_address).c_str(), mask_key_codes_get() ? -1 : dqm->event.code, controllers_[controller_id]->getKeyName(dqm->event.code, mask_key_codes_get()), ctrlm_key_status_str(key_status));
 
       ctrlm_obj_controller_ble_t *controller = controllers_[controller_id];
 

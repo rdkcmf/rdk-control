@@ -52,6 +52,57 @@ using namespace std;
 #define BROADCAST_PRODUCT_NAME_EC302                     ("SkyQ EC302")
 #define XCONF_PRODUCT_NAME_EC302                         ("EC302-10")
 
+// map to convert a key code to its identifiable name on the remote.
+// map<key code, tuple<name, masked_name>>
+static const map<uint16_t, tuple<const char*, const char*>> ctrlm_ble_key_names {
+   {KEY_1,             {"1",                 "Numeric"}},
+   {KEY_2,             {"2",                 "Numeric"}},
+   {KEY_3,             {"3",                 "Numeric"}},
+   {KEY_4,             {"4",                 "Numeric"}},
+   {KEY_5,             {"5",                 "Numeric"}},
+   {KEY_6,             {"6",                 "Numeric"}},
+   {KEY_7,             {"7",                 "Numeric"}},
+   {KEY_8,             {"8",                 "Numeric"}},
+   {KEY_9,             {"9",                 "Numeric"}},
+   {KEY_0,             {"0",                 "Numeric"}},
+   {KEY_F1,            {"Standby",           "Standby"}},
+   {KEY_F15,           {"Input",             "Input"}},
+   {KEY_UP,            {"Up",                "Directional"}},
+   {KEY_LEFT,          {"Left",              "Directional"}},
+   {KEY_RIGHT,         {"Right",             "Directional"}},
+   {KEY_DOWN,          {"Down",              "Directional"}},
+   {KEY_ENTER,         {"Select",            "Select"}},
+   {KEY_KPPLUS,        {"Volume+",           "Volume+"}},
+   {KEY_KPMINUS,       {"Volume-",           "Volume-"}},
+   {KEY_KPASTERISK,    {"Mute",              "Mute"}},
+   {KEY_HOME,          {"Home",              "Home"}},
+   {KEY_F17,           {"Proximity Sensor",  "Proximity Sensor"}},
+   {KEY_F8,            {"Voice",             "Voice"}},
+   {KEY_ESC,           {"Dismiss",           "Dismiss"}},
+   {KEY_F9,            {"Info",              "Info"}},
+   {KEY_BATTERY,       {"Battery Low",       "Battery Low"}},
+   {KEY_F16,           {"Plus",              "Plus"}},
+   {KEY_F13,           {"Option",            "Option"}},
+   {KEY_F4,            {"Red",               "Red"}},
+   {KEY_DELETE,        {"Green",             "Green"}},
+   {KEY_INSERT,        {"Yellow",            "Yellow"}},
+   {KEY_END,           {"Blue",              "Blue"}},
+   {KEY_PAGEUP,        {"Channel+",          "Channel+"}},
+   {KEY_PAGEDOWN,      {"Channel-",          "Channel-"}},
+   {KEY_F2,            {"Help/Cog",          "Help/Cog"}},
+   {KEY_F5,            {"Apps",              "Apps"}},
+   {KEY_F10,           {"Rewind",            "Rewind"}},
+   {KEY_F11,           {"Play",              "Play"}},
+   {KEY_F12,           {"FFwd",              "FFwd"}},
+   {KEY_F7,            {"Record",            "Record"}},
+   {KEY_F3,            {"Search",            "Search"}},
+   {KEY_F6,            {"Sky",               "Sky"}},
+   {KEY_F14,           {"Quick Access",      "Quick Access"}},
+   {KEY_KPRIGHTPAREN,  {"App 1",             "App 1"}},
+   {KEY_KPLEFTPAREN,   {"App 2",             "App 2"}},
+   {KEY_KPCOMMA,       {"App 3",             "App 3"}}
+};
+
 
 // Function Implementations
 
@@ -96,6 +147,14 @@ ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t(ctrlm_controller_id_t con
 
 ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t() {
    LOG_INFO("%s: default constructor\n", __FUNCTION__);
+}
+
+const char* ctrlm_obj_controller_ble_t::getKeyName(uint16_t code, bool mask) {
+   if (ctrlm_ble_key_names.end() != ctrlm_ble_key_names.find(code)) {
+      return mask ? get<1>(ctrlm_ble_key_names.at(code)) : get<0>(ctrlm_ble_key_names.at(code));
+   } else {
+      return "Unknown";
+   }
 }
 
 void ctrlm_obj_controller_ble_t::db_create() {

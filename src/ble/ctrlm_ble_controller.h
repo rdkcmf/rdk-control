@@ -104,6 +104,8 @@ public:
    void                          setSwRevision(std::string rev);
    ctrlm_version_t               getSwRevision();
 
+   const char*                   getKeyName(uint16_t code, bool mask);
+
    guchar                        property_write_irdb_entry_id_name_tv(guchar *data, guchar length);
    guchar                        property_write_irdb_entry_id_name_avr(guchar *data, guchar length);
    guchar                        property_read_irdb_entry_id_name_tv(guchar *data, guchar length);
