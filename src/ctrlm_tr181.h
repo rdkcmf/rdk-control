@@ -58,6 +58,7 @@
 #define CTRLM_TR181_VOICE_PARAMS_AUDIO_DUCKING_LEVEL         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.AudioDuckingLevel"
 #define CTRLM_TR181_VOICE_PARAMS_VSDK_CONFIGURATION          "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.VSDKConfiguration"
 #define CTRLM_TR181_VOICE_PARAMS_KEYWORD_SENSITIVITY         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Voice.KeywordSensitivity"
+#define CTRLM_TR181_TELEMETRY_ENABLE                         "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Telemetry.Enable"
 #define CTRLM_TR181_TELEMETRY_REPORT_GLOBAL                  "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.global"
 #define CTRLM_TR181_TELEMETRY_REPORT_RF4CE                   "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.rf4ce"
 #define CTRLM_TR181_TELEMETRY_REPORT_BLE                     "Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ctrlm.telemetry_report.ble"

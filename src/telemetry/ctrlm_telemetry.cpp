@@ -27,10 +27,17 @@ void ctrlm_telemetry_t::destroy_instance() {
 ctrlm_telemetry_t::ctrlm_telemetry_t() {
     char component[] = "ctrlm";
     LOG_INFO("%s: Telemetry 2.0 init\n", __FUNCTION__);
-    t2_init(component);
-    this->reporting_interval = JSON_INT_VALUE_CTRLM_GLOBAL_TELEMETRY_REPORT_INTERVAL;
+
+    this->enabled = false;
+    ctrlm_tr181_bool_get(CTRLM_TR181_TELEMETRY_ENABLE, &this->enabled);
+
+    LOG_INFO("%s: Telemetry is %s\n", __FUNCTION__, this->enabled ? "enabled" : "disabled");
+    if(this->enabled) {
+        t2_init(component);
+    }
 
     // Launch report timeout
+    this->reporting_interval = JSON_INT_VALUE_CTRLM_GLOBAL_TELEMETRY_REPORT_INTERVAL;
     this->timeout_id = 0;
     this->set_duration(this->reporting_interval);
     this->event_reported[ctrlm_telemetry_report_t::GLOBAL] = false;
@@ -45,7 +52,7 @@ ctrlm_telemetry_t::~ctrlm_telemetry_t() {
 }
 
 void ctrlm_telemetry_t::set_duration(unsigned int duration) {
-    if(duration != this->reporting_interval || this->timeout_id == 0) {
+    if((duration != this->reporting_interval || this->timeout_id == 0) && this->enabled) {
         this->reporting_interval = duration;
         ctrlm_timeout_destroy(&this->timeout_id);
         this->timeout_id = ctrlm_timeout_create(this->reporting_interval, ctrlm_telemetry_t::report_timeout, (void *)NULL);

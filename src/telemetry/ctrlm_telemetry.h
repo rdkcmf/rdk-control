@@ -68,7 +68,7 @@ public:
      */
     template <typename T>
     bool event(ctrlm_telemetry_report_t report, ctrlm_telemetry_event_t<T> &event) {
-        bool ret = event.event();
+        bool ret = (this->enabled ? event.event() : this->enabled);
         if(ret) {
             this->event_reported[report] = true;
         }
@@ -117,6 +117,7 @@ protected:
 
 
 private:
+    bool          enabled;
     unsigned int  timeout_id;
     unsigned int  reporting_interval;
     std::map<ctrlm_telemetry_report_t,bool> event_reported;
