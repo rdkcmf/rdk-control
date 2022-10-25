@@ -1701,8 +1701,9 @@ void ctrlm_obj_network_rf4ce_t::req_process_rib_get(void *data, int size) {
    if(!controller_exists(controller_id)) {
       LOG_WARN("%s: Controller %u NOT present.\n", __FUNCTION__, controller_id);
       *dqm->cmd_result = CTRLM_RIB_REQUEST_ERROR;
+   } else {
+      controllers_[controller_id]->rf4ce_rib_get_target((ctrlm_rf4ce_rib_attr_id_t)dqm->attribute_id, dqm->attribute_index, dqm->length, dqm->length_out, dqm->data);
    }
-   controllers_[controller_id]->rf4ce_rib_get_target((ctrlm_rf4ce_rib_attr_id_t)dqm->attribute_id, dqm->attribute_index, dqm->length, dqm->length_out, dqm->data);
 
    ctrlm_obj_network_t::req_process_rib_get(data, size);
 }
