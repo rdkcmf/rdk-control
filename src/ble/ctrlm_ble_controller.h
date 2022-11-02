@@ -146,6 +146,7 @@ public:
 
    void                          setUpgradePaused(bool paused);
    bool                          getUpgradePaused();
+   bool                          getUpgradePauseSupported(void);
 
    void                          update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost);
    void                          property_write_voice_metrics(void);

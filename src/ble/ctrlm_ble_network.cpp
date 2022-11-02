@@ -1765,12 +1765,12 @@ void ctrlm_obj_network_ble_t::ind_process_keypress(void *data, int size) {
       params.ieee_address = dqm->ieee_address;
       if (key_status == CTRLM_KEY_STATUS_DOWN) {
          if (controller->getUpgradeInProgress()) {
-            if (hal_api_fw_upgrade_cancel_) {
+            if (controller->getUpgradePauseSupported() && hal_api_fw_upgrade_cancel_) {
                if (CTRLM_HAL_RESULT_SUCCESS == hal_api_fw_upgrade_cancel_(params)) {
                   controller->setUpgradePaused(true);
                }
             } else {
-               LOG_FATAL("%s: hal_api_fw_upgrade_cancel_ is NULL!\n", __PRETTY_FUNCTION__);
+               LOG_WARN("%s: Remote upgrade in progress, but cannot pause the upgrade because its not supported in this remote firmware.\n", __PRETTY_FUNCTION__);
             }
          }
          if (controller->getUpgradePaused()) {

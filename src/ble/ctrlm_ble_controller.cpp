@@ -544,6 +544,13 @@ bool ctrlm_obj_controller_ble_t::getUpgradeInProgress(void) {
    return upgrade_in_progress_;
 }
 
+bool ctrlm_obj_controller_ble_t::getUpgradePauseSupported(void) {
+   if ( (controller_type_ == BLE_CONTROLLER_TYPE_LC103) && (sw_revision_.compare(ctrlm_version_t(string("5103.2.4"))) < 0) ) {
+         return false;
+   }
+   return true;
+}
+
 void ctrlm_obj_controller_ble_t::setUpgradePaused(bool paused) {
    upgrade_paused_ = paused;
 }
