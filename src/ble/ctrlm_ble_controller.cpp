@@ -52,6 +52,9 @@ using namespace std;
 #define BROADCAST_PRODUCT_NAME_EC302                     ("SkyQ EC302")
 #define XCONF_PRODUCT_NAME_EC302                         ("EC302-10")
 
+#define BROADCAST_PRODUCT_NAME_XR103                     ("SkyQ XR103")
+#define XCONF_PRODUCT_NAME_XR103                         ("XR103-10")
+
 // map to convert a key code to its identifiable name on the remote.
 // map<key code, tuple<name, masked_name>>
 static const map<uint16_t, tuple<const char*, const char*>> ctrlm_ble_key_names {
@@ -120,6 +123,7 @@ ctrlm_obj_controller_ble_t::ctrlm_obj_controller_ble_t(ctrlm_controller_id_t con
    upgrade_in_progress_(false),
    upgrade_attempted_(false),
    upgrade_paused_(false),
+   upgrade_stuck_(false),
    stored_in_db_(false),
    connected_(false),
    validation_result_(validation_result),
@@ -275,6 +279,8 @@ void ctrlm_obj_controller_ble_t::setControllerType(std::string productName) {
    } else if (productName.find(BROADCAST_PRODUCT_NAME_LC203) != std::string::npos) {
       // LC203 for all controlMgr purposes is the same as LC103, it even loads the same f/w
       controller_type_ = BLE_CONTROLLER_TYPE_LC103;
+   } else if (productName.find(BROADCAST_PRODUCT_NAME_XR103) != std::string::npos) {
+      controller_type_ = BLE_CONTROLLER_TYPE_XR103;
    } else {
       controller_type_ = BLE_CONTROLLER_TYPE_UNKNOWN;
    }
@@ -294,6 +300,9 @@ bool ctrlm_obj_controller_ble_t::getOTAProductName(string &name) {
          break;
       case BLE_CONTROLLER_TYPE_EC302:
          name = XCONF_PRODUCT_NAME_EC302;
+         break;
+      case BLE_CONTROLLER_TYPE_XR103:
+         name = XCONF_PRODUCT_NAME_XR103;
          break;
       case BLE_CONTROLLER_TYPE_IR:
          return false;
@@ -546,9 +555,21 @@ bool ctrlm_obj_controller_ble_t::getUpgradeInProgress(void) {
    return upgrade_in_progress_;
 }
 
+bool ctrlm_obj_controller_ble_t::needsBLEConnParamUpdateBeforeOTA(ctrlm_hal_ble_connection_params_t &connParams) {
+   if ( (controller_type_ == BLE_CONTROLLER_TYPE_LC103) && (sw_revision_.compare(ctrlm_version_t(string("5103.3.2"))) < 0) ) {
+      connParams.minInterval = 7.5;
+      connParams.maxInterval = 7.5;
+      connParams.latency = 0;
+      connParams.supvTimeout = 15000;
+      LOG_WARN("%s: Controller <%s> is running a software version that requires a BLE connection parameter update before an OTA.\n", __FUNCTION__, ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+      return true;
+   }
+   return false;
+}
+
 bool ctrlm_obj_controller_ble_t::getUpgradePauseSupported(void) {
    if ( (controller_type_ == BLE_CONTROLLER_TYPE_LC103) && (sw_revision_.compare(ctrlm_version_t(string("5103.2.4"))) < 0) ) {
-         return false;
+      return false;
    }
    return true;
 }
@@ -561,6 +582,19 @@ bool ctrlm_obj_controller_ble_t::getUpgradePaused() {
    return upgrade_paused_;
 }
 
+void ctrlm_obj_controller_ble_t::setUpgradeError(std::string error_str) {
+   if ( (controller_type_ == BLE_CONTROLLER_TYPE_LC103) && (sw_revision_.compare(ctrlm_version_t(string("5103.2.4"))) < 0) ) {
+      if (error_str.find("Timeout was reached") != std::string::npos) {
+         LOG_WARN("%s: Controller %u received timeout error from OTA attempt, it may be in stuck state.\n", __FUNCTION__, controller_id_get());
+         upgrade_stuck_ = true;
+      }
+   }
+}
+
+bool ctrlm_obj_controller_ble_t::getUpgradeStuck() {
+   return upgrade_stuck_;
+}
+
 void ctrlm_obj_controller_ble_t::ota_failure_cnt_incr() {
    ctrlm_obj_controller_t::ota_failure_cnt_incr();
    ctrlm_db_ble_write_ota_failure_cnt_last_success(network_id_get(), controller_id_get(), ota_failure_cnt_from_last_success_);
@@ -569,8 +603,14 @@ void ctrlm_obj_controller_ble_t::ota_failure_cnt_incr() {
 
 void ctrlm_obj_controller_ble_t::ota_clear_all_failure_counters() {
    ctrlm_obj_controller_t::ota_clear_all_failure_counters();
+   upgrade_stuck_ = false;
    ctrlm_db_ble_write_ota_failure_cnt_last_success(network_id_get(), controller_id_get(), ota_failure_cnt_from_last_success_);
    LOG_DEBUG("%s: Controller %s <%s> OTA failure count since last successful upgrade reset to 0.\n", __FUNCTION__, ctrlm_ble_controller_type_str(controller_type_), ctrlm_convert_mac_long_to_string(ieee_address_).c_str());
+}
+
+void ctrlm_obj_controller_ble_t::ota_failure_cnt_session_clear() {
+   ctrlm_obj_controller_t::ota_failure_cnt_session_clear();
+   upgrade_stuck_ = false;
 }
 
 void ctrlm_obj_controller_ble_t::ota_failure_type_z_cnt_set(uint8_t ota_failures) {

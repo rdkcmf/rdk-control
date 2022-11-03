@@ -79,6 +79,7 @@ const char *ctrlm_ble_controller_type_str(ctrlm_ble_controller_type_t controller
         case BLE_CONTROLLER_TYPE_PR1:     return("BLE_CONTROLLER_PR1");
         case BLE_CONTROLLER_TYPE_LC103:   return("BLE_CONTROLLER_LC103");
         case BLE_CONTROLLER_TYPE_EC302:   return("BLE_CONTROLLER_EC302");
+        case BLE_CONTROLLER_TYPE_XR103:   return("BLE_CONTROLLER_XR103");
         case BLE_CONTROLLER_TYPE_UNKNOWN: return("BLE_CONTROLLER_UNKNOWN");
         case BLE_CONTROLLER_TYPE_INVALID: return("BLE_CONTROLLER_INVALID");
         default:                                return("INVALID__TYPE");

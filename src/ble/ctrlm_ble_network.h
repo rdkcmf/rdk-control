@@ -186,6 +186,7 @@ private:
    ctrlm_hal_ble_req_IRSetCode_t                hal_api_set_ir_codes_;
    ctrlm_hal_ble_req_IRClear_t                  hal_api_clear_ir_codes_;
    ctrlm_hal_ble_req_FindMe_t                   hal_api_find_me_;
+   ctrlm_hal_ble_req_SetBLEConnParams_t         hal_api_set_ble_conn_params_;
    ctrlm_hal_ble_req_GetDaemonLogLevels_t       hal_api_get_daemon_log_levels_;
    ctrlm_hal_ble_req_SetDaemonLogLevels_t       hal_api_set_daemon_log_levels_;
    ctrlm_hal_ble_req_FwUpgrade_t                hal_api_fw_upgrade_;

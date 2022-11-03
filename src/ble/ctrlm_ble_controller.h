@@ -44,6 +44,7 @@ typedef enum {
    BLE_CONTROLLER_TYPE_PR1,
    BLE_CONTROLLER_TYPE_LC103,
    BLE_CONTROLLER_TYPE_EC302,
+   BLE_CONTROLLER_TYPE_XR103,
    BLE_CONTROLLER_TYPE_IR,    // add new remote types before this
    BLE_CONTROLLER_TYPE_UNKNOWN,
    BLE_CONTROLLER_TYPE_INVALID
@@ -120,6 +121,8 @@ public:
 
    virtual void                  ota_failure_cnt_incr();
    virtual void                  ota_clear_all_failure_counters();
+   virtual void                  ota_failure_cnt_session_clear();
+
    virtual void                  ota_failure_type_z_cnt_set(uint8_t ota_failures);
    virtual uint8_t               ota_failure_type_z_cnt_get(void) const;
    virtual bool                  is_controller_type_z(void) const;
@@ -147,6 +150,9 @@ public:
    void                          setUpgradePaused(bool paused);
    bool                          getUpgradePaused();
    bool                          getUpgradePauseSupported(void);
+   void                          setUpgradeError(std::string error_str);
+   bool                          getUpgradeStuck();
+   bool                          needsBLEConnParamUpdateBeforeOTA(ctrlm_hal_ble_connection_params_t &connParams);
 
    void                          update_voice_metrics(bool is_short_utterance, guint32 voice_packets_sent, guint32 voice_packets_lost);
    void                          property_write_voice_metrics(void);
@@ -172,6 +178,7 @@ private:
    bool                             upgrade_in_progress_;
    bool                             upgrade_attempted_;
    bool                             upgrade_paused_;
+   bool                             upgrade_stuck_;
 
    int                              ir_code_;
 

@@ -128,7 +128,7 @@ public:
 
    virtual void          ota_failure_cnt_incr();
    virtual void          ota_clear_all_failure_counters();
-   void                  ota_failure_cnt_session_clear();
+   virtual void          ota_failure_cnt_session_clear();
    bool                  retry_ota() const;
 
    virtual void          ota_failure_type_z_cnt_set(uint8_t ota_failures);

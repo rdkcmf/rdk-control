@@ -128,6 +128,8 @@ static void ctrlm_hal_ble_FwUpgrade_ResultCB(GDBusProxy *proxy, GAsyncResult *re
 static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgrade(ctrlm_hal_ble_FwUpgrade_params_t params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_FwUpgradeCancel(ctrlm_hal_ble_FwUpgradeCancel_params_t params);
 
+static ctrlm_hal_result_t ctrlm_hal_ble_req_SetBLEConnParams(ctrlm_hal_ble_SetBLEConnParams_params_t params);
+
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuUnpairReason(ctrlm_hal_ble_GetRcuUnpairReason_params_t *params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuRebootReason(ctrlm_hal_ble_GetRcuRebootReason_params_t *params);
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetRcuLastWakeupKey(ctrlm_hal_ble_GetRcuLastWakeupKey_params_t *params);
@@ -464,6 +466,7 @@ void *ctrlm_hal_ble_main(ctrlm_hal_ble_main_init_t *main_init_)
         params.set_ir_codes = ctrlm_hal_ble_req_IRSetCode;
         params.clear_ir_codes = ctrlm_hal_ble_req_IRClear;
         params.find_me = ctrlm_hal_ble_req_FindMe;
+        params.set_ble_conn_params = ctrlm_hal_ble_req_SetBLEConnParams;
         params.get_daemon_log_levels = ctrlm_hal_ble_req_GetDaemonLogLevel;
         params.set_daemon_log_levels = ctrlm_hal_ble_req_SetDaemonLogLevel;
         params.fw_upgrade = ctrlm_hal_ble_req_FwUpgrade;
@@ -988,6 +991,24 @@ static ctrlm_hal_result_t ctrlm_hal_ble_req_FindMe(ctrlm_hal_ble_FindMe_params_t
     return ret;
 }
 
+static ctrlm_hal_result_t ctrlm_hal_ble_req_SetBLEConnParams(ctrlm_hal_ble_SetBLEConnParams_params_t params)
+{
+    LOG_INFO("%s: Enter...\n", __FUNCTION__);
+    ctrlm_hal_result_t ret = CTRLM_HAL_RESULT_SUCCESS;
+    GVariant  *reply = NULL;
+
+    ret = ctrlm_hal_ble_dbusSendMethodCall (g_ctrlm_hal_ble->getDbusDeviceIfceProxy(params.ieee_address),
+                                            "SetConnectionParams",
+                                            g_variant_new ("(ddii)",
+                                                            (gdouble)params.connParams.minInterval,
+                                                            (gdouble)params.connParams.maxInterval,
+                                                            (gint32)params.connParams.latency,
+                                                            (gint32)params.connParams.supvTimeout),
+                                            &reply);
+    if (NULL != reply) { g_variant_unref(reply); }
+    return ret;
+}
+
 static ctrlm_hal_result_t ctrlm_hal_ble_req_GetDaemonLogLevel(daemon_logging_t *logging)
 {
     LOG_INFO("%s: Enter...\n", __FUNCTION__);
@@ -1507,7 +1528,7 @@ static void ctrlm_hal_ble_ParseVariantToRcuProperty(std::string prop, GVariant *
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_BATTERY_LEVEL;
     } else if (0 == prop.compare("Connected")) {
         g_variant_get (value, "b", &bool_variant);
-        LOG_DEBUG("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), bool_variant ? "TRUE":"FALSE");
+        LOG_INFO("%s: Item '%s' = <%s>\n", __FUNCTION__, prop.c_str(), bool_variant ? "TRUE":"FALSE");
         rcu_status.rcu_data.connected = bool_variant;
         rcu_status.property_updated = CTRLM_HAL_BLE_PROPERTY_CONNECTED;
     } else if (0 == prop.compare("AudioGainLevel")) {

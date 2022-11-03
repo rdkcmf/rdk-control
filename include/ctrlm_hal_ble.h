@@ -208,6 +208,18 @@ typedef struct {
 } ctrlm_hal_ble_FindMe_params_t;
 
 typedef struct {
+   double   minInterval;
+   double   maxInterval;
+   int      latency;
+   int      supvTimeout;
+} ctrlm_hal_ble_connection_params_t;
+
+typedef struct {
+   unsigned long long                ieee_address;
+   ctrlm_hal_ble_connection_params_t connParams;
+} ctrlm_hal_ble_SetBLEConnParams_params_t;
+
+typedef struct {
    unsigned long long   ieee_address;
    std::string          file_path;
 } ctrlm_hal_ble_FwUpgrade_params_t;
@@ -322,9 +334,15 @@ typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_IRSetCode_t)(ctrlm_hal_ble_IRSetC
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_IRClear_t)(ctrlm_hal_ble_IRClear_params_t params);
 
 /// @brief Trigger FindMe alarm on the remote
+/// @param[in] ieee_address - MAC address of the controller
 /// @param[in] level - (0): Disable the find me signal. (1): Signal the find me beeping at the 'mid' level. (2): Signal the find me beeping at the 'high' level
 /// @param[in] duration - currently ignored
 typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_FindMe_t)(ctrlm_hal_ble_FindMe_params_t params);
+
+/// @brief Set BLE Connection Parameters for a specific device
+/// @param[in] ieee_address - MAC address of the controller
+/// @param[in] connParams - BLE connection parameters (min/max connection interval, slave latency, supervision timeout)
+typedef ctrlm_hal_result_t (*ctrlm_hal_ble_req_SetBLEConnParams_t)(ctrlm_hal_ble_SetBLEConnParams_params_t params);
 
 /// @brief Get the log level bitmask of the BLE daemon
 /// @param[out] log_levels - 0x020 Debug, 0x010 Info, 0x008 Milestone, 0x004 Warning, 0x002 Error, 0x001 Fatal
@@ -395,6 +413,7 @@ typedef struct {
    ctrlm_hal_ble_req_IRSetCode_t                set_ir_codes;
    ctrlm_hal_ble_req_IRClear_t                  clear_ir_codes;
    ctrlm_hal_ble_req_FindMe_t                   find_me;
+   ctrlm_hal_ble_req_SetBLEConnParams_t         set_ble_conn_params;
    ctrlm_hal_ble_req_GetDaemonLogLevels_t       get_daemon_log_levels;
    ctrlm_hal_ble_req_SetDaemonLogLevels_t       set_daemon_log_levels;
    ctrlm_hal_ble_req_FwUpgrade_t                fw_upgrade;

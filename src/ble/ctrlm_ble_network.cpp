@@ -267,6 +267,7 @@ void ctrlm_obj_network_ble_t::hal_init_confirm(ctrlm_hal_ble_cfm_init_params_t p
    hal_api_set_ir_codes_               = params.set_ir_codes;
    hal_api_clear_ir_codes_             = params.clear_ir_codes;
    hal_api_find_me_                    = params.find_me;
+   hal_api_set_ble_conn_params_        = params.set_ble_conn_params;
    hal_api_get_daemon_log_levels_      = params.get_daemon_log_levels;
    hal_api_set_daemon_log_levels_      = params.set_daemon_log_levels;
    hal_api_fw_upgrade_                 = params.fw_upgrade;
@@ -1221,6 +1222,19 @@ void ctrlm_obj_network_ble_t::req_process_upgrade_controllers(void *data, int si
             if (true == controller.second->getOTAProductName(ota_product_name)) {
                if (ota_product_name == upgrade_image.first) {
                   if (controller.second->swUpgradeRequired(upgrade_image.second.version_software, upgrade_image.second.force_update)) {
+                     //--------------------------------------------------------------------------------------------------------------
+                     // See if the controller is running a fw version that requires a BLE connection param update before an OTA
+                     ctrlm_hal_ble_SetBLEConnParams_params_t conn_params;
+                     if (controller.second->needsBLEConnParamUpdateBeforeOTA(conn_params.connParams) && hal_api_set_ble_conn_params_) {
+                        conn_params.ieee_address = controller.second->getMacAddress();
+                        if (CTRLM_HAL_RESULT_SUCCESS == hal_api_set_ble_conn_params_(conn_params)) {
+                           LOG_INFO("%s: Successfully set BLE connection parameters\n", __PRETTY_FUNCTION__);
+                        } else {
+                           LOG_ERROR("%s: Failed to set BLE connection parameters\n", __PRETTY_FUNCTION__);
+                        }
+                     }
+                     //--------------------------------------------------------------------------------------------------------------
+
                      ctrlm_version_t new_version = upgrade_image.second.version_software;
                      LOG_INFO("%s: Attempting to upgrade controller %s from <%s> to <%s>\n", __PRETTY_FUNCTION__,
                            ctrlm_convert_mac_long_to_string(controller.second->getMacAddress()).c_str(),
@@ -1482,6 +1496,7 @@ void ctrlm_obj_network_ble_t::ind_process_rcu_status(void *data, int size) {
                      ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_controllers_timer_tag);
                      g_ctrlm_ble_network.upgrade_controllers_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_CONTINUE_TIMEOUT, ctrlm_ble_upgrade_controllers, &id_);
                   } else {
+                     controller->setUpgradeError(string(dqm->rcu_data.upgrade_error));
                      LOG_ERROR("%s: Controller <%s> OTA upgrade keeps failing and reached maximum retries.  Won't try again until a new request is sent.\n", __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->rcu_data.ieee_address).c_str());
                   }
                   controller->ota_failure_cnt_incr();
@@ -1629,18 +1644,19 @@ ctrlm_controller_id_t ctrlm_obj_network_ble_t::controller_add(ctrlm_hal_ble_rcu_
       auto controller = controllers_[id];
       controller->setMacAddress(rcu_data.ieee_address);
       controller->setName(string(rcu_data.name));
-      controller->setSerialNumber(string(rcu_data.serial_number));
-      controller->setManufacturer(string(rcu_data.manufacturer));
-      controller->setModel(string(rcu_data.model));
-      controller->setFwRevision(string(rcu_data.fw_revision));
-      controller->setHwRevision(string(rcu_data.hw_revision));
-      controller->setSwRevision(string(rcu_data.sw_revision));
-      controller->setAudioGainLevel(rcu_data.audio_gain_level);
       controller->setAudioCodecs(rcu_data.audio_codecs);
-      controller->setBatteryPercent(rcu_data.battery_level);
       controller->setConnected(rcu_data.connected);
-      controller->setWakeupConfig(rcu_data.wakeup_config);
-      controller->setWakeupCustomList(rcu_data.wakeup_custom_list, rcu_data.wakeup_custom_list_size);
+      // only update these parameters if they are not empty or invalid.
+      if (rcu_data.serial_number[0] != '\0') { controller->setSerialNumber(string(rcu_data.serial_number)); }
+      if (rcu_data.manufacturer[0] != '\0') { controller->setManufacturer(string(rcu_data.manufacturer)); }
+      if (rcu_data.model[0] != '\0') { controller->setModel(string(rcu_data.model)); }
+      if (rcu_data.fw_revision[0] != '\0') { controller->setFwRevision(string(rcu_data.fw_revision)); }
+      if (rcu_data.hw_revision[0] != '\0') { controller->setHwRevision(string(rcu_data.hw_revision)); }
+      if (rcu_data.sw_revision[0] != '\0') { controller->setSwRevision(string(rcu_data.sw_revision)); }
+      if (rcu_data.audio_gain_level != 0xFF) { controller->setAudioGainLevel(rcu_data.audio_gain_level); }
+      if (rcu_data.battery_level != 0xFF) { controller->setBatteryPercent(rcu_data.battery_level); }
+      if (rcu_data.wakeup_config != 0xFF) { controller->setWakeupConfig(rcu_data.wakeup_config); }
+      if (rcu_data.wakeup_custom_list_size != 0) { controller->setWakeupCustomList(rcu_data.wakeup_custom_list, rcu_data.wakeup_custom_list_size); }
       controller->db_store();
    }
    return id;
@@ -1778,10 +1794,16 @@ void ctrlm_obj_network_ble_t::ind_process_keypress(void *data, int size) {
             //delete existing timer and start again
             ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
             g_ctrlm_ble_network.upgrade_pause_timer_tag = ctrlm_timeout_create(CTRLM_BLE_UPGRADE_PAUSE_TIMEOUT, ctrlm_ble_upgrade_resume, &id_);
+         } else if (controller->getUpgradeStuck() && !upgrade_in_progress_) {
+            LOG_INFO("%s: Remote <%s> could be in an upgrade stuck state.  Triggering another attempt now while the remote is being used, which can resolve the stuck state.\n", 
+                  __PRETTY_FUNCTION__, ctrlm_convert_mac_long_to_string(dqm->ieee_address).c_str());
+            //delete existing timer and immediately kick off another upgrade
+            ctrlm_timeout_destroy(&g_ctrlm_ble_network.upgrade_pause_timer_tag);
+            g_ctrlm_ble_network.upgrade_pause_timer_tag = ctrlm_timeout_create(500, ctrlm_ble_upgrade_resume, &id_);
          }
       }
 
-      controllers_[controller_id]->process_event_key(key_status, dqm->event.code);
+      controller->process_event_key(key_status, dqm->event.code);
    } else {
       LOG_WARN("%s: Controller (0x%llX) doesn't exist in the network, doing nothing...\n", __PRETTY_FUNCTION__, dqm->ieee_address);
    }
