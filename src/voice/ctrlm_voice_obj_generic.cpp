@@ -178,6 +178,8 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 }
             }
         }
+        // Default to requiring stb data for all routes
+        this->device_requires_stb_data[src_device] = true;
         sem_post(&this->device_status_semaphore);
 
         if(url == NULL) {
@@ -300,6 +302,8 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
 
                 // Set low latency websocket parameters
                 routes[i].dsts[0].params[XRSR_POWER_MODE_FULL] = &this->prefs.dst_params_low_latency;
+                // do not require stb data for aows protocol
+                this->device_requires_stb_data[src_device] = false;
                 i++;
                 LOG_INFO("%s: url translation from %s to %s\n", __FUNCTION__, url->c_str(), urls_translated[translated_index].c_str());
             }

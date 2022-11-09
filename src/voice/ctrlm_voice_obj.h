@@ -568,6 +568,7 @@ public:
     virtual void          voice_sdk_close();
     virtual void          voice_sdk_update_routes() = 0;
     virtual void          mask_pii_updated(bool enable) = 0;
+    virtual bool          voice_session_requires_stb_data(ctrlm_voice_device_t device_type);
     virtual bool          voice_session_has_stb_data();
     unsigned long         voice_session_id_next();
     void                  voice_session_notify_abort(ctrlm_network_id_t network_id, ctrlm_controller_id_t controller_id, unsigned long session_id, ctrlm_voice_session_abort_reason_t reason);
@@ -612,7 +613,8 @@ public:
 
     protected:
     sem_t                                             device_status_semaphore;
-    uint8_t                                           device_status[CTRLM_VOICE_DEVICE_INVALID];
+    uint8_t                                           device_status[CTRLM_VOICE_DEVICE_INVALID + 1];
+    bool                                              device_requires_stb_data[CTRLM_VOICE_DEVICE_INVALID + 1];
     std::vector<ctrlm_voice_endpoint_t *>             endpoints;
     std::vector<std::pair<std::string, std::string> > query_strs_ptt;
 

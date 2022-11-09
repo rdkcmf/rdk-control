@@ -181,14 +181,20 @@ ctrlm_voice_t::ctrlm_voice_t() {
 
     // Device Status initialization
     sem_init(&this->device_status_semaphore, 0, 1);
-    this->device_status[CTRLM_VOICE_DEVICE_PTT] = CTRLM_VOICE_DEVICE_STATUS_NONE;
-    this->device_status[CTRLM_VOICE_DEVICE_FF]  = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_status[CTRLM_VOICE_DEVICE_PTT]            = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_requires_stb_data[CTRLM_VOICE_DEVICE_PTT] = true;
+    this->device_status[CTRLM_VOICE_DEVICE_FF]             = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_requires_stb_data[CTRLM_VOICE_DEVICE_FF]  = true;
 #ifdef CTRLM_LOCAL_MIC
-    this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE] = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE]            = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_requires_stb_data[CTRLM_VOICE_DEVICE_MICROPHONE] = true;
 #endif
 #ifdef CTRLM_LOCAL_MIC_TAP
-    this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE_TAP] = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_status[CTRLM_VOICE_DEVICE_MICROPHONE_TAP]            = CTRLM_VOICE_DEVICE_STATUS_NONE;
+    this->device_requires_stb_data[CTRLM_VOICE_DEVICE_MICROPHONE_TAP] = true;
 #endif
+    this->device_status[CTRLM_VOICE_DEVICE_INVALID]             = CTRLM_VOICE_DEVICE_STATUS_NOT_SUPPORTED;
+    this->device_requires_stb_data[CTRLM_VOICE_DEVICE_INVALID]  = true;
 
     errno_t safec_rc = memset_s(&this->status, sizeof(this->status), 0, sizeof(this->status));
     ERR_CHK(safec_rc);
@@ -1240,7 +1246,7 @@ ctrlm_voice_session_response_status_t ctrlm_voice_t::voice_session_req(ctrlm_net
         return(VOICE_SESSION_RESPONSE_SERVER_NOT_READY);
     } 
 #ifdef AUTH_ENABLED
-    else if(!this->voice_session_has_stb_data()) {
+    else if(this->voice_session_requires_stb_data(device_type) && !this->voice_session_has_stb_data()) {
         LOG_ERROR("%s: Authentication Data missing\n", __FUNCTION__);
         this->voice_session_notify_abort(network_id, controller_id, 0, CTRLM_VOICE_SESSION_ABORT_REASON_NO_RECEIVER_ID);
         return(VOICE_SESSION_RESPONSE_SERVER_NOT_READY);
@@ -2153,6 +2159,10 @@ void ctrlm_voice_t::voice_stb_data_pii_mask_set(bool mask_pii) {
 
 bool ctrlm_voice_t::voice_stb_data_pii_mask_get() const {
    return(this->mask_pii);
+}
+
+bool ctrlm_voice_t::voice_session_requires_stb_data(ctrlm_voice_device_t device_type) {
+   return(this->device_requires_stb_data[device_type]);
 }
 
 bool ctrlm_voice_t::voice_session_has_stb_data() {
