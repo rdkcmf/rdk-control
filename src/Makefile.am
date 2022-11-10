@@ -90,7 +90,6 @@ controlMgr_SOURCES  += voice/ctrlm_voice_obj.cpp                           \
                        voice/ipc/ctrlm_voice_ipc_request_type.c            \
                        voice/endpoints/ctrlm_voice_endpoint.cpp            \
                        voice/endpoints/ctrlm_voice_endpoint_http.cpp       \
-                       voice/endpoints/ctrlm_voice_endpoint_ws.cpp         \
                        voice/endpoints/ctrlm_voice_endpoint_ws_nextgen.cpp \
                        voice/endpoints/ctrlm_voice_endpoint_ws_nsp.cpp
 

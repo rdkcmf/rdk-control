@@ -34,7 +34,6 @@
 #include "json_config.h"
 #include "ctrlm_voice_ipc_iarm_all.h"
 #include "ctrlm_voice_endpoint_http.h"
-#include "ctrlm_voice_endpoint_ws.h"
 #include "ctrlm_voice_endpoint_ws_nextgen.h"
 #include "ctrlm_voice_endpoint_ws_nsp.h"
 
@@ -49,7 +48,6 @@ ctrlm_voice_generic_t::ctrlm_voice_generic_t() : ctrlm_voice_t() {
     ipc->register_ipc();
     this->voice_set_ipc(ipc);
     this->obj_http       = NULL;
-    this->obj_ws         = NULL;
     this->obj_ws_nextgen = NULL;
     this->obj_ws_nsp     = NULL;
     #ifdef SUPPORT_VOICE_DEST_ALSA
@@ -65,18 +63,13 @@ ctrlm_voice_generic_t::~ctrlm_voice_generic_t() {
 void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
     ctrlm_voice_t::voice_sdk_open(json_obj_vsdk);
 
-    this->obj_ws         = new ctrlm_voice_endpoint_ws_t(this);
     this->obj_http       = new ctrlm_voice_endpoint_http_t(this);
     this->obj_ws_nextgen = new ctrlm_voice_endpoint_ws_nextgen_t(this);
     this->obj_ws_nsp     = new ctrlm_voice_endpoint_ws_nsp_t(this);
     #ifdef SUPPORT_VOICE_DEST_ALSA
     this->obj_sdt        = new ctrlm_voice_endpoint_sdt_t(this);
     #endif
-    if(this->obj_ws->open() == false) {
-        LOG_ERROR("%s: Failed to open speech WS\n", __FUNCTION__);
-        xrsr_close();
-        g_assert(0);
-    } else if(this->obj_http->open() == false) {
+    if(this->obj_http->open() == false) {
         LOG_ERROR("%s: Failed to open speech HTTP\n", __FUNCTION__);
         xrsr_close();
         g_assert(0);
@@ -96,7 +89,6 @@ void ctrlm_voice_generic_t::voice_sdk_open(json_t *json_obj_vsdk) {
         g_assert(0);
     }
     #endif
-    this->endpoints.push_back(this->obj_ws);
     this->endpoints.push_back(this->obj_http);
     this->endpoints.push_back(this->obj_ws_nextgen);
     this->endpoints.push_back(this->obj_ws_nsp);
@@ -115,10 +107,6 @@ void ctrlm_voice_generic_t::voice_sdk_close() {
 
     ctrlm_voice_t::voice_sdk_close();
 
-    if(this->obj_ws != NULL) {
-        delete this->obj_ws;
-        this->obj_ws = NULL;
-    }
     if(this->obj_http != NULL) {
         delete this->obj_http;
         this->obj_http = NULL;
@@ -216,29 +204,6 @@ void ctrlm_voice_generic_t::voice_sdk_update_routes() {
                 #else
                 routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM | XRSR_AUDIO_FORMAT_ADPCM;
                 #endif
-                routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
-                routes[i].dsts[0].stream_from     = stream_from;
-                routes[i].dsts[0].stream_offset   = stream_offset;
-                routes[i].dsts[0].stream_until    = stream_until;
-                #ifdef ENABLE_DEEP_SLEEP
-                if(src == XRSR_SRC_MICROPHONE) {
-                    routes[i].dsts[0].params[XRSR_POWER_MODE_LOW] = &this->prefs.dst_params_standby;
-                }
-                #endif
-                i++;
-            }
-        } else if(url->rfind("ws", 0) == 0) {
-            xrsr_handlers_t    handlers_xrsr = {0};
-
-            if(!this->obj_ws->get_handlers(&handlers_xrsr)) {
-                LOG_ERROR("%s: failed to get handlers ws\n", __FUNCTION__);
-            } else {
-
-                routes[i].src                     = src;
-                routes[i].dst_qty                 = 1;
-                routes[i].dsts[0].url             = url->c_str();
-                routes[i].dsts[0].handlers        = handlers_xrsr;
-                routes[i].dsts[0].formats         = XRSR_AUDIO_FORMAT_PCM;
                 routes[i].dsts[0].stream_time_min = this->prefs.utterance_duration_min;
                 routes[i].dsts[0].stream_from     = stream_from;
                 routes[i].dsts[0].stream_offset   = stream_offset;
@@ -372,9 +337,6 @@ void ctrlm_voice_generic_t::query_strings_updated() {
 void ctrlm_voice_generic_t::mask_pii_updated(bool enable) {
     if(this->obj_http) {
         this->obj_http->voice_stb_data_mask_pii_set(enable);
-    }
-    if(this->obj_ws) {
-        this->obj_ws->voice_stb_data_mask_pii_set(enable);
     }
     if(this->obj_ws_nextgen) {
         this->obj_ws_nextgen->voice_stb_data_mask_pii_set(enable);
