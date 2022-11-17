@@ -47,6 +47,7 @@ using namespace std;
 
 #define BROADCAST_PRODUCT_NAME_LC103                     ("SkyQ LC103")
 #define BROADCAST_PRODUCT_NAME_LC203                     ("SkyQ LC203")
+#define BROADCAST_PRODUCT_NAME_LC102                     ("SkyQ LC102")
 #define XCONF_PRODUCT_NAME_LC103                         ("LC103-10")
 
 #define BROADCAST_PRODUCT_NAME_EC302                     ("SkyQ EC302")
@@ -278,6 +279,9 @@ void ctrlm_obj_controller_ble_t::setControllerType(std::string productName) {
       controller_type_ = BLE_CONTROLLER_TYPE_LC103;
    } else if (productName.find(BROADCAST_PRODUCT_NAME_LC203) != std::string::npos) {
       // LC203 for all controlMgr purposes is the same as LC103, it even loads the same f/w
+      controller_type_ = BLE_CONTROLLER_TYPE_LC103;
+   } else if (productName.find(BROADCAST_PRODUCT_NAME_LC102) != std::string::npos) {
+      // LC102 for all controlMgr purposes is the same as LC103, it even loads the same f/w
       controller_type_ = BLE_CONTROLLER_TYPE_LC103;
    } else if (productName.find(BROADCAST_PRODUCT_NAME_XR103) != std::string::npos) {
       controller_type_ = BLE_CONTROLLER_TYPE_XR103;
