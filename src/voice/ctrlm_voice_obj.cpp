@@ -1536,7 +1536,7 @@ void ctrlm_voice_t::voice_session_data_post_processing(int bytes_sent, const cha
     if(session_delta > 0 && watermark > voice_buffer_high_watermark) {
         voice_buffer_high_watermark = watermark;
     }
-    if(session_delta > (VOICE_BUFFER_WARNING_THRESHOLD * this->voice_packet_interval)) {
+    if(session_delta > (long long)(VOICE_BUFFER_WARNING_THRESHOLD * this->voice_packet_interval)) {
         voice_buffer_warning_triggered = 1;
     }
     #endif
