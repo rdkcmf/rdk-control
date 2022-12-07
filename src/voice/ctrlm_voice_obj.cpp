@@ -3606,6 +3606,7 @@ xrsr_power_mode_t voice_xrsr_power_map(ctrlm_power_state_t ctrlm_power_state) {
 
 void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
     bool enabled = true;
+    bool reroute = false;
 
     attr.get_rfc_value(JSON_INT_NAME_VOICE_VREX_REQUEST_TIMEOUT,         this->prefs.timeout_vrex_connect,0);
     attr.get_rfc_value(JSON_INT_NAME_VOICE_VREX_RESPONSE_TIMEOUT,        this->prefs.timeout_vrex_session,0);
@@ -3618,7 +3619,6 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
     attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_QTY_MAX,       this->prefs.utterance_file_qty_max, 1, 100000);
     attr.get_rfc_value(JSON_INT_NAME_VOICE_UTTERANCE_FILE_SIZE_MAX,      this->prefs.utterance_file_size_max, 4 * 1024);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_UTTERANCE_PATH,               this->prefs.utterance_path);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_MINIMUM_DURATION,             this->prefs.utterance_duration_min);
     attr.get_rfc_value(JSON_INT_NAME_VOICE_FFV_LEADING_SAMPLES,          this->prefs.ffv_leading_samples, 0);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_APP_ID_HTTP,                  this->prefs.app_id_http);
     attr.get_rfc_value(JSON_STR_NAME_VOICE_APP_ID_WS,                    this->prefs.app_id_ws);
@@ -3640,21 +3640,24 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
         this->set_audio_mode(&audio_settings);
     }
 
+    // All attributes that need a re-route to apply
+    if(attr.get_rfc_value(JSON_INT_NAME_VOICE_MINIMUM_DURATION,                              this->prefs.utterance_duration_min) |
     #ifdef ENABLE_DEEP_SLEEP
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_standby.connect_check_interval);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_CONNECT,        this->prefs.dst_params_standby.timeout_connect);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_standby.timeout_inactivity);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_SESSION,        this->prefs.dst_params_standby.timeout_session);
-    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_DST_PARAMS_STANDBY_IPV4_FALLBACK,         this->prefs.dst_params_standby.ipv4_fallback);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_BACKOFF_DELAY,          this->prefs.dst_params_standby.backoff_delay);
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_CONNECT_CHECK_INTERVAL,     this->prefs.dst_params_standby.connect_check_interval) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_CONNECT,            this->prefs.dst_params_standby.timeout_connect) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_INACTIVITY,         this->prefs.dst_params_standby.timeout_inactivity) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_TIMEOUT_SESSION,            this->prefs.dst_params_standby.timeout_session) |
+       attr.get_rfc_value(JSON_BOOL_NAME_VOICE_DST_PARAMS_STANDBY_IPV4_FALLBACK,             this->prefs.dst_params_standby.ipv4_fallback) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_STANDBY_BACKOFF_DELAY,              this->prefs.dst_params_standby.backoff_delay) |
     #endif
-
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_low_latency.connect_check_interval);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_CONNECT,        this->prefs.dst_params_low_latency.timeout_connect);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_low_latency.timeout_inactivity);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_SESSION,        this->prefs.dst_params_low_latency.timeout_session);
-    attr.get_rfc_value(JSON_BOOL_NAME_VOICE_DST_PARAMS_LOW_LATENCY_IPV4_FALLBACK,         this->prefs.dst_params_low_latency.ipv4_fallback);
-    attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_BACKOFF_DELAY,          this->prefs.dst_params_low_latency.backoff_delay);
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_CONNECT_CHECK_INTERVAL, this->prefs.dst_params_low_latency.connect_check_interval) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_CONNECT,        this->prefs.dst_params_low_latency.timeout_connect) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_INACTIVITY,     this->prefs.dst_params_low_latency.timeout_inactivity) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_TIMEOUT_SESSION,        this->prefs.dst_params_low_latency.timeout_session) |
+       attr.get_rfc_value(JSON_BOOL_NAME_VOICE_DST_PARAMS_LOW_LATENCY_IPV4_FALLBACK,         this->prefs.dst_params_low_latency.ipv4_fallback) |
+       attr.get_rfc_value(JSON_INT_NAME_VOICE_DST_PARAMS_LOW_LATENCY_BACKOFF_DELAY,          this->prefs.dst_params_low_latency.backoff_delay)) {
+        reroute = true;
+    }
 
     this->voice_params_opus_encoder_validate();
 
@@ -3672,6 +3675,9 @@ void ctrlm_voice_t::voice_rfc_retrieved_handler(const ctrlm_rfc_attr_t& attr) {
                 this->voice_device_disable((ctrlm_voice_device_t)i, true, NULL);
             }
         }
+        reroute = true;
+    }
+    if(reroute) {
         this->voice_sdk_update_routes();
     }
 }

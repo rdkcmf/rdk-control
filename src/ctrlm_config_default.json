@@ -233,7 +233,7 @@
       "vrex_request_timeout"             :        30,
       "enable_sat"                       :      true,
       "sat_request_timeout"              :         5,
-      "minimum_duration"                 :       100,
+      "minimum_duration"                 :       300,
       "ffv_leading_samples"              :      1600,
       "timeout_packet_initial"           :      3200,
       "timeout_packet_subsequent"        :       250,
